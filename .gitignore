@@ -1,0 +1,46 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Voice server Python venv and cache
+voice-server/.venv
+voice-server/venv/
+voice-server/__pycache__/
+
+# Local backups (keep repo clean; backups stay on your machine)
+*.backup
+*.backup-*
+*-backup
+*-backup.*
+*.pre-enhanced-backup
+*.windows-backup
+
+# AI handoff / generated cruft
+AGENT-*
+handoff*.json
+*-manifest.json
+ATOM-*-FIX.md
+config/brave_key.txt

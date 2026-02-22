@@ -1,0 +1,9 @@
+{
+  "name": "atom-code-terminal",
+  "type": "module",
+  "version": "1.0.0",
+  "dependencies": {
+    "node-pty": "^1.0.0",
+    "ws": "^8.18.0"
+  }
+}

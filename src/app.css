@@ -1,0 +1,1817 @@
+@import 'tailwindcss';
+@import './styles/tokens.css';
+
+/* Tailwind v4: use .dark class on html for theme toggle (not just prefers-color-scheme) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Inter', system-ui, ui-sans-serif, sans-serif;
+  /* Single source of truth: Tailwind spacing uses one multiplier base */
+  --spacing: var(--space-1);
+  /* Global radius kill switch: utilities still work; themes set --ui-radius */
+  --radius-sm: var(--ui-radius);
+  --radius-md: var(--ui-radius);
+  --radius-lg: var(--ui-radius);
+  --radius-xl: var(--ui-radius);
+  --radius-2xl: var(--ui-radius);
+}
+/* Default radius (Cathedral overrides to --radius-none) */
+:root {
+  --ui-radius: var(--radius-md);
+  /* Temporal theme evolution (controller overwrites when data-ui-theme="temporal") */
+  --ui-bg-intensity: 1;
+  --ui-saturation: 1;
+  --ui-depth-multiplier: 1;
+  --ui-blur-strength: 1;
+  --ui-shadow-depth: 1;
+  --ui-panel-separation: 1;
+  --ui-texture-opacity: 0;
+}
+
+/* Base: refined neutral backgrounds, darker dark mode */
+html {
+  @apply antialiased;
+}
+/* Focus rings for keyboard (visible only on focus-visible) */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[role="button"]:focus-visible,
+[role="combobox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ui-bg-main), 0 0 0 4px var(--ui-accent);
+  border-radius: var(--ui-radius);
+}
+body {
+  @apply min-h-screen text-zinc-800 dark:text-zinc-200;
+  background-color: #fafafa;
+}
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Stop state for send button (themes override; neural uses .chat-input-container .chat-send-button) */
+.chat-send-button[data-state="stop"] {
+  background: var(--ui-accent-hot, #dc2626);
+}
+/* Fallback error UI (main.js): token spacing only */
+.error-pre {
+  padding: var(--space-4);
+  color: red;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+}
+.dark body {
+  background-color: #0d0d0d;
+}
+/* Metrics graph axes/grid (light gray in light mode, subtle light in dark) */
+html { --metrics-axis: #d4d4d4; --metrics-grid: #e5e5e5; }
+.dark { --metrics-axis: rgba(255,255,255,0.18); --metrics-grid: rgba(255,255,255,0.08); }
+/* Monospace for metrics */
+.font-mono {
+  font-feature-settings: "tnum";
+}
+
+/* Markdown content in message bubbles */
+.prose-chat h1 { @apply text-xl font-bold mt-4 mb-2; }
+.prose-chat h2 { @apply text-lg font-semibold mt-3 mb-2; }
+.prose-chat h3 { @apply text-base font-semibold mt-2 mb-1; }
+.prose-chat p { @apply my-2; }
+.prose-chat ul { @apply list-disc pl-6 my-2; }
+.prose-chat ol { @apply list-decimal pl-6 my-2; }
+.prose-chat { font-size: 14px; }
+.prose-chat pre { border-radius: 12px; @apply p-3 my-2 overflow-x-auto text-sm; }
+.prose-chat code { border-radius: 12px; @apply px-1.5 py-0.5 text-sm; }
+.prose-chat pre code { @apply p-0 bg-transparent; }
+.prose-chat blockquote { @apply border-l-4 border-zinc-300 dark:border-zinc-600 pl-4 my-2 italic; }
+.prose-chat a { @apply text-blue-600 dark:text-blue-400 underline; }
+
+/* Code block wrapper: header + actions (copy, run, save) */
+.code-block-wrapper {
+  position: relative;
+  margin: 0.5rem 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+}
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0.75rem;
+  background: color-mix(in srgb, var(--ui-bg-sidebar) 80%, transparent);
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 12px 12px 0 0;
+  font-size: 0.75rem;
+}
+.code-block-lang {
+  color: var(--ui-text-secondary);
+  font-family: var(--font-mono);
+  text-transform: lowercase;
+}
+.code-block-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+.code-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+.code-action-btn:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ui-accent) 15%, transparent);
+}
+
+/* Code block content: always dark editor-style background so syntax highlighting is readable in any theme */
+.code-block-wrapper pre {
+  background: #282c34 !important;
+  color: #abb2bf !important;
+  border-radius: 0 0 12px 12px;
+}
+.code-block-wrapper pre code {
+  background: transparent !important;
+  color: inherit !important;
+}
+/* Strong, readable highlight.js token colors on dark background (One Dark–style) */
+.code-block-wrapper .hljs,
+.code-block-wrapper .hljs-subst { color: #abb2bf; }
+.code-block-wrapper .hljs-string,
+.code-block-wrapper .hljs-addition { color: #98c379; }
+.code-block-wrapper .hljs-keyword,
+.code-block-wrapper .hljs-selector-tag,
+.code-block-wrapper .hljs-name { color: #c678dd; }
+.code-block-wrapper .hljs-number { color: #d19a66; }
+.code-block-wrapper .hljs-attr,
+.code-block-wrapper .hljs-attribute,
+.code-block-wrapper .hljs-variable { color: #56b6c2; }
+.code-block-wrapper .hljs-title,
+.code-block-wrapper .hljs-title.function_ { color: #61afef; }
+.code-block-wrapper .hljs-comment,
+.code-block-wrapper .hljs-quote { color: #5c6370; font-style: italic; }
+.code-block-wrapper .hljs-built_in,
+.code-block-wrapper .hljs-class .hljs-title { color: #e6c07b; }
+.code-block-wrapper .hljs-params { color: #abb2bf; }
+.code-block-wrapper .hljs-regexp,
+.code-block-wrapper .hljs-meta { color: #56b6c2; }
+.code-block-wrapper .hljs-doctag,
+.code-block-wrapper .hljs-section { color: #61afef; }
+.code-block-wrapper .hljs-deletion { color: #e06c75; }
+.code-block-wrapper .hljs-symbol,
+.code-block-wrapper .hljs-bullet,
+.code-block-wrapper .hljs-link { color: #56b6c2; }
+.code-block-wrapper .hljs-literal { color: #56b6c2; }
+.code-block-wrapper .hljs-type { color: #e6c07b; }
+.code-block-wrapper .hljs-selector-id,
+.code-block-wrapper .hljs-selector-class { color: #e6c07b; }
+.code-block-wrapper .hljs-selector-attr,
+.code-block-wrapper .hljs-selector-pseudo { color: #e6c07b; }
+.code-block-wrapper .hljs-template-tag,
+.code-block-wrapper .hljs-template-variable { color: #e06c75; }
+.code-block-wrapper .hljs-emphasis { font-style: italic; }
+.code-block-wrapper .hljs-strong { font-weight: bold; }
+
+/* Assistant: thinking (light italics) vs answer (standard) when model uses think tags */
+.assistant-thinking {
+  font-style: italic;
+  opacity: 0.85;
+  color: var(--ui-text-secondary);
+}
+.assistant-answer {
+  font-style: normal;
+}
+
+/* Accent: American flag red with contrasting bright orbit colors */
+:root {
+  --atom-accent: #B22234;
+  --atom-accent-light: #E03c51;
+  --atom-teal: #06b6d4;
+  --atom-amber: #f59e0b;
+}
+.dark {
+  --atom-accent: #DC143C;
+  --atom-accent-light: #E03c51;
+  --atom-teal: #22d3ee;
+  --atom-amber: #fbbf24;
+}
+
+/* Thinking indicator: sleek minimal atom – theme accent, GPU-friendly animation */
+@keyframes atom-nucleus-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+@keyframes atom-orbit-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes atom-orbit-spin-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+.thinking-atom-icon {
+  display: block;
+  /* Nucleus glow uses theme accent so it contrasts with any background */
+  --atom-nucleus-glow: color-mix(in srgb, var(--ui-accent) 70%, transparent);
+  filter: drop-shadow(0 0 6px var(--atom-nucleus-glow)) drop-shadow(0 0 10px var(--atom-nucleus-glow));
+}
+.thinking-atom-nucleus {
+  fill: var(--ui-accent);
+  transform-origin: 16px 16px;
+  animation: atom-nucleus-pulse var(--duration-long) var(--ease-in-out) infinite;
+  filter: drop-shadow(0 0 4px var(--ui-accent));
+}
+.thinking-atom-orbit,
+.thinking-atom-orbit-2,
+.thinking-atom-orbit-3 {
+  transform-origin: 16px 16px;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  fill: none;
+  opacity: 1;
+}
+.thinking-atom-orbit {
+  stroke: #00f0ff;
+  animation: atom-orbit-spin 4s linear infinite;
+}
+.thinking-atom-orbit-2 {
+  stroke: #ff00ff;
+  animation: atom-orbit-spin-reverse 3s linear infinite;
+}
+.thinking-atom-orbit-3 {
+  stroke: #00ff00;
+  animation: atom-orbit-spin 5s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinking-atom-icon .thinking-atom-nucleus,
+  .thinking-atom-icon .thinking-atom-orbit,
+  .thinking-atom-icon .thinking-atom-orbit-2,
+  .thinking-atom-icon .thinking-atom-orbit-3 {
+    animation: none;
+  }
+  .thinking-atom-icon .thinking-atom-nucleus {
+    opacity: 1;
+  }
+}
+
+/* ATOM logo (static, theme-aware – used next to wordmark in header and splash) */
+.atom-logo-icon {
+  display: block;
+}
+.atom-logo-nucleus {
+  fill: var(--atom-accent);
+}
+.atom-logo-orbit-1 {
+  stroke: var(--atom-accent-light);
+}
+.atom-logo-orbit-2 {
+  stroke: var(--atom-teal);
+}
+.atom-logo-orbit-3 {
+  stroke: var(--atom-amber);
+}
+
+/* Max tokens: hide native spinner so only double/half buttons are used */
+.max-tokens-step-input::-webkit-inner-spin-button,
+.max-tokens-step-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.max-tokens-step-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.batch-size-step-input::-webkit-inner-spin-button,
+.batch-size-step-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.batch-size-step-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Panel tabs: open/close side panels — larger, higher contrast, optional label */
+.panel-tab {
+  position: absolute;
+  width: 32px;
+  min-width: 32px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-accent) 8%, var(--ui-bg-sidebar));
+  color: var(--ui-accent);
+  cursor: pointer;
+  transition: background-color var(--duration-normal), color var(--duration-normal), box-shadow var(--duration-normal);
+  z-index: 10;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.panel-tab:hover {
+  background: color-mix(in srgb, var(--ui-accent) 18%, var(--ui-bg-sidebar));
+  color: var(--ui-text-primary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+.panel-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ui-bg-main), 0 0 0 4px var(--ui-accent);
+}
+.panel-tab svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.panel-tab-strip-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  color: var(--ui-accent);
+  opacity: 0.95;
+  line-height: 1.2;
+}
+.panel-tab-strip-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--ui-accent);
+  flex-shrink: 0;
+}
+/* Same height on both strips: icon sits just a small gap above the arrow tab (tab is 64px tall, centered at 50%) */
+.panel-tab-strip-icon-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - 62px);
+  height: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+@keyframes panel-tab-bounce {
+  0% { transform: var(--panel-tab-transform) scale(1); }
+  40% { transform: var(--panel-tab-transform) scale(1.15); }
+  70% { transform: var(--panel-tab-transform) scale(0.97); }
+  100% { transform: var(--panel-tab-transform) scale(1); }
+}
+.panel-tab-bounce {
+  animation: panel-tab-bounce var(--duration-slow) var(--ease-out);
+}
+
+/* Micro-animations (subtle system feedback) */
+@keyframes ui-input-breathe {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(0,0,0,0); }
+  50% { transform: scale(1.008); box-shadow: 0 0 18px rgba(220, 38, 38, 0.08); }
+}
+.ui-input-breathe {
+  animation: ui-input-breathe var(--duration-long) var(--ease-in-out) infinite;
+}
+
+@keyframes ui-odometer-scan {
+  0% { background-position-y: 0; }
+  100% { background-position-y: 6px; }
+}
+.ui-odometer {
+  position: relative;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.ui-odometer-active::after {
+  content: '';
+  position: absolute;
+  inset: -2px -3px;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(220, 38, 38, 0.25) 0,
+    rgba(220, 38, 38, 0.25) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  animation: ui-odometer-scan var(--duration-slower) linear infinite;
+}
+
+@keyframes ui-gpu-pulse {
+  0% { transform: translateX(-120%); opacity: 0.25; }
+  50% { opacity: 0.85; }
+  100% { transform: translateX(220%); opacity: 0.25; }
+}
+/* Sparkline for tokens/sec */
+.ui-sparkline {
+  display: block;
+}
+.ui-sparkline-line {
+  stroke: rgba(148, 163, 184, 0.6);
+  stroke-width: 1.2;
+}
+.ui-sparkline-active {
+  stroke: rgba(220, 38, 38, 0.9);
+}
+
+/* Command palette (Ctrl+K): backdrop blur + scale-in */
+@keyframes command-palette-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.command-palette-backdrop {
+  background: rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.command-palette-modal {
+  animation: command-palette-in var(--duration-normal) var(--ease-out);
+}
+
+/* Message entrance: subtle fade + slide */
+@keyframes message-entrance {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* Chat message list: consistent body text size with input and bubbles; contain layout to reduce thrashing during stream */
+.chat-message-list {
+  font-size: 14px;
+  contain: layout;
+}
+
+/* Chat scroll area: thin, subtle scrollbar and smooth scroll */
+.chat-scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+.chat-scroll-area::-webkit-scrollbar {
+  width: 8px;
+}
+.chat-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+.chat-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.22);
+}
+
+/* Message entrance: handled by Svelte in:fly on MessageBubble (see MessageBubble.svelte).
+   Class kept for any layout; animation removed so Svelte transition is visible. */
+.message-entrance {
+  /* was: animation: message-entrance 0.25s ease-out; */
+}
+
+/* Cockpit Intel panel: slide in from right */
+@keyframes intel-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.intel-panel-enter {
+  animation: intel-panel-in var(--duration-normal) var(--ease-out);
+}
+
+/* Convo rail width transition is inline (transition-[width] duration-200) */
+
+/* User bubble: theme-tinted, translucent */
+.ui-user-bubble {
+  background-color: var(--ui-accent);
+  background-color: color-mix(in srgb, var(--ui-accent) 20%, transparent);
+  color: var(--ui-text-primary);
+  border: 1px solid var(--ui-accent);
+  border-color: color-mix(in srgb, var(--ui-accent) 35%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-input-breathe,
+  .ui-odometer-active::after,
+  .ui-gpu-meter-active::after,
+  [data-ui-theme="radioactivelab"] .ui-btn-accent,
+  [data-ui-theme="radioactivelab"] .ui-sidebar-active,
+  [data-ui-theme="toxicwaste"] .ui-btn-accent {
+    animation: none !important;
+  }
+}
+
+/* ========== UI theme variables (data-ui-theme on root) ========== */
+[data-ui-theme="default"] {
+  --ui-bg-main: #fafafa;
+  --ui-bg-sidebar: rgba(255,255,255,0.8);
+  --ui-accent: #B22234;
+  --ui-accent-hot: #dc2626;
+  --ui-text-primary: #18181b;
+  --ui-text-secondary: #71717a;
+  --ui-border: rgba(0,0,0,0.08);
+  --ui-sidebar-active: #f4f4f5;
+  --ui-sidebar-hover: #fafafa;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #e4e4e7;
+  --ui-glow: rgba(178, 34, 52, 0.25);
+}
+.dark[data-ui-theme="default"] {
+  --ui-bg-main: #0d0d0d;
+  --ui-bg-sidebar: rgba(24,24,27,0.9);
+  --ui-accent: #E03c51;
+  --ui-accent-hot: #f87171;
+  --ui-text-primary: #fafafa;
+  --ui-text-secondary: #a1a1aa;
+  --ui-border: rgba(255,255,255,0.1);
+  --ui-sidebar-active: rgba(63,63,70,0.8);
+  --ui-sidebar-hover: rgba(39,39,42,0.8);
+  --ui-input-bg: #27272a;
+  --ui-input-border: #52525b;
+  --ui-glow: rgba(224, 60, 81, 0.3);
+}
+
+/* Command Cathedral (v1 architectural validation): brutalist, zero radius, mechanical motion, token-driven */
+[data-ui-theme="cathedral"] {
+  --ui-bg-main: #f5f5f0;
+  --ui-bg-sidebar: #e8e8e0;
+  --ui-accent: #1a1a1a;
+  --ui-accent-hot: #2d2d2d;
+  --ui-text-primary: #1a1a1a;
+  --ui-text-secondary: #4a4a4a;
+  --ui-border: #9a9a8e;
+  --ui-sidebar-active: #ddd;
+  --ui-sidebar-hover: #d0d0c8;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #9a9a8e;
+  --ui-glow: rgba(0, 0, 0, 0.15);
+  --ui-radius: var(--radius-none);
+  --ui-ease: var(--ease-mechanical);
+  --ui-panel-duration: var(--duration-slow);
+}
+[data-ui-theme="cathedral"] body {
+  font-family: var(--font-mono);
+  background-color: var(--ui-bg-main);
+  font-size: var(--text-base);
+  line-height: var(--text-base-line);
+}
+/* Mechanical panel slide: token duration + curve */
+[data-ui-theme="cathedral"] aside {
+  transition: width var(--ui-panel-duration) var(--ui-ease);
+}
+[data-ui-theme="cathedral"] .panel-tab {
+  border-radius: var(--ui-radius) !important;
+}
+/* Zero-radius enforcement: all rounded UI uses token */
+[data-ui-theme="cathedral"] button,
+[data-ui-theme="cathedral"] input,
+[data-ui-theme="cathedral"] textarea,
+[data-ui-theme="cathedral"] select,
+[data-ui-theme="cathedral"] [role="button"],
+[data-ui-theme="cathedral"] [role="combobox"],
+[data-ui-theme="cathedral"] [class*="rounded"],
+[data-ui-theme="cathedral"] .prose-chat pre,
+[data-ui-theme="cathedral"] .prose-chat code {
+  border-radius: var(--ui-radius) !important;
+}
+[data-ui-theme="cathedral"] button:focus-visible,
+[data-ui-theme="cathedral"] a:focus-visible,
+[data-ui-theme="cathedral"] input:focus-visible,
+[data-ui-theme="cathedral"] textarea:focus-visible,
+[data-ui-theme="cathedral"] select:focus-visible,
+[data-ui-theme="cathedral"] [role="button"]:focus-visible,
+[data-ui-theme="cathedral"] [role="combobox"]:focus-visible {
+  border-radius: var(--ui-radius);
+}
+/* Stamped line-by-line output: CSS-only, token duration */
+@keyframes cathedral-stamp {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+[data-ui-theme="cathedral"] .prose-chat > * {
+  animation: cathedral-stamp var(--duration-fast) var(--ease-mechanical) backwards;
+}
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(1) { animation-delay: 0.04s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(2) { animation-delay: 0.08s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(3) { animation-delay: 0.12s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(4) { animation-delay: 0.16s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(5) { animation-delay: 0.2s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(6) { animation-delay: 0.24s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(7) { animation-delay: 0.28s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(8) { animation-delay: 0.32s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(9) { animation-delay: 0.36s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(10) { animation-delay: 0.4s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(11) { animation-delay: 0.44s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(12) { animation-delay: 0.48s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(13) { animation-delay: 0.52s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(14) { animation-delay: 0.56s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(15) { animation-delay: 0.6s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(16) { animation-delay: 0.64s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(17) { animation-delay: 0.68s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(18) { animation-delay: 0.72s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(19) { animation-delay: 0.76s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(20) { animation-delay: 0.8s; }
+[data-ui-theme="cathedral"] .prose-chat > *:nth-child(n+21) { animation-delay: 0.84s; }
+@media (prefers-reduced-motion: reduce) {
+  [data-ui-theme="cathedral"] .prose-chat > * {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Temporal – evolution by time + conversation depth (controller sets vars on root) */
+[data-ui-theme="temporal"] {
+  --ui-bg-main: #f0f0ed;
+  --ui-bg-sidebar: #e5e5e2;
+  --ui-accent: #2563eb;
+  --ui-accent-hot: #3b82f6;
+  --ui-text-primary: #1a1a1a;
+  --ui-text-secondary: #525252;
+  --ui-border: rgba(0, 0, 0, 0.1);
+  --ui-sidebar-active: #dbdbd8;
+  --ui-sidebar-hover: #e0e0dd;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #d4d4d4;
+  --ui-glow: rgba(37, 99, 235, 0.2);
+}
+.dark[data-ui-theme="temporal"] {
+  --ui-bg-main: #1a1a1a;
+  --ui-bg-sidebar: #252525;
+  --ui-accent: #60a5fa;
+  --ui-accent-hot: #93c5fd;
+  --ui-text-primary: #f5f5f5;
+  --ui-text-secondary: #a3a3a3;
+  --ui-border: rgba(255, 255, 255, 0.1);
+  --ui-sidebar-active: #2d2d2d;
+  --ui-sidebar-hover: #333;
+  --ui-input-bg: #262626;
+  --ui-input-border: #404040;
+  --ui-glow: rgba(96, 165, 250, 0.25);
+}
+[data-ui-theme="temporal"] body {
+  filter: brightness(var(--ui-bg-intensity)) saturate(var(--ui-saturation));
+}
+[data-ui-theme="temporal"] aside {
+  border-width: calc(1px * var(--ui-panel-separation));
+}
+[data-ui-theme="temporal"] .panel-tab {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, calc(0.12 * var(--ui-shadow-depth)));
+}
+[data-ui-theme="temporal"] main::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(ellipse at 50% 0%, rgba(0, 0, 0, var(--ui-texture-opacity)) 0%, transparent 60%);
+}
+
+/* Newsprint (Editorial) – warm paper, dark ink, masthead accent */
+[data-ui-theme="newsprint"] {
+  --ui-bg-main: #f4f1ea;
+  --ui-bg-sidebar: #ebe6dc;
+  --ui-accent: #8b2500;
+  --ui-accent-hot: #b33a0a;
+  --ui-accent-cool: #5c4033;
+  --ui-text-primary: #1c1917;
+  --ui-text-secondary: #57534e;
+  --ui-border: #b8a99a;
+  --ui-sidebar-active: #e8e2d8;
+  --ui-sidebar-hover: #e0d9cc;
+  --ui-input-bg: #fefdfb;
+  --ui-input-border: #b8a99a;
+  --ui-glow: rgba(139, 37, 0, 0.15);
+  --atom-accent: #8b2500;
+  --atom-accent-light: #a03008;
+  --atom-teal: #5c4033;
+  --atom-amber: #b45309;
+}
+[data-ui-theme="newsprint"] body {
+  background: #f4f1ea;
+  font-family: 'Georgia', 'Times New Roman', Times, serif;
+}
+
+/* Daily Edition (Front Page) – Grok-style newspaper: masthead strip, column feel, gold accent */
+[data-ui-theme="dailyedition"] {
+  --ui-bg-main: #f2efe6;
+  --ui-bg-sidebar: #e8e4d9;
+  --ui-accent: #1a1a1a;
+  --ui-accent-hot: #8b6914;
+  --ui-accent-cool: #5c4a2a;
+  --ui-text-primary: #1a1a1a;
+  --ui-text-secondary: #4a4540;
+  --ui-border: #a89f8f;
+  --ui-sidebar-active: #ddd8cc;
+  --ui-sidebar-hover: #d4cfc2;
+  --ui-input-bg: #fcfbf7;
+  --ui-input-border: #a89f8f;
+  --ui-glow: rgba(139, 105, 20, 0.12);
+  --atom-accent: #8b6914;
+  --atom-accent-light: #a67c1a;
+  --atom-teal: #5c4a2a;
+  --atom-amber: #8b6914;
+}
+[data-ui-theme="dailyedition"] body {
+  background: #f2efe6;
+  font-family: 'Georgia', 'Times New Roman', Times, serif;
+}
+/* Masthead-style strip below header (newspaper “below the fold” rule) */
+[data-ui-theme="dailyedition"] header {
+  position: relative;
+  border-bottom: 2px solid var(--ui-border);
+}
+[data-ui-theme="dailyedition"] header::after {
+  content: '';
+  display: block;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 4px;
+  background: linear-gradient(90deg, var(--ui-accent) 0%, var(--ui-accent) 20%, transparent 20%, transparent 80%, var(--ui-accent) 80%);
+  opacity: 0.4;
+}
+/* Main chat area: subtle column-rule (vertical line like newspaper columns) */
+[data-ui-theme="dailyedition"] main {
+  border-left: 1px solid var(--ui-border);
+  box-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.04);
+}
+/* Right panel: “sidebar column” look (slightly darker paper) */
+[data-ui-theme="dailyedition"] aside {
+  background-color: #e8e4d9 !important;
+  border-left: 2px solid var(--ui-border);
+}
+/* Send / primary buttons: muted gold (newspaper ad accent) */
+[data-ui-theme="dailyedition"] .chat-send-button:not([data-state="stop"]) {
+  background: #8b6914 !important;
+  color: #fcfbf7 !important;
+}
+[data-ui-theme="dailyedition"] .chat-send-button:hover:not(:disabled):not([data-state="stop"]) {
+  background: #a67c1a !important;
+}
+/* Daily Edition: headline – title case, less aggressive (capitalize, font-weight 700) */
+[data-ui-theme="dailyedition"] .ui-greeting-title {
+  font-family: 'Anton', 'Georgia', serif;
+  font-size: clamp(2.5rem, 7vw, 4.5rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+  text-transform: capitalize;
+  color: var(--ui-text-primary);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Splash: ATOM wordmark above headline */
+.ui-splash-branding {
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  color: var(--ui-accent);
+  opacity: 0.9;
+}
+
+/* Splash: gradient fade divider (replaces star divider) */
+.ui-splash-divider {
+  height: 2px;
+  background: linear-gradient(to right, transparent, var(--ui-accent) 50%, transparent);
+  opacity: 0.3;
+}
+
+/* Splash: subtle fade-in on load */
+.ui-splash-wrap {
+  animation: ui-splash-fade-in var(--duration-slow) var(--ease-out);
+}
+@keyframes ui-splash-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Neural Observatory (Cyberpunk) — canvas is background layer; UI floats above with transparent bg */
+[data-ui-theme="neural"] {
+  --ui-bg-main: transparent;
+  --ui-bg-sidebar: rgba(15, 23, 42, 0.85);
+  --ui-accent: #66fcf1;
+  --ui-accent-hot: #ff6b6b;
+  --ui-text-primary: #c5c6c7;
+  --ui-text-secondary: #66fcf1;
+  --ui-border: rgba(102, 252, 241, 0.25);
+  --ui-sidebar-active: rgba(15, 23, 42, 0.95);
+  --ui-sidebar-hover: rgba(45, 55, 72, 0.9);
+  --ui-input-bg: rgba(31, 40, 51, 0.9);
+  --ui-input-border: rgba(102, 252, 241, 0.3);
+  --ui-glow: rgba(102, 252, 241, 0.3);
+  --atom-accent: #66fcf1;
+  --atom-accent-light: #66fcf1;
+  --atom-teal: #66fcf1;
+  --atom-amber: #45a29e;
+}
+[data-ui-theme="neural"] body {
+  background: radial-gradient(circle at center, #0a0f1f 0%, #020409 60%, #000000 100%);
+}
+
+/* Right-side negative space: dark gradient so UI sits in composed space */
+[data-ui-theme="neural"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 25% 45%, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.85) 100%),
+    linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.75) 100%);
+  z-index: 0;
+}
+
+/* Header / top bar: visible over bloom */
+[data-ui-theme="neural"] .cockpit-header,
+[data-ui-theme="neural"] header.shrink-0 {
+  position: relative;
+  z-index: 2;
+  background: rgba(10, 15, 25, 0.88) !important;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Sidebar/ConvoRail always on top of neural canvas (no cover) */
+.cockpit-main-row {
+  isolation: isolate;
+}
+[data-ui-theme="neural"] .convo-rail {
+  position: relative;
+  z-index: 2;
+}
+[data-ui-theme="neural"] .cockpit-main {
+  position: relative;
+  z-index: 0;
+}
+/* Sidebar legibility (ConvoRail + main sidebar aside) */
+[data-ui-theme="neural"] .convo-rail,
+[data-ui-theme="neural"] aside.shrink-0.border-r {
+  background: rgba(12, 18, 30, 0.85) !important;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Chat input: zero panel effect; flex layout for stable send button alignment */
+[data-ui-theme="neural"] .chat-input-container {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+/* Inner input area: no panel (border/background/shadow) in neural */
+[data-ui-theme="neural"] .chat-input-container .chat-input-main {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+[data-ui-theme="neural"] .chat-input-container .chat-input-main:focus-within {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+[data-ui-theme="neural"] .chat-input-dock {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ChatView content above neural background; fills shell */
+.chat-view-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+[data-ui-theme="neural"] .chat-view-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* Greeting: visible above canvas, no transform; centered; tighter gap to input */
+[data-ui-theme="neural"] .ui-greeting-title {
+  transform: none;
+  text-align: center;
+  opacity: 1;
+  font-weight: 500;
+  letter-spacing: 0.072em;
+  text-transform: uppercase;
+  color: #e6faff;
+  text-shadow:
+    0 0 8px rgba(0, 255, 255, 0.38),
+    0 0 18px rgba(255, 0, 200, 0.22);
+  margin-bottom: 0.5rem;
+}
+[data-ui-theme="neural"] .ui-splash-wrap .ui-splash-divider {
+  margin-bottom: 0.75rem;
+}
+
+/* Neural: send button — integrated with input row, no circle/glow */
+[data-ui-theme="neural"] .chat-input-container .chat-send-button {
+  position: static;
+  border-radius: 8px;
+  padding: 0.55rem 1rem;
+  font-size: 0.9rem;
+  background: rgba(0, 255, 255, 0.06);
+  border: 1px solid rgba(0, 255, 255, 0.5);
+  color: #00ffff;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  font-weight: 600;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+[data-ui-theme="neural"] .chat-input-container .chat-send-button:hover {
+  background: rgba(0, 255, 255, 0.12);
+  border-color: rgba(0, 255, 255, 0.7);
+}
+
+[data-ui-theme="neural"] .chat-input-container .chat-send-button:active {
+  background: rgba(0, 255, 255, 0.1);
+}
+
+[data-ui-theme="neural"] .chat-input-container .chat-send-button:disabled {
+  background: rgba(40, 50, 65, 0.6);
+  color: rgba(255, 255, 255, 0.35);
+  border-color: rgba(0, 255, 255, 0.25);
+  cursor: not-allowed;
+}
+
+[data-ui-theme="neural"] .chat-input-container .chat-send-button[data-state="stop"] {
+  background: #b91c1c;
+  border-color: rgba(255, 100, 100, 0.6);
+  color: #fff;
+}
+
+/* Modal Generate buttons: text color from theme (neural overrides below) */
+.image-modal-generate-btn,
+.video-modal-generate-btn {
+  color: var(--ui-bg-main);
+}
+/* Neural: --ui-bg-main is transparent so force dark text on accent bg */
+[data-ui-theme="neural"] .image-modal-generate-btn,
+[data-ui-theme="neural"] .video-modal-generate-btn {
+  color: #0a0f1f !important;
+}
+
+/* Neural: thinking text readable (cyan on white was unreadable) */
+[data-ui-theme="neural"] .assistant-thinking {
+  color: #0f766e !important;
+}
+.dark [data-ui-theme="neural"] .assistant-thinking {
+  color: #99f6e4 !important;
+}
+
+/* ========== Signal Room — transmission chamber, no Three.js ========== */
+@keyframes signalDrift {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(6px); }
+}
+@keyframes signalSweep {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+@keyframes signalFlicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.996; }
+}
+/* Morse SOS: phosphor green pulse during send only; intensity reduced ~30% */
+@keyframes transmitPulse {
+  /* S: three short (dit) */
+  0%   { background-color: rgba(0,255,0,0.65); color: #000; box-shadow: 0 0 0 8px rgba(0,255,0,0.7), 0 0 70px 28px rgba(0,255,0,0.65); }
+  3.7% { background-color: transparent; color: #00ffff; box-shadow: 0 0 0 0 rgba(0,255,0,0), 0 0 8px 2px rgba(0,255,255,0.12); }
+  7.4% { background-color: rgba(0,255,0,0.65); color: #000; box-shadow: 0 0 0 8px rgba(0,255,0,0.7), 0 0 70px 28px rgba(0,255,0,0.65); }
+  11%  { background-color: transparent; color: #00ffff; box-shadow: 0 0 0 0 rgba(0,255,0,0), 0 0 8px 2px rgba(0,255,255,0.12); }
+  15%  { background-color: rgba(0,255,0,0.65); color: #000; box-shadow: 0 0 0 8px rgba(0,255,0,0.7), 0 0 70px 28px rgba(0,255,0,0.65); }
+  19%  { background-color: transparent; color: #00ffff; box-shadow: 0 0 0 0 rgba(0,255,0,0), 0 0 8px 2px rgba(0,255,255,0.12); }
+  /* O: three long (dah) */
+  30%  { background-color: rgba(0,255,0,0.65); color: #000; box-shadow: 0 0 0 8px rgba(0,255,0,0.7), 0 0 70px 28px rgba(0,255,0,0.65); }
+  41%  { background-color: transparent; color: #00ffff; box-shadow: 0 0 0 0 rgba(0,255,0,0), 0 0 8px 2px rgba(0,255,255,0.12); }
+  52%  { background-color: rgba(0,255,0,0.65); color: #000; box-shadow: 0 0 0 8px rgba(0,255,0,0.7), 0 0 70px 28px rgba(0,255,0,0.65); }
+  63%  { background-color: transparent; color: #00ffff; box-shadow: 0 0 0 0 rgba(0,255,0,0), 0 0 8px 2px rgba(0,255,255,0.12); }
+  74%  { background-color: rgba(0,255,0,0.65); color: #000; box-shadow: 0 0 0 8px rgba(0,255,0,0.7), 0 0 70px 28px rgba(0,255,0,0.65); }
+  85%  { background-color: transparent; color: #00ffff; box-shadow: 0 0 0 0 rgba(0,255,0,0), 0 0 8px 2px rgba(0,255,255,0.12); }
+  /* S: three short */
+  89%  { background-color: rgba(0,255,0,0.65); color: #000; box-shadow: 0 0 0 8px rgba(0,255,0,0.7), 0 0 70px 28px rgba(0,255,0,0.65); }
+  93%  { background-color: transparent; color: #00ffff; box-shadow: 0 0 0 0 rgba(0,255,0,0), 0 0 8px 2px rgba(0,255,255,0.12); }
+  97%  { background-color: rgba(0,255,0,0.65); color: #000; box-shadow: 0 0 0 8px rgba(0,255,0,0.7), 0 0 70px 28px rgba(0,255,0,0.65); }
+  100% { background-color: transparent; color: #00ffff; box-shadow: 0 0 0 0 rgba(0,255,0,0), 0 0 8px 2px rgba(0,255,255,0.12); }
+}
+
+[data-ui-theme="signal"] {
+  --ui-bg-main: transparent;
+  --ui-bg-sidebar: rgba(0, 20, 25, 0.9);
+  --ui-accent: #00ffff;
+  --ui-accent-hot: #ff6b6b;
+  --ui-text-primary: #00ffff;
+  --ui-text-secondary: rgba(0, 255, 255, 0.75);
+  --ui-border: rgba(0, 255, 255, 0.4);
+  --ui-input-bg: transparent;
+  --ui-input-border: rgba(0, 255, 255, 0.4);
+  --atom-accent: #00ffff;
+  --atom-teal: #00ffff;
+  --atom-amber: #00ffff;
+}
+
+/* SIGNAL ROOM ENVIRONMENT */
+
+html[data-ui-theme="signal"] body {
+  background: #000;
+  overflow: hidden;
+  animation: signalFlicker 8s infinite;
+}
+
+/* Scan lines */
+html[data-ui-theme="signal"] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0,255,255,0.035) 0px,
+      rgba(0,255,255,0.035) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  animation: signalDrift 14s linear infinite;
+  box-shadow: inset 0 0 140px rgba(0,0,0,0.85);
+}
+
+/* Radial transmission core only (no sweep bar) */
+html[data-ui-theme="signal"] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 32% 48%,
+    rgba(0,255,255,0.09),
+    rgba(0,255,255,0.04) 35%,
+    transparent 75%
+  );
+}
+
+html[data-ui-theme="signal"] body.is-streaming::after {
+  background: radial-gradient(
+    circle at 32% 48%,
+    rgba(0,255,255,0.14),
+    rgba(0,255,255,0.04) 35%,
+    transparent 75%
+  );
+}
+
+[data-ui-theme="signal"] .chat-view-content {
+  position: relative;
+  z-index: 1;
+}
+
+[data-ui-theme="signal"] .ui-greeting-title {
+  text-align: center;
+  letter-spacing: 0.12em;
+  color: #00ffff;
+  opacity: 0.9;
+  text-shadow: none;
+  font-weight: 400;
+}
+
+[data-ui-theme="signal"] .chat-input-container {
+  background: transparent;
+  border-bottom: 2px solid rgba(0,255,255,0.55);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+[data-ui-theme="signal"] .chat-input-container .chat-input-main {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+[data-ui-theme="signal"] .chat-input-dock {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+/* Send button: matches theme — horizontal bar, not round; no pulse in standby */
+[data-ui-theme="signal"] .chat-input-container .chat-send-button {
+  width: auto;
+  min-width: 0;
+  height: auto;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0,255,255,0.55);
+  background: transparent;
+  color: #00ffff;
+  font-weight: 600;
+  box-shadow: 0 0 12px rgba(0,255,255,0.4);
+}
+
+[data-ui-theme="signal"] .chat-input-container .chat-send-button:hover:not(:disabled):not([data-state="stop"]) {
+  background: rgba(0,255,255,0.9);
+  color: #000;
+}
+
+[data-ui-theme="signal"] .chat-input-container .chat-send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+[data-ui-theme="signal"] .chat-input-container .chat-send-button[data-state="stop"] {
+  border-color: var(--ui-accent-hot, #dc2626);
+}
+
+/* SOS pulse only while sending (streaming) — re-energizes when you hit Send */
+html[data-ui-theme="signal"] body.is-streaming .chat-input-container .chat-send-button {
+  animation: transmitPulse 2.5s steps(1, end) infinite;
+}
+
+[data-ui-theme="signal"] .cockpit-header,
+[data-ui-theme="signal"] header.shrink-0 {
+  background: rgba(0, 10, 12, 0.9) !important;
+  border-bottom: 1px solid rgba(0,255,255,0.6);
+}
+
+[data-ui-theme="signal"] .convo-rail,
+[data-ui-theme="signal"] aside.shrink-0.border-r {
+  background: rgba(0, 15, 18, 0.9) !important;
+  border-right: 1px solid rgba(0,255,255,0.6);
+}
+
+[data-ui-theme="signal"] .image-modal-generate-btn,
+[data-ui-theme="signal"] .video-modal-generate-btn {
+  color: #000 !important;
+}
+
+/* ========== Light themes ========== */
+
+/* Arctic Command (light + electric) */
+[data-ui-theme="arctic"] {
+  --ui-bg-main: #f8fafc;
+  --ui-bg-sidebar: #e0f2fe;
+  --ui-accent: #f97316;
+  --ui-accent-hot: #dc2626;
+  --ui-accent-cool: #0ea5e9;
+  --ui-text-primary: #0f172a;
+  --ui-text-secondary: #64748b;
+  --ui-border: #cbd5e1;
+  --ui-sidebar-active: #f8fafc;
+  --ui-sidebar-hover: #f8fafc;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #cbd5e1;
+  --ui-glow: rgba(14, 165, 233, 0.25);
+  --atom-accent: #0ea5e9;
+  --atom-accent-light: #06b6d4;
+  --atom-teal: #06b6d4;
+  --atom-amber: #f97316;
+}
+
+/* Neon Daylight (retro-future bright) */
+[data-ui-theme="neon"] {
+  --ui-bg-main: #ffffff;
+  --ui-bg-sidebar: #fef3c7;
+  --ui-accent: #eab308;
+  --ui-accent-hot: #dc2626;
+  --ui-accent-cool: #06b6d4;
+  --ui-text-primary: #171717;
+  --ui-text-secondary: #525252;
+  --ui-border: #e5e5e5;
+  --ui-sidebar-active: #ffffff;
+  --ui-sidebar-hover: #fef9c3;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #e5e5e5;
+  --ui-glow: rgba(234, 179, 8, 0.3);
+  --atom-accent: #eab308;
+  --atom-accent-light: #06b6d4;
+  --atom-teal: #06b6d4;
+  --atom-amber: #dc2626;
+}
+
+/* Mint Laboratory (fresh + technical) */
+[data-ui-theme="mint"] {
+  --ui-bg-main: #f0fdf4;
+  --ui-bg-sidebar: #d1fae5;
+  --ui-accent: #10b981;
+  --ui-accent-hot: #f59e0b;
+  --ui-accent-cool: #3b82f6;
+  --ui-text-primary: #064e3b;
+  --ui-text-secondary: #6b7280;
+  --ui-border: #d1d5db;
+  --ui-sidebar-active: #f0fdf4;
+  --ui-sidebar-hover: #ecfdf5;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #d1d5db;
+  --ui-glow: rgba(16, 185, 129, 0.25);
+  --atom-accent: #10b981;
+  --atom-accent-light: #3b82f6;
+  --atom-teal: #10b981;
+  --atom-amber: #f59e0b;
+}
+
+/* Coral Reef (warm + energetic) */
+[data-ui-theme="coral"] {
+  --ui-bg-main: #fffbeb;
+  --ui-bg-sidebar: #fed7aa;
+  --ui-accent: #f97316;
+  --ui-accent-hot: #dc2626;
+  --ui-accent-cool: #0891b2;
+  --ui-text-primary: #1c1917;
+  --ui-text-secondary: #78716c;
+  --ui-border: #e7e5e4;
+  --ui-sidebar-active: #fffbeb;
+  --ui-sidebar-hover: #fff7ed;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #e7e5e4;
+  --ui-glow: rgba(249, 115, 22, 0.25);
+  --atom-accent: #f97316;
+  --atom-accent-light: #0891b2;
+  --atom-teal: #0891b2;
+  --atom-amber: #dc2626;
+}
+
+/* High Contrast Lab (maximum pop) */
+[data-ui-theme="highcontrast"] {
+  --ui-bg-main: #ffffff;
+  --ui-bg-sidebar: #f3f4f6;
+  --ui-accent: #2563eb;
+  --ui-accent-hot: #dc2626;
+  --ui-text-primary: #000000;
+  --ui-text-secondary: #6b7280;
+  --ui-border: #d1d5db;
+  --ui-sidebar-active: #ffffff;
+  --ui-sidebar-hover: #e5e7eb;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #d1d5db;
+  --ui-glow: rgba(37, 99, 235, 0.25);
+  --atom-accent: #2563eb;
+  --atom-accent-light: #3b82f6;
+  --atom-teal: #16a34a;
+  --atom-amber: #ea580c;
+}
+
+/* Cyber Citrus (unconventional + bold) */
+[data-ui-theme="cybercitrus"] {
+  --ui-bg-main: #fefce8;
+  --ui-bg-sidebar: #fef08a;
+  --ui-accent: #65a30d;
+  --ui-accent-hot: #dc2626;
+  --ui-accent-cool: #0284c7;
+  --ui-text-primary: #14532d;
+  --ui-text-secondary: #4d7c0f;
+  --ui-border: #d9f99d;
+  --ui-sidebar-active: #fefce8;
+  --ui-sidebar-hover: #fef9c3;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #d9f99d;
+  --ui-glow: rgba(101, 163, 13, 0.3);
+  --atom-accent: #65a30d;
+  --atom-accent-light: #0284c7;
+  --atom-teal: #65a30d;
+  --atom-amber: #dc2626;
+}
+
+/* Option 7: Industrial Hazard (Yellow/Black - Maximum Visibility) */
+[data-ui-theme="industrialhazard"] {
+  --ui-bg-main: #ffffff;
+  --ui-bg-sidebar: #fef9c3;
+  --ui-accent: #facc15;
+  --ui-accent-hot: #000000;
+  --ui-accent-cool: #000000;
+  --ui-text-primary: #000000;
+  --ui-text-secondary: #404040;
+  --ui-border: #000000;
+  --ui-sidebar-active: #fef08a;
+  --ui-sidebar-hover: #fef9c3;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #000000;
+  --ui-glow: rgba(250, 204, 21, 0.4);
+  --atom-accent: #facc15;
+  --atom-accent-light: #dc2626;
+  --atom-teal: #16a34a;
+  --atom-amber: #000000;
+}
+
+/* Option 8: Fire & Ice (Extreme Contrast) */
+[data-ui-theme="fireice"] {
+  --ui-bg-main: #0c4a6e;
+  --ui-bg-sidebar: #075985;
+  --ui-accent: #ff6b35;
+  --ui-accent-hot: #fbbf24;
+  --ui-accent-cool: #38bdf8;
+  --ui-text-primary: #f0f9ff;
+  --ui-text-secondary: #7dd3fc;
+  --ui-border: #0e7490;
+  --ui-sidebar-active: #0c4a6e;
+  --ui-sidebar-hover: #0369a1;
+  --ui-input-bg: #075985;
+  --ui-input-border: #0e7490;
+  --ui-glow: rgba(255, 107, 53, 0.35);
+  --atom-accent: #ff6b35;
+  --atom-accent-light: #38bdf8;
+  --atom-teal: #38bdf8;
+  --atom-amber: #fbbf24;
+}
+[data-ui-theme="fireice"] body {
+  background: linear-gradient(135deg, #0c4a6e 0%, #075985 50%, #0c4a6e 100%);
+  background-size: 200% 200%;
+  animation: ui-gradient-shift 18s var(--ease-default) infinite;
+}
+
+/* Option 9: Hacker Terminal Green (Modern) */
+[data-ui-theme="hacker"] {
+  --ui-bg-main: #001a00;
+  --ui-bg-sidebar: #003300;
+  --ui-accent: #00ff41;
+  --ui-accent-hot: #ffff00;
+  --ui-accent-cool: #00cc33;
+  --ui-text-primary: #33ff77;
+  --ui-text-secondary: #00cc33;
+  --ui-border: #004d00;
+  --ui-sidebar-active: #001a00;
+  --ui-sidebar-hover: #002200;
+  --ui-input-bg: #003300;
+  --ui-input-border: #004d00;
+  --ui-glow: rgba(0, 255, 65, 0.35);
+  --atom-accent: #00ff41;
+  --atom-accent-light: #ffff00;
+  --atom-teal: #00ff41;
+  --atom-amber: #ffff00;
+}
+[data-ui-theme="hacker"] body {
+  background: #001a00;
+}
+
+/* Option 10: Medical Grade (Clinical Precision) */
+[data-ui-theme="medical"] {
+  --ui-bg-main: #f8f9fa;
+  --ui-bg-sidebar: #e9ecef;
+  --ui-accent: #0077b6;
+  --ui-accent-hot: #d62828;
+  --ui-accent-cool: #52b788;
+  --ui-accent-warning: #f77f00;
+  --ui-text-primary: #212529;
+  --ui-text-secondary: #6c757d;
+  --ui-border: #dee2e6;
+  --ui-sidebar-active: #f8f9fa;
+  --ui-sidebar-hover: #e9ecef;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #dee2e6;
+  --ui-glow: rgba(0, 119, 182, 0.25);
+  --atom-accent: #0077b6;
+  --atom-accent-light: #52b788;
+  --atom-teal: #52b788;
+  --atom-amber: #f77f00;
+}
+
+/* Option 11: Radioactive Lab (Neon Lime Science) – dynamic: subtle accent pulse */
+[data-ui-theme="radioactivelab"] {
+  --ui-bg-main: #0a0a0a;
+  --ui-bg-sidebar: #1a1a1a;
+  --ui-accent: #ccff00;
+  --ui-accent-hot: #ff3366;
+  --ui-accent-cool: #00ffff;
+  --ui-accent-warning: #ffff00;
+  --ui-text-primary: #ffffff;
+  --ui-text-secondary: #99ff00;
+  --ui-border: #333333;
+  --ui-sidebar-active: #252525;
+  --ui-sidebar-hover: #2a2a2a;
+  --ui-input-bg: #1a1a1a;
+  --ui-input-border: #333333;
+  --ui-glow: rgba(204, 255, 0, 0.35);
+  --atom-accent: #ccff00;
+  --atom-accent-light: #99ff00;
+  --atom-teal: #00ffff;
+  --atom-amber: #ff3366;
+}
+[data-ui-theme="radioactivelab"] body {
+  background: #0a0a0a;
+}
+[data-ui-theme="radioactivelab"] .ui-btn-accent,
+[data-ui-theme="radioactivelab"] .ui-sidebar-active {
+  animation: theme-heartbeat var(--duration-long) var(--ease-in-out) infinite;
+}
+
+/* Option 12: Copper Circuit (Warm Industrial) */
+[data-ui-theme="coppercircuit"] {
+  --ui-bg-main: #1a1410;
+  --ui-bg-sidebar: #2d2319;
+  --ui-accent: #ff6b35;
+  --ui-accent-secondary: #d4af37;
+  --ui-accent-hot: #ff6b35;
+  --ui-accent-cool: #4a9eff;
+  --ui-text-primary: #fef5e7;
+  --ui-text-secondary: #c19a6b;
+  --ui-border: #3d2f1f;
+  --ui-sidebar-active: #3d2f1f;
+  --ui-sidebar-hover: #4a3a28;
+  --ui-input-bg: #2d2319;
+  --ui-input-border: #3d2f1f;
+  --ui-glow: rgba(255, 107, 53, 0.3);
+  --atom-accent: #ff6b35;
+  --atom-accent-light: #d4af37;
+  --atom-teal: #4a9eff;
+  --atom-amber: #d4af37;
+}
+[data-ui-theme="coppercircuit"] body {
+  background: #1a1410;
+}
+
+/* Option 13: Arctic Neon (Ice + Electric) – dynamic: subtle body gradient */
+[data-ui-theme="arcticneon"] {
+  --ui-bg-main: #e8f4f8;
+  --ui-bg-sidebar: #b8e6f0;
+  --ui-accent: #00d9ff;
+  --ui-accent-hot: #ff1744;
+  --ui-accent-cool: #00bfa5;
+  --ui-text-primary: #001a1f;
+  --ui-text-secondary: #004d5c;
+  --ui-border: #80deea;
+  --ui-sidebar-active: #e0f7fa;
+  --ui-sidebar-hover: #b2ebf2;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #80deea;
+  --ui-glow: rgba(0, 217, 255, 0.3);
+  --atom-accent: #00d9ff;
+  --atom-accent-light: #00bfa5;
+  --atom-teal: #00bfa5;
+  --atom-amber: #ff1744;
+}
+[data-ui-theme="arcticneon"] body {
+  background: linear-gradient(135deg, #e8f4f8 0%, #b8e6f0 50%, #e8f4f8 100%);
+  background-size: 200% 200%;
+  animation: ui-gradient-shift 20s var(--ease-default) infinite;
+}
+
+/* Option 14: Sunset Gradient (Orange/Red Dynamic) – gradient accent */
+[data-ui-theme="sunsetgradient"] {
+  --ui-bg-main: #fff8f2;
+  --ui-bg-sidebar: #ffead9;
+  --ui-accent: #e85c2a;
+  --ui-accent-hot: #d84315;
+  --ui-text-primary: #2d1b0e;
+  --ui-text-secondary: #8b4510;
+  --ui-border: #e89860;
+  --ui-sidebar-active: #fff0e6;
+  --ui-sidebar-hover: #ffdfc9;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #e89860;
+  --ui-glow: rgba(232, 92, 42, 0.35);
+  --ui-accent-gradient: linear-gradient(135deg, #ff8c42 0%, #e85c2a 50%, #d84315 100%);
+  --atom-accent: #e85c2a;
+  --atom-accent-light: #f57c42;
+  --atom-teal: #ff8c42;
+  --atom-amber: #d84315;
+}
+[data-ui-theme="sunsetgradient"] body {
+  background: linear-gradient(180deg, #fff8f2 0%, #ffead9 50%, #ffe0cc 100%);
+  background-size: 100% 200%;
+  animation: ui-gradient-shift 25s var(--ease-default) infinite;
+}
+[data-ui-theme="sunsetgradient"] .ui-btn-accent {
+  background: var(--ui-accent-gradient);
+  color: #2d1b0e;
+}
+
+/* Option 15: Racing Stripe (Red/White/Black Speed) */
+[data-ui-theme="racingstripe"] {
+  --ui-bg-main: #ffffff;
+  --ui-bg-sidebar: #f5f5f5;
+  --ui-accent: #e30613;
+  --ui-accent-secondary: #000000;
+  --ui-accent-cool: #c0c0c0;
+  --ui-text-primary: #000000;
+  --ui-text-secondary: #666666;
+  --ui-border: #dddddd;
+  --ui-sidebar-active: #ffffff;
+  --ui-sidebar-hover: #eeeeee;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #dddddd;
+  --ui-glow: rgba(227, 6, 19, 0.35);
+  --atom-accent: #e30613;
+  --atom-accent-light: #000000;
+  --atom-teal: #c0c0c0;
+  --atom-amber: #e30613;
+}
+[data-ui-theme="racingstripe"] body {
+  background: #ffffff;
+}
+
+/* Option 16: Jungle Terminal (Green, Not Matrix) */
+[data-ui-theme="jungleterminal"] {
+  --ui-bg-main: #f0f4f0;
+  --ui-bg-sidebar: #d4e7d4;
+  --ui-accent: #2d5016;
+  --ui-accent-hot: #ff6b35;
+  --ui-accent-cool: #004d40;
+  --ui-text-primary: #1a1a1a;
+  --ui-text-secondary: #4a6741;
+  --ui-border: #a8c99c;
+  --ui-sidebar-active: #e8f0e8;
+  --ui-sidebar-hover: #dce8dc;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #a8c99c;
+  --ui-glow: rgba(45, 80, 22, 0.3);
+  --atom-accent: #2d5016;
+  --atom-accent-light: #004d40;
+  --atom-teal: #004d40;
+  --atom-amber: #ff6b35;
+}
+[data-ui-theme="jungleterminal"] body {
+  background: #f0f4f0;
+}
+
+/* Option 17: Magma Flow (Red/Orange/Black Heat) – dynamic: heat gradient shift */
+[data-ui-theme="magmaflow"] {
+  --ui-bg-main: #1a0a00;
+  --ui-bg-sidebar: #2d1400;
+  --ui-accent: #ff4500;
+  --ui-accent-hot: #ff6347;
+  --ui-accent-cool: #ffa500;
+  --ui-text-primary: #fff5ee;
+  --ui-text-secondary: #ffb366;
+  --ui-border: #4d2600;
+  --ui-sidebar-active: #3d1a00;
+  --ui-sidebar-hover: #4d2600;
+  --ui-input-bg: #2d1400;
+  --ui-input-border: #4d2600;
+  --ui-glow: rgba(255, 69, 0, 0.4);
+  --atom-accent: #ff4500;
+  --atom-accent-light: #ff6347;
+  --atom-teal: #ffa500;
+  --atom-amber: #ff6347;
+}
+[data-ui-theme="magmaflow"] body {
+  background: linear-gradient(135deg, #1a0a00 0%, #2d1400 40%, #4d2600 70%, #1a0a00 100%);
+  background-size: 200% 200%;
+  animation: ui-gradient-shift 18s var(--ease-default) infinite;
+}
+
+/* Option 18: Chrome & Glass (Ultra Modern) – glassmorphism */
+[data-ui-theme="chromeglass"] {
+  --ui-bg-main: #f8f9fa;
+  --ui-bg-sidebar: rgba(233, 236, 239, 0.85);
+  --ui-accent: #0066cc;
+  --ui-accent-metallic: #c0c0c0;
+  --ui-text-primary: #212529;
+  --ui-text-secondary: #6c757d;
+  --ui-border: #dee2e6;
+  --ui-sidebar-active: rgba(255, 255, 255, 0.5);
+  --ui-sidebar-hover: rgba(255, 255, 255, 0.3);
+  --ui-input-bg: rgba(255, 255, 255, 0.9);
+  --ui-input-border: #dee2e6;
+  --ui-glow: rgba(0, 102, 204, 0.25);
+  --ui-glass: rgba(255, 255, 255, 0.15);
+  --atom-accent: #0066cc;
+  --atom-accent-light: #3399ff;
+  --atom-teal: #0066cc;
+  --atom-amber: #c0c0c0;
+}
+[data-ui-theme="chromeglass"] body {
+  background: #f8f9fa;
+}
+[data-ui-theme="chromeglass"] aside,
+[data-ui-theme="chromeglass"] [class*="backdrop-blur"],
+[data-ui-theme="chromeglass"] .ui-card-style {
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--ui-bg-sidebar) 90%, var(--ui-glass));
+}
+
+/* Option 19: Toxic Waste (Yellow/Black Hazard) – dynamic: accent pulse */
+[data-ui-theme="toxicwaste"] {
+  --ui-bg-main: #000000;
+  --ui-bg-sidebar: #1a1a00;
+  --ui-accent: #ffff00;
+  --ui-accent-hot: #ff00ff;
+  --ui-accent-cool: #00ff00;
+  --ui-text-primary: #ffff00;
+  --ui-text-secondary: #cccc00;
+  --ui-border: #333300;
+  --ui-sidebar-active: #2a2a00;
+  --ui-sidebar-hover: #333300;
+  --ui-input-bg: #1a1a00;
+  --ui-input-border: #333300;
+  --ui-glow: rgba(255, 255, 0, 0.4);
+  --atom-accent: #ffff00;
+  --atom-accent-light: #00ff00;
+  --atom-teal: #00ff00;
+  --atom-amber: #ff00ff;
+}
+[data-ui-theme="toxicwaste"] body {
+  background: #000000;
+}
+[data-ui-theme="toxicwaste"] .ui-btn-accent {
+  animation: theme-heartbeat var(--duration-long) var(--ease-in-out) infinite;
+}
+
+/* ATOM — Clinical, high-contrast dark (Unified Multimedia Gatekeeper default) */
+[data-ui-theme="atom"] {
+  --ui-bg-main: #0c0c0c;
+  --ui-bg-sidebar: #141414;
+  --ui-accent: #00d4aa;
+  --ui-accent-hot: #00ffcc;
+  --ui-accent-cool: #00a88a;
+  --ui-text-primary: #f5f5f5;
+  --ui-text-secondary: #a3a3a3;
+  --ui-border: #262626;
+  --ui-sidebar-active: #1a1a1a;
+  --ui-sidebar-hover: #1f1f1f;
+  --ui-input-bg: #141414;
+  --ui-input-border: #262626;
+  --ui-glow: rgba(0, 212, 170, 0.25);
+  --atom-accent: #00d4aa;
+  --atom-accent-light: #00ffcc;
+  --atom-teal: #00a88a;
+  --atom-amber: #00d4aa;
+}
+[data-ui-theme="atom"] body {
+  background: #0c0c0c;
+}
+
+@keyframes theme-heartbeat {
+  0%, 100% { opacity: 1; box-shadow: 0 4px 15px var(--ui-glow); }
+  50% { opacity: 0.92; box-shadow: 0 4px 24px var(--ui-glow); }
+}
+
+@keyframes ui-gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Theme-aware utilities (glow, etc.) */
+.ui-input-glow:focus-within {
+  border-color: var(--ui-accent-cool, var(--ui-accent));
+  box-shadow: 0 0 15px var(--ui-glow);
+}
+.ui-input-glow textarea::placeholder {
+  color: var(--ui-text-secondary);
+  opacity: 0.9;
+}
+.ui-btn-accent {
+  background: var(--ui-accent);
+  color: var(--ui-bg-main);
+  box-shadow: 0 4px 15px var(--ui-glow);
+  transition: all var(--duration-fast) var(--ease-default);
+}
+.ui-btn-accent:hover {
+  box-shadow: 0 6px 20px var(--ui-glow);
+  transform: translateY(-1px);
+}
+.ui-sidebar-active {
+  border-left: 3px solid var(--ui-accent-cool, var(--ui-accent));
+  background: linear-gradient(90deg, var(--ui-glow) 0%, transparent 100%);
+}
+.ui-pill-suggestion {
+  color: var(--ui-accent);
+  border-color: var(--ui-accent);
+  background: transparent;
+  transition: all var(--duration-fast) var(--ease-default);
+}
+.ui-pill-suggestion:hover {
+  background: var(--ui-accent);
+  color: var(--ui-bg-main);
+}
+.ui-model-selector-open {
+  border-color: var(--ui-accent-cool, var(--ui-accent)) !important;
+}
+
+/* ========== Dynamic UI (theme/layout transitions, animations) ========== */
+/* Revert: see docs/ATOM-DYNAMIC-UI-UNDO.md */
+
+/* Theme switch and layout: token durations only */
+html {
+  transition: background-color var(--duration-slower) var(--ease-default), color var(--duration-slower) var(--ease-default);
+}
+body {
+  transition: background-color var(--duration-slower) var(--ease-default);
+}
+.atom-layout-transition,
+.atom-panel-wrap {
+  transition: width var(--duration-slow) var(--ease-default), min-width var(--duration-slow) var(--ease-default), grid-template-columns var(--duration-slow) var(--ease-default), opacity var(--duration-slow) var(--ease-default);
+}
+.model-card-active {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Model selector and controls: clear sans-serif for readability */
+.ui-model-selector,
+.ui-model-selector * {
+  font-family: var(--font-sans);
+}
+
+/* Streaming: pulsing border glow */
+.atom-streaming-glow {
+  animation: atom-streaming-glow var(--duration-long) var(--ease-in-out) infinite;
+}
+@keyframes atom-streaming-glow {
+  0%, 100% { box-shadow: 0 0 0 1px var(--ui-border), 0 0 12px rgba(6, 182, 212, 0.2); }
+  50% { box-shadow: 0 0 0 1px var(--atom-teal), 0 0 20px rgba(6, 182, 212, 0.4); }
+}
+
+/* Response complete: brief green flash */
+.atom-complete-flash {
+  animation: atom-complete-flash var(--duration-slower) var(--ease-out) forwards;
+}
+@keyframes atom-complete-flash {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+  40% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0.15); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Error: red shake */
+.atom-error-shake {
+  animation: atom-error-shake var(--duration-slow) var(--ease-in-out);
+}
+@keyframes atom-error-shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-6px); }
+  30% { transform: translateX(5px); }
+  45% { transform: translateX(-4px); }
+  60% { transform: translateX(3px); }
+  75% { transform: translateX(-2px); }
+}
+
+/* Subtle animated gradient background (15s loop, low opacity). Disabled in .atom-performance-mode */
+.atom-gradient-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.06;
+  background: linear-gradient(
+    135deg,
+    var(--atom-teal) 0%,
+    transparent 30%,
+    var(--atom-accent) 50%,
+    transparent 70%,
+    var(--atom-amber) 100%
+  );
+  background-size: 200% 200%;
+  animation: atom-gradient-drift 15s var(--ease-in-out) infinite;
+  pointer-events: none;
+}
+.atom-performance-mode .atom-gradient-bg::before {
+  display: none;
+}
+@keyframes atom-gradient-drift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* ── Theme-aware accent for checkboxes and sliders ── */
+.accent-themed {
+  accent-color: var(--ui-accent);
+}
+
+/* Reduced motion: disable or shorten animations */
+@media (prefers-reduced-motion: reduce) {
+  html, body { transition-duration: 0.01ms; }
+  .atom-layout-transition,
+  .atom-panel-wrap { transition-duration: 0.01ms; }
+  .atom-streaming-glow { animation: none; box-shadow: 0 0 0 1px var(--ui-border); }
+  .atom-complete-flash { animation: none; }
+  .atom-error-shake { animation: none; }
+  .atom-gradient-bg::before { animation: none; }
+}
