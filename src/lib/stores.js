@@ -425,6 +425,9 @@ export const editorContent = writable('');
 export const editorLanguage = writable('javascript');
 export const editorFilePath = writable(null);
 
+/** When set to { content, language }, EditorPanel opens this content in the editor (e.g. from a code block Edit). Cleared by EditorPanel after applying. */
+export const openInEditorFromChat = writable(/** @type {{ content: string, language: string } | null} */ (null));
+
 /** Last code sent to terminal via Run button (for error feedback loop). */
 export const lastExecutedCode = writable(null);
 

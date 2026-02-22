@@ -5,7 +5,7 @@
   import { get } from "svelte/store";
   import PerfStats from "$lib/components/PerfStats.svelte";
   import AuthVideo from "$lib/components/AuthVideo.svelte";
-  import { pinnedContent, deepinfraApiKey, terminalCommand, terminalOpen, fileServerUrl, workspaceRoot, pinnedFiles, diffViewerState } from "$lib/stores.js";
+  import { pinnedContent, deepinfraApiKey, terminalCommand, terminalOpen, fileServerUrl, workspaceRoot, pinnedFiles, diffViewerState, editorOpen, openInEditorFromChat } from "$lib/stores.js";
 
   /** DeepInfra key: init from store + env so it's there on first paint; subscribe to stay in sync with Settings. */
   let deepinfraKey = $state(
@@ -103,6 +103,24 @@
     svelte: "svelte",
   };
 
+  /** Map code-fence language to editor language (for syntax highlighting). */
+  function fenceLangToEditorLang(lang) {
+    const l = (lang || "").trim().toLowerCase();
+    if (["python", "py"].includes(l)) return "python";
+    if (["javascript", "js", "ts", "typescript", "jsx", "tsx", "mjs", "cjs"].includes(l)) return "javascript";
+    if (["html", "htm", "svelte"].includes(l)) return "html";
+    if (l === "css") return "css";
+    if (l === "json") return "json";
+    return "javascript";
+  }
+
+  function openCodeInEditor(code, lang) {
+    const mappedLang = fenceLangToEditorLang(lang);
+    openInEditorFromChat.set({ content: code, language: mappedLang });
+    terminalOpen.set(true);
+    editorOpen.set(true);
+  }
+
   function handleCodeAction(event) {
     const btn = event.target.closest(".code-action-btn");
     if (!btn) return;
@@ -126,14 +144,23 @@
     }
     if (action === "save") {
       const lang = (wrapper?.dataset.language || "txt").toLowerCase();
-      const ext = LANG_EXT[lang] ?? "txt";
-      const blob = new Blob([code], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `snippet.${ext}`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const lineCount = (code.match(/\n/g) || []).length + (code.trimEnd() !== "" ? 1 : 0);
+      if (lineCount >= 10) {
+        openCodeInEditor(code, lang);
+      } else {
+        const ext = LANG_EXT[lang] ?? "txt";
+        const blob = new Blob([code], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `snippet.${ext}`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    }
+    if (action === "edit") {
+      const lang = (wrapper?.dataset.language || "").trim().toLowerCase();
+      openCodeInEditor(code, lang);
     }
     if (action === "apply") {
       applyToFilePending = { code };

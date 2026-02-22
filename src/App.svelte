@@ -31,7 +31,8 @@ import UiThemeSelect from '$lib/components/UiThemeSelect.svelte';
   import { checkLmStudioConnection } from '$lib/api.js';
   import { COCKPIT_LM_CHECKING, COCKPIT_LM_CONNECTED, COCKPIT_LM_UNREACHABLE, COCKPIT_CLOUD_APIS_AVAILABLE } from '$lib/cockpitCopy.js';
 
-  const MIN_TERMINAL_HEIGHT = 100;
+  const MIN_TERMINAL_HEIGHT = 150;
+  const MAX_TERMINAL_HEIGHT_RATIO = 0.7;
   let cockpitMainEl = $state(null);
   let terminalDragging = $state(false);
 
@@ -43,7 +44,8 @@ import UiThemeSelect from '$lib/components/UiThemeSelect.svelte';
     function onMove(moveE) {
       const mainRect = cockpitMainEl?.getBoundingClientRect();
       if (!mainRect) return;
-      const maxH = Math.max(MIN_TERMINAL_HEIGHT, mainRect.height - 80);
+      const maxFromViewport = Math.round(typeof window !== 'undefined' ? window.innerHeight * MAX_TERMINAL_HEIGHT_RATIO : 600);
+      const maxH = Math.max(MIN_TERMINAL_HEIGHT, Math.min(mainRect.height - 80, maxFromViewport));
       const delta = startY - moveE.clientY;
       const next = Math.round(Math.max(MIN_TERMINAL_HEIGHT, Math.min(maxH, startH + delta)));
       terminalHeight.set(next);
@@ -312,31 +314,37 @@ import UiThemeSelect from '$lib/components/UiThemeSelect.svelte';
           </div>
           {#if $terminalOpen}
             <div
-              class="terminal-resize-handle shrink-0 cursor-ns-resize hover:bg-[color-mix(in_srgb,var(--ui-accent)_20%,transparent)] transition-colors"
-              style="height: 4px; min-height: 4px;"
+              class="bottom-panel-resize-handle shrink-0 flex items-center justify-center transition-colors"
+              style="height: 6px; min-height: 6px; cursor: row-resize; background: var(--ui-bg-sidebar); border-top: 1px solid var(--ui-border);"
               role="separator"
               aria-label="Resize bottom panel"
               onmousedown={onTerminalResizeStart}
-            ></div>
+            >
+              <span class="resize-handle-line" aria-hidden="true"></span>
+            </div>
             <div
               class="terminal-slot shrink-0 overflow-hidden flex flex-col"
               style="height: {$terminalHeight}px; min-height: {MIN_TERMINAL_HEIGHT}px;"
             >
-              <div class="bottom-panel-tabs shrink-0 flex items-stretch gap-0 border-b" style="height: 30px; min-height: 30px; border-color: var(--ui-border); background: var(--ui-bg-sidebar);">
+              <div class="bottom-panel-tabs shrink-0 flex items-center gap-0 border-b" style="height: 32px; min-height: 32px; border-color: var(--ui-border); background: var(--ui-bg-sidebar); padding: 0 0.25rem;">
                 <button
                   type="button"
-                  class="px-3 text-xs font-medium transition-colors"
-                  style="color: {$editorOpen ? 'var(--ui-text-secondary)' : 'var(--ui-text-primary)'}; border-bottom: 2px solid {$editorOpen ? 'transparent' : 'var(--ui-accent)'}; background: {$editorOpen ? 'transparent' : 'transparent'};"
+                  class="bottom-panel-tab px-3 text-xs font-medium transition-colors rounded-t"
+                  style="color: {$editorOpen ? 'var(--ui-text-secondary)' : 'var(--ui-text-primary)'}; border-bottom: 2px solid {$editorOpen ? 'transparent' : 'var(--ui-accent)'}; background: {$editorOpen ? 'transparent' : 'color-mix(in srgb, var(--ui-accent) 12%, transparent)'};"
+                  title="Switch to terminal"
+                  aria-label="Switch to terminal"
                   onclick={() => editorOpen.set(false)}
                 >Terminal</button>
                 <button
                   type="button"
-                  class="px-3 text-xs font-medium transition-colors"
-                  style="color: {$editorOpen ? 'var(--ui-text-primary)' : 'var(--ui-text-secondary)'}; border-bottom: 2px solid {$editorOpen ? 'var(--ui-accent)' : 'transparent'}; background: transparent;"
+                  class="bottom-panel-tab px-3 text-xs font-medium transition-colors rounded-t"
+                  style="color: {$editorOpen ? 'var(--ui-text-primary)' : 'var(--ui-text-secondary)'}; border-bottom: 2px solid {$editorOpen ? 'var(--ui-accent)' : 'transparent'}; background: {$editorOpen ? 'color-mix(in srgb, var(--ui-accent) 12%, transparent)' : 'transparent'};"
+                  title="Switch to editor (Ctrl+E)"
+                  aria-label="Switch to editor"
                   onclick={() => { editorOpen.set(true); terminalOpen.set(true); }}
                 >Editor</button>
               </div>
-              <div class="flex-1 min-h-0 overflow-hidden">
+              <div class="flex-1 min-h-0 overflow-hidden relative" style="z-index: 0;">
                 {#if $editorOpen}
                   <EditorPanel />
                 {:else}
@@ -353,12 +361,12 @@ import UiThemeSelect from '$lib/components/UiThemeSelect.svelte';
                 type="button"
                 class="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors"
                 style="color: var(--ui-text-secondary);"
-                title="Open terminal (Ctrl+`)"
-                aria-label="Open terminal"
+                title="Open terminal & editor (Ctrl+`)"
+                aria-label="Open terminal and editor"
                 onclick={() => terminalOpen.set(true)}
               >
                 <span aria-hidden="true">▶</span>
-                <span>Terminal</span>
+                <span>Terminal & Editor</span>
               </button>
             </div>
           {/if}
@@ -408,3 +416,25 @@ import UiThemeSelect from '$lib/components/UiThemeSelect.svelte';
   {/if}
   <LabDiagnosticsOverlay />
 </div>
+
+<style>
+  .bottom-panel-tab:hover {
+    color: var(--ui-text-primary);
+    background: color-mix(in srgb, var(--ui-accent) 8%, transparent) !important;
+  }
+  .bottom-panel-resize-handle:hover {
+    background: color-mix(in srgb, var(--ui-accent) 12%, var(--ui-bg-sidebar));
+  }
+  .bottom-panel-resize-handle:hover .resize-handle-line {
+    background: var(--ui-accent);
+    height: 2px;
+  }
+  .resize-handle-line {
+    width: 48px;
+    height: 1px;
+    background: var(--ui-text-secondary);
+    opacity: 0.6;
+    border-radius: 1px;
+    transition: height 0.15s, background 0.15s;
+  }
+</style>

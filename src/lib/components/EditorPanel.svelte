@@ -1,9 +1,11 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { EditorView, keymap, lineNumbers } from '@codemirror/view';
-  import { EditorState } from '@codemirror/state';
-  import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+  import { EditorState, Compartment } from '@codemirror/state';
+  import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+  import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldGutter } from '@codemirror/language';
+  import { closeBrackets } from '@codemirror/autocomplete';
   import { javascript } from '@codemirror/lang-javascript';
   import { python } from '@codemirror/lang-python';
   import { html } from '@codemirror/lang-html';
@@ -16,7 +18,9 @@
     editorFilePath,
     terminalCommand,
     terminalOpen,
+    editorOpen,
     fileServerUrl,
+    openInEditorFromChat,
   } from '$lib/stores.js';
 
   let containerEl = $state(null);
@@ -24,6 +28,8 @@
   let savedToast = $state(false);
   let savePathPrompt = $state(null);
   let savePathInput = $state('');
+  /** When user saves via the system save dialog, we keep the handle for subsequent Saves. */
+  let saveFileHandle = $state(null);
 
   const LANG_MAP = {
     javascript: javascript,
@@ -50,13 +56,20 @@
     return LANG_MAP[lang]?.() ?? javascript();
   }
 
+  const langCompartment = new Compartment();
+
   function getExtensions() {
     return [
       lineNumbers(),
+      foldGutter(),
       history(),
-      keymap.of([...defaultKeymap, ...historyKeymap]),
-      getLanguageExtension(),
+      keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+      langCompartment.of(getLanguageExtension()),
+      bracketMatching(),
+      closeBrackets(),
+      syntaxHighlighting(defaultHighlightStyle),
       oneDark,
+      EditorView.lineWrapping,
       EditorView.updateListener.of((update) => {
         if (update.docChanged && view) {
           const text = update.state.doc.toString();
@@ -83,10 +96,38 @@
       doc: content,
       extensions: getExtensions(),
     });
-    view = new EditorView({
+    const editorView = new EditorView({
       state,
       parent: containerEl,
     });
+    view = editorView;
+    const resizeObserver = new ResizeObserver(() => {
+      editorView.requestMeasure();
+    });
+    resizeObserver.observe(containerEl);
+    return () => {
+      resizeObserver.disconnect();
+      editorView.destroy();
+      view = null;
+    };
+  });
+
+  $effect(() => {
+    const request = $openInEditorFromChat;
+    if (request) {
+      editorContent.set(request.content);
+      editorLanguage.set(request.language);
+      editorFilePath.set(null);
+      saveFileHandle = null;
+      openInEditorFromChat.set(null);
+    }
+  });
+
+  $effect(() => {
+    const lang = $editorLanguage;
+    const path = $editorFilePath;
+    if (!view) return;
+    view.dispatch({ effects: langCompartment.reconfigure(getLanguageExtension()) });
   });
 
   $effect(() => {
@@ -106,18 +147,59 @@
     terminalOpen.set(true);
   }
 
-  async function save() {
+  function suggestedSaveName() {
     const path = get(editorFilePath);
-    const content = get(editorContent) ?? '';
-    if (!path?.trim()) {
-      savePathPrompt = true;
-      savePathInput = '';
-      return;
+    if (path?.trim()) {
+      const base = path.replace(/^.*[/\\]/, '');
+      if (base) return base;
     }
-    await doSave(path.trim(), content);
+    return 'untitled.txt';
   }
 
-  async function doSave(path, content) {
+  async function save() {
+    const content = get(editorContent) ?? '';
+    const path = get(editorFilePath)?.trim();
+    if (path && (path.startsWith('/') || path.match(/^[A-Za-z]:[\\/]/))) {
+      await doSaveViaServer(path, content);
+      return;
+    }
+    if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+      try {
+        let handle = saveFileHandle;
+        if (!handle) {
+          handle = await window.showSaveFilePicker({
+            suggestedName: suggestedSaveName(),
+            types: [
+              { description: 'Text/Code', accept: { 'text/*': ['.txt', '.js', '.py', '.html', '.css', '.json', '.md', '.svelte', '.ts', '.tsx', '.jsx'] } },
+              { description: 'All files', accept: { '*/*': ['*'] } },
+            ],
+          });
+          saveFileHandle = handle;
+          editorFilePath.set(handle.name);
+        }
+        const w = await handle.createWritable();
+        await w.write(content);
+        await w.close();
+        savedToast = true;
+        setTimeout(() => (savedToast = false), 2000);
+        savePathPrompt = null;
+        return;
+      } catch (e) {
+        if (e?.name === 'AbortError') return;
+        console.error('[EditorPanel] save failed', e);
+        alert(e?.message || 'Save failed');
+        return;
+      }
+    }
+    if (path) {
+      await doSaveViaServer(path, content);
+      return;
+    }
+    savePathPrompt = true;
+    savePathInput = '';
+  }
+
+  async function doSaveViaServer(path, content) {
     const base = (get(fileServerUrl) || 'http://localhost:8768').replace(/\/$/, '');
     try {
       const res = await fetch(`${base}/write`, {
@@ -141,7 +223,7 @@
   function saveWithPath() {
     const p = savePathInput?.trim();
     if (!p) return;
-    doSave(p, get(editorContent) ?? '').then(() => {
+    doSaveViaServer(p, get(editorContent) ?? '').then(() => {
       editorFilePath.set(p);
       savePathInput = '';
     });
@@ -153,18 +235,21 @@
     navigator.clipboard.writeText(content).catch(() => {});
   }
 
-  onDestroy(() => {
-    if (view) {
-      view.destroy();
-      view = null;
+  function closePanel(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
-  });
+    editorOpen.set(false);
+    terminalOpen.set(false);
+  }
+
 </script>
 
-<div class="editor-panel flex flex-col h-full min-h-[200px]" style="background: var(--ui-code-bg, #1e1e2e);">
+<div class="editor-panel flex flex-col h-full min-h-[200px] overflow-hidden" style="background: var(--ui-code-bg, #1e1e2e);">
   <div
     class="editor-toolbar shrink-0 flex items-center justify-between gap-2 px-2 py-1 border-b"
-    style="height: 32px; min-height: 32px; border-color: var(--ui-border); background: var(--ui-bg-sidebar); color: var(--ui-text-secondary);"
+    style="position: relative; z-index: 5; height: 32px; min-height: 32px; border-color: var(--ui-border); background: var(--ui-bg-sidebar); color: var(--ui-text-secondary);"
   >
     <span class="truncate text-xs font-mono" style="color: var(--ui-text-primary);" title={$editorFilePath || 'Untitled'}>
       {$editorFilePath || 'Untitled'}
@@ -191,9 +276,17 @@
         title="Copy to clipboard"
         onclick={copyContent}
       >Copy</button>
+      <button
+        type="button"
+        class="editor-toolbar-close shrink-0 flex items-center justify-center rounded text-xs transition-colors"
+        style="color: var(--ui-text-secondary); min-width: 28px; min-height: 28px; width: 28px; height: 28px; pointer-events: auto;"
+        title="Close panel (Ctrl+`)"
+        aria-label="Close terminal and editor panel"
+        onclick={closePanel}
+      >✕</button>
     </div>
   </div>
-  <div class="editor-container flex-1 min-h-[200px] overflow-auto" bind:this={containerEl}></div>
+  <div class="editor-container flex-1 min-h-[200px] overflow-auto relative" style="z-index: 0;" bind:this={containerEl}></div>
   {#if savedToast}
     <div
       class="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded text-xs font-medium"
@@ -205,10 +298,10 @@
       class="absolute inset-0 flex items-center justify-center z-10"
       style="background: rgba(0,0,0,0.5);"
       role="dialog"
-      aria-label="Enter file path to save"
+      aria-label="Save file"
     >
       <div class="rounded-lg border p-4 shadow-xl max-w-sm w-full mx-2" style="background: var(--ui-bg-main); border-color: var(--ui-border);">
-        <p class="text-sm mb-2" style="color: var(--ui-text-primary);">No file path set. Enter path to save (absolute):</p>
+        <p class="text-sm mb-2" style="color: var(--ui-text-primary);">Enter absolute path to save (file server):</p>
         <input
           type="text"
           class="w-full rounded border px-3 py-2 text-sm font-mono mb-3"
@@ -249,5 +342,13 @@
   }
   .editor-container :global(.cm-scroller) {
     min-height: 200px;
+    overflow: auto;
+  }
+  .editor-container :global(.cm-editor) {
+    max-height: 100%;
+  }
+  .editor-toolbar-close:hover {
+    color: var(--ui-text-primary);
+    background: color-mix(in srgb, var(--ui-accent) 12%, transparent);
   }
 </style>

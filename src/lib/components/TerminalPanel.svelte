@@ -172,10 +172,10 @@
       fontSize: 13,
       fontFamily: 'var(--font-mono, ui-monospace, monospace)',
       theme: {
-        background: 'var(--ui-bg-main, #1e1e1e)',
-        foreground: 'var(--ui-text-primary, #d4d4d4)',
+        background: '#1e1e2e',
+        foreground: '#d4d4d4',
         cursor: 'var(--ui-accent, #0ea5e9)',
-        cursorAccent: 'var(--ui-bg-main, #1e1e1e)',
+        cursorAccent: '#1e1e2e',
       },
     });
     const fit = new FitAddon();
@@ -280,7 +280,7 @@
   {/if}
   <div class="terminal-toolbar" style="display: flex; align-items: center; justify-content: space-between; padding: 0.25rem 0.5rem; background: color-mix(in srgb, var(--ui-bg-sidebar) 90%, transparent); border-bottom: 1px solid var(--ui-border); font-size: 0.75rem; color: var(--ui-text-secondary);">
     <span class="terminal-title">Terminal</span>
-    <div class="terminal-toolbar-actions" style="display: flex; align-items: center; gap: 0.25rem;">
+    <div class="terminal-toolbar-actions" style="display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
       <button
         type="button"
         class="terminal-toolbar-btn"
@@ -291,11 +291,11 @@
       >Clear</button>
       <button
         type="button"
-        class="terminal-toolbar-btn"
-        title="Close (Ctrl+`)"
-        aria-label="Close terminal"
+        class="terminal-toolbar-close"
+        title="Close panel (Ctrl+`)"
+        aria-label="Close terminal and editor panel"
         onclick={() => terminalOpen.set(false)}
-        style="padding: 0.2rem 0.4rem; border-radius: 4px; background: transparent; border: none; cursor: pointer; color: var(--ui-text-secondary); font-size: 0.8rem;"
+        style="min-width: 28px; min-height: 28px; width: 28px; height: 28px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 4px; border: none; cursor: pointer; color: var(--ui-text-secondary); font-size: 1rem; background: transparent; transition: color 0.15s, background 0.15s;"
       >✕</button>
     </div>
   </div>
@@ -308,3 +308,10 @@
     onclick={() => terminal?.focus()}
   ></div>
 </div>
+
+<style>
+  .terminal-toolbar-close:hover {
+    color: var(--ui-text-primary);
+    background: color-mix(in srgb, var(--ui-accent) 12%, transparent);
+  }
+</style>

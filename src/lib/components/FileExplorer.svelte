@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
-  import { workspaceRoot, fileServerUrl, pinnedFiles, fileExplorerOpen, terminalCommand, terminalOpen } from '$lib/stores.js';
+  import { workspaceRoot, fileServerUrl, pinnedFiles, fileExplorerOpen, terminalCommand, terminalOpen, editorContent, editorFilePath, editorLanguage, editorOpen } from '$lib/stores.js';
   import FileTree from '$lib/components/FileTree.svelte';
   import { parseGitHubUrl } from '$lib/github.js';
 
@@ -117,6 +117,41 @@
 
   function copyPath(path) {
     navigator.clipboard?.writeText(path);
+  }
+
+  /** Map file extension to editor language (syntax highlighting). */
+  function pathToEditorLang(filePath) {
+    const ext = (filePath || '').split('.').pop()?.toLowerCase() || '';
+    if (ext === 'py') return 'python';
+    if (['js', 'jsx', 'mjs', 'cjs', 'ts', 'tsx'].includes(ext)) return 'javascript';
+    if (['html', 'htm', 'svelte'].includes(ext)) return 'html';
+    if (ext === 'css') return 'css';
+    if (ext === 'json') return 'json';
+    return 'javascript';
+  }
+
+  async function openFileInEditor(filePath) {
+    const absPath = (filePath || '').trim().replace(/\/+$/, '') || '';
+    if (!absPath) return;
+    let base = (get(fileServerUrl) || 'http://localhost:8768').replace(/\/$/, '');
+    if (base.includes(':8766')) base = base.replace(':8766', ':8768');
+    try {
+      const res = await fetch(`${base}/content?path=${encodeURIComponent(absPath)}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || res.statusText);
+      }
+      const data = await res.json();
+      const content = typeof data.content === 'string' ? data.content : '';
+      editorContent.set(content);
+      editorFilePath.set(absPath);
+      editorLanguage.set(pathToEditorLang(absPath));
+      editorOpen.set(true);
+      if (!get(terminalOpen)) terminalOpen.set(true);
+    } catch (e) {
+      console.error('[FileExplorer] open in editor failed', e);
+      error = e?.message || 'Failed to load file';
+    }
   }
 
   function onContextMenu(e, node) {
@@ -264,10 +299,12 @@
         nodes={tree}
         {expandedDirs}
         {pinnedSet}
+        openFilePath={$editorFilePath}
         level={0}
         onToggleDir={toggleDir}
         onPin={pin}
         onUnpin={unpin}
+        onOpenFile={openFileInEditor}
         onCopyPath={copyPath}
         {onContextMenu}
       />

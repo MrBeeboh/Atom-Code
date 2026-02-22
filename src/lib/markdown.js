@@ -41,6 +41,7 @@ marked.use({
       <button type="button" class="code-action-btn" data-action="copy" title="Copy code">📋</button>
       <button type="button" class="code-action-btn" data-action="run" title="Run in terminal">▶</button>
       <button type="button" class="code-action-btn" data-action="save" title="Save to file">💾</button>
+      <button type="button" class="code-action-btn" data-action="edit" title="Edit in editor">✎</button>
       <button type="button" class="code-action-btn" data-action="apply" title="Apply to file">✏️</button>
     </div>
   </div>
