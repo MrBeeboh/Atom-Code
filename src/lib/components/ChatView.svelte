@@ -312,9 +312,10 @@ import { injectGitHubContextIfPresent } from '$lib/github.js';
       if (pathsToFetch.length >= 8) break;
       if (!pathsToFetch.includes(p)) pathsToFetch.push(p);
     }
-    // Phase 9C: @file mentions — explicitly included files
-    for (const p of mentionedFilePaths || []) {
-      const pathForFetch = (p || '').trim().replace(/:(\d+)$/, '');
+    // Phase 9C: @file mentions — explicitly included files (deduped)
+    const mentioned = [...new Set((mentionedFilePaths || []).map((p) => (p || '').trim()))].filter(Boolean);
+    for (const p of mentioned) {
+      const pathForFetch = p.replace(/:(\d+)$/, '');
       if (pathForFetch && !pathsToFetch.includes(pathForFetch)) pathsToFetch.push(pathForFetch);
     }
 

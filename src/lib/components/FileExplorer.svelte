@@ -15,6 +15,7 @@
   let cloneModalOpen = $state(false);
   let cloneUrlInput = $state('');
   let cloneError = $state('');
+  let shallowClone = $state(false);
 
   $effect(() => {
     workspaceInput = $workspaceRoot || '';
@@ -63,6 +64,7 @@
     cloneModalOpen = true;
     cloneUrlInput = '';
     cloneError = '';
+    shallowClone = false;
   }
 
   function closeCloneModal() {
@@ -90,7 +92,8 @@
     const cloneUrl = url.includes('://') ? url : `https://github.com/${parsed.owner}/${parsed.repo}.git`;
     const repoName = parsed.repo.replace(/\.git$/, '');
     const targetPath = root.replace(/\/+$/, '') + '/' + repoName;
-    terminalCommand.set(`cd "${root.replace(/"/g, '\\"')}" && git clone "${cloneUrl}"`);
+    const depthFlag = shallowClone ? ' --depth 1' : '';
+    terminalCommand.set(`cd "${root.replace(/"/g, '\\"')}" && git clone${depthFlag} "${cloneUrl}"`);
     workspaceRoot.set(targetPath);
     workspaceInput = targetPath;
     terminalOpen.set(true);
@@ -222,6 +225,10 @@
         bind:value={cloneUrlInput}
         onkeydown={(e) => e.key === 'Escape' && closeCloneModal()}
       />
+      <label class="flex items-center gap-2 mb-2 cursor-pointer">
+        <input type="checkbox" bind:checked={shallowClone} />
+        <span class="text-xs" style="color: var(--ui-text-secondary);">Shallow clone (--depth 1, faster, less history)</span>
+      </label>
       {#if cloneError}
         <p class="text-xs mb-2" style="color: var(--ui-error, #dc2626);">{cloneError}</p>
       {/if}

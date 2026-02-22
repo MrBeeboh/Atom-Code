@@ -15,6 +15,7 @@ const GITHUB_URL_RE = /(?:https?:\/\/)?(?:www\.)?github\.com\/([a-zA-Z0-9_.-]+)\
  */
 export function parseGitHubUrl(text) {
   if (!text || typeof text !== 'string') return null;
+  GITHUB_URL_RE.lastIndex = 0;
   const m = GITHUB_URL_RE.exec(text);
   if (!m) return null;
   return { owner: m[1], repo: m[2].replace(/\.git$/, '') };
@@ -101,15 +102,13 @@ async function fetchFileContent(owner, repo, path, ref, token) {
 }
 
 const KEY_FILES = ['README.md', 'README', 'package.json', 'requirements.txt', 'Cargo.toml', 'go.mod', 'pyproject.toml'];
-const MAX_FILES_TO_FETCH = 15;
-const MAX_TOTAL_CHARS = 12000;
+const MAX_FILES_TO_FETCH = 4;
+const MAX_TOTAL_CHARS = 7000;
+const FILE_LIST_MAX_LINES = 80;
 
 /**
- * Build context string for a repo: tree summary + key file contents.
- * @param {string} owner
- * @param {string} repo
- * @param {string} [token]
- * @returns {Promise<string>}
+ * Build context string for a repo: short tree summary + README-first file contents.
+ * Keeps context small so "summarize the README" etc. are fast.
  */
 export async function fetchRepoContext(owner, repo, token) {
   const info = await fetchRepoInfo(owner, repo, token);
@@ -117,33 +116,26 @@ export async function fetchRepoContext(owner, repo, token) {
   const tree = await fetchTree(owner, repo, defaultBranch, token);
 
   const pathList = tree.map((n) => n.path).sort((a, b) => a.localeCompare(b));
-  const maxList = 250;
-  const listLines = pathList.length <= maxList
+  const listLines = pathList.length <= FILE_LIST_MAX_LINES
     ? pathList.map((p) => `- ${p}`).join('\n')
-    : pathList.slice(0, maxList).map((p) => `- ${p}`).join('\n') + `\n... and ${pathList.length - maxList} more files`;
+    : pathList.slice(0, FILE_LIST_MAX_LINES).map((p) => `- ${p}`).join('\n') + `\n... and ${pathList.length - FILE_LIST_MAX_LINES} more files`;
   const treeSummary = `Repository: ${owner}/${repo} (branch: ${defaultBranch})\nFile list:\n${listLines}`;
 
   let totalChars = treeSummary.length;
   const parts = [treeSummary];
 
+  // Prefer README and a few key files only (so "summarize the README" gets mostly README)
   const toFetch = [];
   for (const key of KEY_FILES) {
     const found = pathList.find((p) => p === key || p.endsWith('/' + key));
     if (found) toFetch.push(found);
-  }
-  for (const path of pathList) {
-    if (toFetch.length >= MAX_FILES_TO_FETCH) break;
-    const ext = path.includes('.') ? path.split('.').pop() : '';
-    if (['.md', '.json', '.toml', '.yaml', '.yml'].includes('.' + ext) && !path.includes('node_modules') && !toFetch.includes(path)) {
-      toFetch.push(path);
-    }
   }
   toFetch.splice(MAX_FILES_TO_FETCH);
 
   for (const path of toFetch) {
     if (totalChars >= MAX_TOTAL_CHARS) break;
     const content = await fetchFileContent(owner, repo, path, defaultBranch, token);
-    if (content && content.length < 8000) {
+    if (content && content.length < 6000) {
       totalChars += content.length + 100;
       if (totalChars > MAX_TOTAL_CHARS) {
         parts.push(`\n--- ${path} ---\n${content.slice(0, Math.max(0, content.length - (totalChars - MAX_TOTAL_CHARS)))}`);
@@ -156,8 +148,32 @@ export async function fetchRepoContext(owner, repo, token) {
   return parts.join('\n\n');
 }
 
+const GITHUB_CACHE_PREFIX = 'github:context:';
+const GITHUB_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+function getCachedGitHubContext(owner, repo) {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(GITHUB_CACHE_PREFIX + owner + ':' + repo);
+    if (!raw) return null;
+    const { context, fetchedAt } = JSON.parse(raw);
+    if (typeof context !== 'string' || !fetchedAt) return null;
+    if (Date.now() - fetchedAt > GITHUB_CACHE_TTL_MS) return null;
+    return context;
+  } catch (_) {
+    return null;
+  }
+}
+
+function setCachedGitHubContext(owner, repo, context) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(GITHUB_CACHE_PREFIX + owner + ':' + repo, JSON.stringify({ context, fetchedAt: Date.now() }));
+  } catch (_) {}
+}
+
 /**
- * If text contains GitHub URLs, fetch first repo's context. Returns context string or empty.
+ * If text contains GitHub URLs, fetch first repo's context (or use 1h cache). Returns context string or empty.
  * @param {string} text - user message
  * @param {string} [token] - GitHub PAT
  * @returns {Promise<string>}
@@ -165,9 +181,15 @@ export async function fetchRepoContext(owner, repo, token) {
 export async function injectGitHubContextIfPresent(text, token) {
   const first = parseGitHubUrl(text);
   if (!first) return '';
+  const header = `[GitHub repo ${first.owner}/${first.repo} — contents below for context. When the user asks about this repo (e.g. README, files, or "what is X"), answer from this content; do not suggest curl or other ways to fetch it.]\n\n`;
+  const footer = `\n\n--- End of repo context. User message follows ---\n\n`;
+  const cached = getCachedGitHubContext(first.owner, first.repo);
+  if (cached) return header + cached + footer;
   try {
     const context = await fetchRepoContext(first.owner, first.repo, token);
-    return `[GitHub repo ${first.owner}/${first.repo} — contents below for context]\n\n${context}\n\n--- End of repo context. User message follows ---\n\n`;
+    const full = context;
+    setCachedGitHubContext(first.owner, first.repo, full);
+    return header + full + footer;
   } catch (e) {
     console.warn('[github]', e?.message);
     return '';
