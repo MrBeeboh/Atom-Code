@@ -17,6 +17,9 @@ export const conversations = writable([]);
 /** Messages for the active conversation (reactive) */
 export const activeMessages = writable([]);
 
+/** Current streaming text; only updated during stream. Stops list re-renders per token. */
+export const streamingContent = writable('');
+
 /** When set, ChatInput processes these files (drop anywhere in chat) then clears. */
 export const pendingDroppedFiles = writable(null);
 

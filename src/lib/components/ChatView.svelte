@@ -1,6 +1,6 @@
 <script>
   import { get } from 'svelte/store';
-  import { activeConversationId, activeMessages, conversations, settings, effectiveModelId, isStreaming, chatError, chatCommand, pendingDroppedFiles, webSearchForNextMessage, webSearchInProgress, webSearchConnected, grokApiKey, deepinfraApiKey, uiTheme, contextUsage, summarizeAndContinueTrigger } from '$lib/stores.js';
+  import { activeConversationId, activeMessages, streamingContent, conversations, settings, effectiveModelId, isStreaming, chatError, chatCommand, pendingDroppedFiles, webSearchForNextMessage, webSearchInProgress, webSearchConnected, grokApiKey, deepinfraApiKey, uiTheme, contextUsage, summarizeAndContinueTrigger } from '$lib/stores.js';
   import { getMessages, addMessage, clearMessages, deleteMessage, getMessageCount, createConversation } from '$lib/db.js';
   import { streamChatCompletionWithMetrics } from '$lib/streamReporter.js';
   import { requestGrokImageGeneration, requestDeepInfraImageGeneration, requestDeepInfraVideoGeneration, isGrokModel, isDeepSeekModel, requestChatCompletion } from '$lib/api.js';
@@ -368,6 +368,7 @@
       imageRefs: [],
     };
     activeMessages.update((arr) => [...arr, assistantPlaceholder]);
+    streamingContent.set('');
 
     isStreaming.set(true);
     let fullContent = '';
@@ -394,22 +395,11 @@
         signal: controller.signal,
         onChunk(chunk) {
           fullContent += chunk;
-          activeMessages.update((arr) => {
-            const out = [...arr];
-            const last = out[out.length - 1];
-            if (last && last.role === 'assistant') out[out.length - 1] = { ...last, content: fullContent, modelId: $effectiveModelId, imageRefs: [...streamImageRefs] };
-            return out;
-          });
+          streamingContent.set(fullContent);
         },
         onImageRef(ref) {
           if (ref?.image_id) {
             streamImageRefs.push({ image_id: ref.image_id, size: (ref && 'size' in ref ? ref.size : undefined) || 'LARGE' });
-            activeMessages.update((arr) => {
-              const out = [...arr];
-              const last = out[out.length - 1];
-              if (last && last.role === 'assistant') out[out.length - 1] = { ...last, content: fullContent, modelId: $effectiveModelId, imageRefs: [...streamImageRefs] };
-              return out;
-            });
           }
         },
         onDone() {
@@ -427,10 +417,18 @@
       return;
     } finally {
       chatAbortController = null;
+      streamingContent.set('');
       isStreaming.set(false);
     }
 
     if (streamResult?.aborted) return;
+
+    activeMessages.update((arr) => {
+      const out = [...arr];
+      const last = out[out.length - 1];
+      if (last && last.role === 'assistant') out[out.length - 1] = { ...last, content: fullContent, imageRefs: streamImageRefs.length ? [...streamImageRefs] : last.imageRefs };
+      return out;
+    });
 
     const completionTokens = streamResult?.usage?.completion_tokens ?? Math.max(1, Math.ceil(fullContent.length / 4));
     const elapsedMs = streamResult?.elapsedMs ?? 0;

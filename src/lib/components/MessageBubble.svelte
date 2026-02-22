@@ -20,7 +20,7 @@
     return () => unsub();
   });
 
-  let { message, streaming = false } = $props();
+  let { message, streaming = false, streamingContentOverride } = $props();
   const isUser = $derived(message.role === "user");
   const isAssistant = $derived(message.role === "assistant");
   const content = $derived(
@@ -28,6 +28,11 @@
   );
   const contentArray = $derived(
     Array.isArray(message.content) ? message.content : [],
+  );
+  const displayContent = $derived(
+    streaming && typeof streamingContentOverride === "string"
+      ? streamingContentOverride
+      : content,
   );
   const imageRefs = $derived(
     Array.isArray(message.imageRefs) ? message.imageRefs : [],
@@ -39,17 +44,17 @@
     Array.isArray(message.videoUrls) ? message.videoUrls : [],
   );
   const parts = $derived(
-    isAssistant && content ? splitThinkingAndAnswer(content) : [],
+    isAssistant && displayContent ? splitThinkingAndAnswer(displayContent) : [],
   );
   const hasThinkingOrAnswer = $derived(parts.length > 0);
   const imageThumbUrls = $derived(
-    isAssistant && content && content.includes('[Image: http')
-      ? Array.from(content.matchAll(/\[Image: (https?:\/\/[^\]]+)\]/g)).map((m) => m[1])
+    isAssistant && displayContent && displayContent.includes('[Image: http')
+      ? Array.from(displayContent.matchAll(/\[Image: (https?:\/\/[^\]]+)\]/g)).map((m) => m[1])
       : []
   );
   const html = $derived(
-    isAssistant && content && !hasThinkingOrAnswer
-      ? renderMarkdown(content)
+    isAssistant && displayContent && !hasThinkingOrAnswer
+      ? renderMarkdown(displayContent)
       : "",
   );
 
@@ -63,7 +68,7 @@
 
   function copyContent() {
     const text =
-      content ||
+      displayContent ||
       contentArray.map((p) => (p.type === "text" ? p.text : "")).join("");
     if (text) {
       navigator.clipboard?.writeText(text);
@@ -75,7 +80,7 @@
   }
   function pinContent() {
     const text =
-      content ||
+      displayContent ||
       contentArray.map((p) => (p.type === "text" ? p.text : "")).join("");
     if (text) {
       pinnedContent.set(text);
@@ -232,7 +237,7 @@
       {/if}
     {:else if isAssistant}
       <div class="message-assistant-body" onclick={handleCodeAction} role="presentation">
-      {#if !content}
+      {#if !displayContent}
         <div class="flex items-center py-1" aria-label="Thinking">
           <svg
             class="thinking-atom-icon w-8 h-8"
@@ -278,7 +283,7 @@
       {:else}
         <div class="prose-chat prose dark:prose-invert max-w-none">
           {@html html}
-          {#if content && content.includes('[Image: http')}
+          {#if displayContent && displayContent.includes('[Image: http')}
             <div class="mt-2 flex flex-wrap gap-3">
               {#each imageThumbUrls as url}
                 <img src={url} alt="Result image" class="max-h-32 rounded border border-zinc-200 dark:border-zinc-600" loading="lazy" />
@@ -370,13 +375,13 @@
           {/each}
         </div>
       {/if}
-      {#if isAssistant && (content.includes('Generated image') || content.includes('Generated video')) && !imageUrls.length && !videoUrls.length}
+      {#if isAssistant && (displayContent.includes('Generated image') || displayContent.includes('Generated video')) && !imageUrls.length && !videoUrls.length}
         <p class="mt-2 text-sm text-amber-600 dark:text-amber-400">Media could not be loaded. Try generating again and ensure your DeepInfra API key is set in Settings.</p>
       {/if}
     {/if}
 
     <!-- Copy/Pin buttons for ALL messages (User or Assistant) -->
-    {#if (isUser && (content || contentArray.length)) || (isAssistant && (content || hasThinkingOrAnswer))}
+    {#if (isUser && (content || contentArray.length)) || (isAssistant && (displayContent || hasThinkingOrAnswer))}
       <div
         class="flex items-center gap-1 mt-2 pt-2 {isUser ? 'justify-end' : ''}"
       >
@@ -476,11 +481,11 @@
           {/if}
         </button>
       </div>
-      {#if isAssistant && (message.stats || content)}
+      {#if isAssistant && (message.stats || displayContent)}
         <div class="perf-stats-wrap mt-2 flex justify-start">
           <PerfStats
             stats={message.stats}
-            contentLength={content.length}
+            contentLength={displayContent.length}
             elapsedMs={message.stats?.elapsed_ms}
           />
         </div>
@@ -497,6 +502,10 @@
   .message-bubble-inner.streaming-bubble {
     will-change: contents;
     contain: layout style;
+    transition: none;
+  }
+  .message-bubble-inner.streaming-bubble * {
+    transition: none;
   }
   .apply-picker-backdrop {
     position: fixed;

@@ -1,6 +1,6 @@
 <script>
   import { tick } from 'svelte';
-  import { activeMessages, isStreaming } from '$lib/stores.js';
+  import { activeMessages, isStreaming, streamingContent } from '$lib/stores.js';
   import MessageBubble from '$lib/components/MessageBubble.svelte';
 
   let listEl;
@@ -63,6 +63,15 @@
       throttledScroll();
     });
   })();
+
+  $: $streamingContent, $isStreaming, (() => {
+    if (!$isStreaming) return;
+    tick().then(() => {
+      const parent = listEl?.parentElement;
+      if (!parent || !isNearBottom(parent)) return;
+      throttledScroll();
+    });
+  })();
 </script>
 
 <div class="chat-message-list max-w-[56rem] mx-auto w-full px-4 pt-6 pb-10" bind:this={listEl}>
@@ -72,6 +81,7 @@
         <MessageBubble
           message={msg}
           streaming={$isStreaming && index === msgs.length - 1 && msg.role === 'assistant'}
+          streamingContentOverride={$isStreaming && index === msgs.length - 1 && msg.role === 'assistant' ? $streamingContent : undefined}
         />
       </div>
     {/each}
