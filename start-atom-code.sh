@@ -3,6 +3,8 @@ cd "$(dirname "$0")"
 
 echo "Starting ATOM Code..."
 
+export ATOM_WORKSPACE_ROOT="${ATOM_WORKSPACE_ROOT:-$HOME}"
+
 # Terminal server
 (cd services/terminal-server && node server.js) &
 TERM_PID=$!
