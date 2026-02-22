@@ -1,6 +1,6 @@
 <script>
   import { get } from 'svelte/store';
-  import { isStreaming, voiceServerUrl, pendingDroppedFiles, webSearchForNextMessage, webSearchInProgress, webSearchConnected, braveApiKey, chatInputPrefill } from '$lib/stores.js';
+  import { isStreaming, voiceServerUrl, pendingDroppedFiles, webSearchForNextMessage, webSearchInProgress, webSearchConnected, braveApiKey, chatInputPrefill, terminalErrorBanner, errorFeedbackRequest } from '$lib/stores.js';
   import ThinkingAtom from '$lib/components/ThinkingAtom.svelte';
   import ContextRing from '$lib/components/ContextRing.svelte';
   import { COCKPIT_SENDING, COCKPIT_SEARCHING, pickWitty } from '$lib/cockpitCopy.js';
@@ -432,7 +432,24 @@
           }
           const data = await res.json();
           const transcribed = (data && data.text) ? String(data.text).trim() : '';
-          if (transcribed) text = text ? text + ' ' + transcribed : transcribed;
+          const fixPatterns = [
+            /^fix it$/i,
+            /^fix that$/i,
+            /^fix the error$/i,
+            /^fix this$/i,
+            /^can you fix/i,
+            /^please fix/i,
+          ];
+          if (transcribed) {
+            const isFixCommand = fixPatterns.some((p) => p.test(transcribed));
+            const banner = get(terminalErrorBanner);
+            if (isFixCommand && banner?.code != null) {
+              errorFeedbackRequest.set({ code: banner.code, output: banner.output ?? '' });
+              terminalErrorBanner.set(null);
+            } else {
+              text = text ? text + ' ' + transcribed : transcribed;
+            }
+          }
         } catch (e) {
           voiceError = e?.message || 'Voice server error. Is it running on ' + url + '?';
         } finally {
