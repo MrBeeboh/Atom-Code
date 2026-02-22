@@ -151,6 +151,13 @@ if (typeof localStorage !== 'undefined') {
   braveApiKey.subscribe((v) => localStorage.setItem('braveApiKey', (typeof v === 'string' ? v : '').trim()));
 }
 
+/** GitHub Personal Access Token: for private repo fetch (Phase 10). Never sent to the model. */
+const getStoredGithubToken = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem('githubToken') ?? '').trim() : null) ?? '';
+export const githubToken = writable(getStoredGithubToken());
+if (typeof localStorage !== 'undefined') {
+  githubToken.subscribe((v) => localStorage.setItem('githubToken', (typeof v === 'string' ? v : '').trim()));
+}
+
 /** Together image endpoint name: required for FLUX.1-schnell-Free (create dedicated endpoint at api.together.ai, then paste the endpoint name here). */
 const getStoredTogetherImageEndpoint = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem('togetherImageEndpoint') ?? '').trim() : null) ?? '';
 export const togetherImageEndpoint = writable(getStoredTogetherImageEndpoint());
@@ -448,6 +455,12 @@ if (typeof localStorage !== 'undefined') {
   pinnedFiles.subscribe((v) => localStorage.setItem('pinnedFiles', JSON.stringify(v ?? [])));
 }
 
+/** Phase 9A: Repo map — project structure text and file list for codebase awareness. */
+export const repoMapText = writable(/** @type {string} */ (''));
+export const repoMapFileList = writable(/** @type {string[]} */ ([]));
+export const repoMapLoading = writable(false);
+export const repoMapError = writable(/** @type {string | null} */ (null));
+
 /** File explorer panel open (toggle with Ctrl+E). */
 export const fileExplorerOpen = writable(
   typeof localStorage !== 'undefined' ? localStorage.getItem('fileExplorerOpen') === 'true' : false
@@ -461,6 +474,9 @@ export const chatInputPrefill = writable(/** @type {string | null} */ (null));
 
 /** Context usage for the current conversation: { promptTokens, contextMax }. Updated from stream usage and from last message when switching conv. Used by ContextRing. */
 export const contextUsage = writable({ promptTokens: 0, contextMax: 128000 });
+
+/** True from Send click until streaming starts or error (GitHub fetch, file context, etc.). Header atom animates when this or isStreaming. */
+export const messagePreparing = writable(false);
 
 /** Increment to request "Summarize and continue". ChatView reacts and runs the flow, then resets context. */
 export const summarizeAndContinueTrigger = writable(0);

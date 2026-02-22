@@ -5,7 +5,9 @@
   import { streamChatCompletionWithMetrics } from '$lib/streamReporter.js';
   import { requestGrokImageGeneration, requestDeepInfraImageGeneration, requestDeepInfraVideoGeneration, isGrokModel, isDeepSeekModel, requestChatCompletion } from '$lib/api.js';
   import { searchDuckDuckGo, formatSearchResultForChat } from '$lib/duckduckgo.js';
-  import { pinnedFiles, fileServerUrl } from '$lib/stores.js';
+  import { pinnedFiles, fileServerUrl, repoMapText, repoMapFileList, githubToken, messagePreparing } from '$lib/stores.js';
+import { findRelevantFiles } from '$lib/repoMap.js';
+import { injectGitHubContextIfPresent } from '$lib/github.js';
   import MessageList from '$lib/components/MessageList.svelte';
   import QuickActions from '$lib/components/QuickActions.svelte';
   import ChatInput from '$lib/components/ChatInput.svelte';
@@ -239,7 +241,7 @@
     return Math.max(0, Math.ceil(chars / 4));
   }
 
-  async function sendUserMessage(text, imageDataUrls = [], videoDataUrls = []) {
+  async function sendUserMessage(text, imageDataUrls = [], videoDataUrls = [], mentionedFilePaths = []) {
     const hasText = (text || '').trim().length > 0;
     const hasImages = imageDataUrls?.length > 0;
     const hasVideos = videoDataUrls?.length > 0;
@@ -250,6 +252,7 @@
       return;
     }
 
+    messagePreparing.set(true);
     let effectiveText = (text || '').trim();
     if (get(webSearchForNextMessage) && hasText) {
       // Stay connected: don't turn off webSearchForNextMessage after send.
@@ -264,6 +267,7 @@
         webSearchConnected.set(false);
         chatError.set(e?.message || 'Web search failed. Click the globe to retry or send without internet.');
         webSearchInProgress.set(false);
+        messagePreparing.set(false);
         throw e; // Propagate so ChatInput restores the user's typed message.
       }
       webSearchInProgress.set(false);
@@ -284,24 +288,49 @@
         ]
       : effectiveText;
 
+    // Phase 10A: If message contains a GitHub URL, fetch repo context (tree + key files)
+    let githubContext = '';
+    try {
+      githubContext = await injectGitHubContextIfPresent(effectiveText, get(githubToken) || undefined);
+    } catch (e) {
+      console.warn('[ChatView] GitHub context fetch failed:', e?.message);
+    }
+
     // Prepend pinned file contents as context when sending (file server is 8768; 8766 is unload helper)
     let fileContext = '';
+    let fileServerBase = (get(fileServerUrl) || 'http://localhost:8768').replace(/\/$/, '');
+    if (fileServerBase.includes(':8766')) fileServerBase = fileServerBase.replace(':8766', ':8768');
+
     const pinned = get(pinnedFiles) || [];
-    if (pinned.length > 0) {
-      let fileServerBase = (get(fileServerUrl) || 'http://localhost:8768').replace(/\/$/, '');
-      if (fileServerBase.includes(':8766')) fileServerBase = fileServerBase.replace(':8766', ':8768');
+    const pinnedSet = new Set(pinned.map((p) => (p || '').trim().replace(/:(\d+)$/, '')));
+
+    // Phase 9B: Smart context — auto-include up to 3 relevant files by keyword match
+    const repoList = get(repoMapFileList) || [];
+    const smartPaths = findRelevantFiles(effectiveText, repoList, 3).filter((p) => !pinnedSet.has(p));
+    const pathsToFetch = [...pinned];
+    for (const p of smartPaths) {
+      if (pathsToFetch.length >= 8) break;
+      if (!pathsToFetch.includes(p)) pathsToFetch.push(p);
+    }
+    // Phase 9C: @file mentions — explicitly included files
+    for (const p of mentionedFilePaths || []) {
+      const pathForFetch = (p || '').trim().replace(/:(\d+)$/, '');
+      if (pathForFetch && !pathsToFetch.includes(pathForFetch)) pathsToFetch.push(pathForFetch);
+    }
+
+    if (pathsToFetch.length > 0) {
       const toRemove = []; // paths that 404 or are invalid — remove from pinned so we stop retrying
       const fileContextParts = await Promise.all(
-        pinned.map(async (filePath) => {
+        pathsToFetch.map(async (filePath) => {
           const pathForFetch = (typeof filePath === 'string' && filePath.trim())
             ? filePath.trim().replace(/:(\d+)$/, '')  // strip :line for file server
             : '';
           if (!pathForFetch || pathForFetch.includes('%') || !pathForFetch.startsWith('/')) {
-            toRemove.push(filePath);
+            if (pinned.includes(filePath)) toRemove.push(filePath);
             return null;
           }
           if (pathForFetch.includes('.code-workspace') || pathForFetch.includes('/.cursor/projects/')) {
-            toRemove.push(filePath);
+            if (pinned.includes(filePath)) toRemove.push(filePath);
             return null;
           }
           try {
@@ -309,15 +338,19 @@
             if (!res.ok) {
               const data = await res.json().catch(() => ({}));
               const msg = data?.error || res.statusText;
-              console.warn('[ChatView] Pinned file fetch failed:', pathForFetch, '—', msg, '(removing from pinned)');
-              toRemove.push(filePath);
+              if (pinned.includes(filePath)) {
+                console.warn('[ChatView] Pinned file fetch failed:', pathForFetch, '—', msg, '(removing from pinned)');
+                toRemove.push(filePath);
+              }
               return null;
             }
             const data = await res.json();
             return data?.content != null ? `--- ${pathForFetch} ---\n${data.content}` : null;
           } catch (e) {
-            console.warn('[ChatView] Pinned file fetch error:', pathForFetch, '(removing from pinned)', e);
-            toRemove.push(filePath);
+            if (pinned.includes(filePath)) {
+              console.warn('[ChatView] Pinned file fetch error:', pathForFetch, '(removing from pinned)', e);
+              toRemove.push(filePath);
+            }
             return null;
           }
         })
@@ -336,18 +369,23 @@
     });
     await loadMessages();
     let lastUserContent = userContent;
-    if (fileContext) {
+    const contextPrefix = [githubContext, fileContext].filter(Boolean).join('\n\n');
+    if (contextPrefix) {
       if (typeof userContent === 'string') {
-        lastUserContent = fileContext + '\n\n' + userContent;
+        lastUserContent = contextPrefix + '\n\n' + userContent;
       } else if (Array.isArray(userContent)) {
         const textPart = userContent.find((p) => p.type === 'text');
         const rest = userContent.filter((p) => p.type !== 'text');
-        const text = (textPart?.text ?? '') ? fileContext + '\n\n' + textPart.text : fileContext;
+        const text = (textPart?.text ?? '') ? contextPrefix + '\n\n' + textPart.text : contextPrefix;
         lastUserContent = [{ type: 'text', text }, ...rest];
       }
     }
     const msgsForApi = [...history, { role: 'user', content: lastUserContent }];
-    const apiMessages = buildApiMessages(msgsForApi, $settings.system_prompt);
+    // Phase 9A: Inject repo map into system prompt for codebase awareness
+    const systemPromptRaw = ($settings.system_prompt || '').trim();
+    const repoMap = (get(repoMapText) || '').trim();
+    const systemPrompt = repoMap ? (systemPromptRaw ? systemPromptRaw + '\n\n' + repoMap : repoMap) : systemPromptRaw;
+    const apiMessages = buildApiMessages(msgsForApi, systemPrompt);
     const estimatedPromptTokens = estimatePromptTokens(apiMessages);
 
     const assistantMsgId = generateId();
@@ -411,6 +449,7 @@
     } finally {
       chatAbortController = null;
       streamingContent.set('');
+      messagePreparing.set(false);
       isStreaming.set(false);
     }
 
@@ -790,8 +829,8 @@
   <div class="chat-view-content flex flex-col min-h-0">
   {#if convId}
     {#if $activeMessages.length === 0}
-      <!-- Greeting + input: centered column 56rem, greeting vertically centered -->
-      <div class="ui-splash-wrap flex-1 flex flex-col min-h-0">
+      <!-- Greeting + input: centered column 56rem, pushed down from top -->
+      <div class="ui-splash-wrap flex-1 flex flex-col min-h-0 pt-16 md:pt-24">
         <div class="flex-1 flex flex-col items-center justify-center min-h-0 px-4 w-full max-w-[56rem] mx-auto">
           <h1 class="ui-greeting-title text-2xl md:text-3xl font-semibold text-center mb-2" style="color: var(--ui-text-primary);">What can I help with?</h1>
           {#if $chatError}

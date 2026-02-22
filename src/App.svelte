@@ -4,7 +4,8 @@
   import { get } from 'svelte/store';
   import { fly } from 'svelte/transition';
   import { backOut, quintOut } from 'svelte/easing';
-  import { theme, sidebarOpen, settingsOpen, layout, activeConversationId, conversations, selectedModelId, uiTheme, cockpitIntelOpen, models, lmStudioConnected, cloudApisAvailable, activeMessages, isStreaming, terminalOpen, terminalHeight, fileExplorerOpen, diffViewerState } from '$lib/stores.js';
+  import { theme, sidebarOpen, settingsOpen, layout, activeConversationId, conversations, selectedModelId, uiTheme, cockpitIntelOpen, models, lmStudioConnected, cloudApisAvailable, activeMessages, isStreaming, messagePreparing, terminalOpen, terminalHeight, fileExplorerOpen, diffViewerState, workspaceRoot, fileServerUrl, repoMapText, repoMapFileList, repoMapLoading, repoMapError } from '$lib/stores.js';
+import { getRepoMap } from '$lib/repoMap.js';
   import { startTemporalController } from '$lib/temporalController.js';
   import { createConversation, listConversations, getMessageCount, getMessages } from '$lib/db.js';
   import { getModels } from '$lib/api.js';
@@ -67,6 +68,45 @@ import UiThemeSelect from '$lib/components/UiThemeSelect.svelte';
   const HEADER_RIGHT_GROUP = 'margin-left: auto;';
 
   let lmStatusMessage = $state('');
+
+  // Phase 9A: Index workspace when root or file server changes
+  $effect(() => {
+    const root = $workspaceRoot?.trim();
+    const base = $fileServerUrl;
+    if (!root) {
+      repoMapText.set('');
+      repoMapFileList.set([]);
+      repoMapError.set(null);
+      return;
+    }
+    let cancelled = false;
+    repoMapLoading.set(true);
+    repoMapError.set(null);
+    getRepoMap(root, base)
+      .then((result) => {
+        if (cancelled) return;
+        if (result) {
+          repoMapText.set(result.text);
+          repoMapFileList.set(result.fileList);
+        } else {
+          repoMapText.set('');
+          repoMapFileList.set([]);
+        }
+        repoMapError.set(null);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          repoMapError.set(e?.message || 'Failed to index project');
+          repoMapText.set('');
+          repoMapFileList.set([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) repoMapLoading.set(false);
+      });
+    return () => { cancelled = true; };
+  });
+
   $effect(() => {
     const c = $lmStudioConnected;
     const cloud = $cloudApisAvailable;
@@ -224,7 +264,7 @@ import UiThemeSelect from '$lib/components/UiThemeSelect.svelte';
       <header class="cockpit-header shrink-0 flex items-center px-4 py-2.5 border-b" style="border-color: var(--ui-border); background-color: var(--ui-bg-sidebar);">
         <!-- Left: brand -->
         <div class="flex items-center gap-2 shrink-0" role="group" aria-label="Brand">
-          <span class="flex items-center gap-1.5 font-semibold shrink-0" style="color: var(--ui-accent);"><AtomLogo size={20} />ATOM Code</span>
+          <span class="flex items-center gap-1.5 font-semibold shrink-0" style="color: var(--ui-accent);"><AtomLogo size={20} animated={$messagePreparing || $isStreaming} />ATOM Code</span>
         </div>
         <!-- Center: model selector + preset — horizontally centered, no extra background -->
         <div class="flex-1 flex items-center justify-center min-w-0 px-4">

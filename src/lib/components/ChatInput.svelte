@@ -1,6 +1,6 @@
 <script>
   import { get } from 'svelte/store';
-  import { isStreaming, voiceServerUrl, pendingDroppedFiles, webSearchForNextMessage, webSearchInProgress, webSearchConnected, braveApiKey, chatInputPrefill, terminalErrorBanner, errorFeedbackRequest } from '$lib/stores.js';
+  import { isStreaming, voiceServerUrl, pendingDroppedFiles, webSearchForNextMessage, webSearchInProgress, webSearchConnected, braveApiKey, chatInputPrefill, terminalErrorBanner, errorFeedbackRequest, repoMapFileList, workspaceRoot } from '$lib/stores.js';
   import ThinkingAtom from '$lib/components/ThinkingAtom.svelte';
   import ContextRing from '$lib/components/ContextRing.svelte';
   import { COCKPIT_SENDING, COCKPIT_SEARCHING, pickWitty } from '$lib/cockpitCopy.js';
@@ -85,6 +85,25 @@
   let attachments = $state([]);
   let attachProcessing = $state(false);
   let attachError = $state(null);
+
+  /** Phase 9C: @file mentions — autocomplete state */
+  let atMentionOpen = $state(false);
+  let atMentionQuery = $state('');
+  let atMentionStartIndex = $state(0);
+  let atMentionSelectedIndex = $state(0);
+  let mentionedFilePaths = $state(/** @type {string[]} */ ([]));
+  const atMentionFiles = $derived.by(() => {
+    const list = $repoMapFileList || [];
+    const root = ($workspaceRoot || '').replace(/\/+$/, '') + '/';
+    const q = (atMentionQuery || '').toLowerCase();
+    return list
+      .map((p) => ({
+        path: p,
+        rel: p.startsWith(root) ? p.slice(root.length) : p.split(/[/\\]/).pop() || p,
+      }))
+      .filter(({ rel }) => !q || rel.toLowerCase().includes(q))
+      .slice(0, 12);
+  });
 
   /** Clippy Easter egg: random smart-ass bubble; first pop soon, then 15s+ apart; also on paperclip hover. */
   const CLIPPY_QUIPS = [
@@ -193,12 +212,15 @@
 
     const savedText = text;
     const savedAttachments = [...attachments];
+    const mentionedToSend = [...mentionedFilePaths];
     text = '';
     attachments = [];
     attachError = null;
+    mentionedFilePaths = [];
+    atMentionOpen = false;
 
     try {
-      if (onSend) await onSend(userMessage, imageDataUrls, videoDataUrls);
+      if (onSend) await onSend(userMessage, imageDataUrls, videoDataUrls, mentionedToSend);
     } catch (err) {
       text = savedText;
       attachments = savedAttachments;
@@ -335,10 +357,75 @@
   });
 
   function handleKeydown(e) {
+    if (atMentionOpen && atMentionFiles.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        atMentionSelectedIndex = (atMentionSelectedIndex + 1) % atMentionFiles.length;
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        atMentionSelectedIndex = (atMentionSelectedIndex - 1 + atMentionFiles.length) % atMentionFiles.length;
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        selectMentionFile(atMentionFiles[atMentionSelectedIndex].path);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        atMentionOpen = false;
+        return;
+      }
+    }
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleSubmit();
     }
+  }
+
+  function selectMentionFile(absolutePath) {
+    const el = textareaEl;
+    if (!el) return;
+    const root = (get(workspaceRoot) || '').replace(/\/+$/, '') + '/';
+    const rel = absolutePath.startsWith(root) ? absolutePath.slice(root.length) : absolutePath.split(/[/\\]/).pop() || absolutePath;
+    const start = atMentionStartIndex;
+    const end = Math.min(start + 1 + (atMentionQuery || '').length, text.length);
+    text = text.slice(0, start) + '@' + rel + ' ' + text.slice(end);
+    mentionedFilePaths = [...mentionedFilePaths, absolutePath];
+    atMentionOpen = false;
+    atMentionQuery = '';
+    atMentionSelectedIndex = 0;
+    setTimeout(() => {
+      el.focus();
+      const newPos = start + rel.length + 2;
+      el.setSelectionRange(newPos, newPos);
+      autoResize();
+    }, 0);
+  }
+
+  function onInputWithMention() {
+    autoResize();
+    const el = textareaEl;
+    if (!el) return;
+    const pos = el.selectionStart;
+    const val = text;
+    const before = val.slice(0, pos);
+    const lastAt = before.lastIndexOf('@');
+    if (lastAt === -1) {
+      atMentionOpen = false;
+      return;
+    }
+    const afterAt = before.slice(lastAt + 1);
+    if (/[\s\n]/.test(afterAt)) {
+      atMentionOpen = false;
+      return;
+    }
+    atMentionOpen = true;
+    atMentionQuery = afterAt;
+    atMentionStartIndex = lastAt;
+    atMentionSelectedIndex = 0;
   }
 
   /** Perplexity-style: stable height when empty, grow only with content up to max. */
@@ -517,12 +604,28 @@
       bind:this={textareaEl}
       bind:value={text}
       onkeydown={handleKeydown}
-      oninput={autoResize}
+      oninput={onInputWithMention}
       onpaste={onPaste}
       disabled={$isStreaming ? true : null}
       placeholder={placeholderText}
       rows="1"
     ></textarea>
+    {#if atMentionOpen && atMentionFiles.length > 0}
+      <div class="at-mention-dropdown" role="listbox" aria-label="Include file">
+        {#each atMentionFiles as file, i}
+          <button
+            type="button"
+            class="at-mention-item"
+            class:selected={i === atMentionSelectedIndex}
+            role="option"
+            aria-selected={i === atMentionSelectedIndex}
+            onclick={() => selectMentionFile(file.path)}
+          >
+            <span class="at-mention-rel">{file.rel}</span>
+          </button>
+        {/each}
+      </div>
+    {/if}
     {#if onGenerateImageGrok || onGenerateImageDeepSeek || onGenerateVideoDeepSeek}
       <div class="media-toolbar">
         {#if onGenerateImageGrok || onGenerateImageDeepSeek}
@@ -726,6 +829,44 @@
     padding: 2px var(--space-2) 0;
     min-height: 28px;
     flex-shrink: 0;
+    border: none;
+    border-top: none;
+    background: transparent;
+  }
+
+  .at-mention-dropdown {
+    flex-shrink: 0;
+    max-height: 200px;
+    overflow-y: auto;
+    border-top: 1px solid var(--ui-border, #e5e7eb);
+    background: var(--ui-input-bg, #fff);
+    border-radius: 0 0 10px 10px;
+    padding: 2px 0;
+  }
+
+  .at-mention-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-family: ui-monospace, monospace;
+    border: none;
+    background: transparent;
+    color: var(--ui-text-primary, #111);
+    cursor: pointer;
+  }
+
+  .at-mention-item:hover,
+  .at-mention-item.selected {
+    background: color-mix(in srgb, var(--ui-accent, #3b82f6) 12%, transparent);
+  }
+
+  .at-mention-rel {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .chat-input-footer {
@@ -835,6 +976,11 @@
 
   textarea:focus {
     outline: none;
+  }
+
+  /* Avoid double focus ring (container already has focus-within); prevents horizontal bar artifact when typing */
+  .chat-input-box textarea:focus-visible {
+    box-shadow: none;
   }
 
   textarea:disabled {

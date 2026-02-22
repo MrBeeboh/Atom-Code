@@ -1,10 +1,12 @@
 <script>
   /** Logo size in pixels (width/height). Default 24 for headers, use larger (e.g. 32) for splash. */
-  let { size = 24 } = $props();
+  /** When true, orbits animate (e.g. while preparing message or streaming). */
+  let { size = 24, animated = false } = $props();
 </script>
 
 <svg
   class="atom-logo-icon shrink-0"
+  class:atom-logo-icon-active={animated}
   viewBox="0 0 32 32"
   fill="none"
   xmlns="http://www.w3.org/2000/svg"

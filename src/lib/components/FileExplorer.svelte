@@ -1,8 +1,9 @@
 <script>
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
-  import { workspaceRoot, fileServerUrl, pinnedFiles, fileExplorerOpen } from '$lib/stores.js';
+  import { workspaceRoot, fileServerUrl, pinnedFiles, fileExplorerOpen, terminalCommand, terminalOpen } from '$lib/stores.js';
   import FileTree from '$lib/components/FileTree.svelte';
+  import { parseGitHubUrl } from '$lib/github.js';
 
   const TREE_DEPTH = 4;
   let tree = $state([]);
@@ -11,6 +12,9 @@
   let expandedDirs = $state(new Set());
   let contextMenu = $state(null);
   let workspaceInput = $state('');
+  let cloneModalOpen = $state(false);
+  let cloneUrlInput = $state('');
+  let cloneError = $state('');
 
   $effect(() => {
     workspaceInput = $workspaceRoot || '';
@@ -53,6 +57,45 @@
 
   function setWorkspace() {
     workspaceRoot.set(workspaceInput?.trim() || '');
+  }
+
+  function openCloneModal() {
+    cloneModalOpen = true;
+    cloneUrlInput = '';
+    cloneError = '';
+  }
+
+  function closeCloneModal() {
+    cloneModalOpen = false;
+    cloneUrlInput = '';
+    cloneError = '';
+  }
+
+  function doClone() {
+    const url = cloneUrlInput?.trim();
+    if (!url) {
+      cloneError = 'Enter a GitHub URL';
+      return;
+    }
+    const parsed = parseGitHubUrl(url + '\n');
+    if (!parsed) {
+      cloneError = 'Invalid GitHub URL (e.g. github.com/owner/repo)';
+      return;
+    }
+    const root = (get(workspaceRoot) || '').trim();
+    if (!root) {
+      cloneError = 'Set workspace root first.';
+      return;
+    }
+    const cloneUrl = url.includes('://') ? url : `https://github.com/${parsed.owner}/${parsed.repo}.git`;
+    const repoName = parsed.repo.replace(/\.git$/, '');
+    const targetPath = root.replace(/\/+$/, '') + '/' + repoName;
+    terminalCommand.set(`cd "${root.replace(/"/g, '\\"')}" && git clone "${cloneUrl}"`);
+    workspaceRoot.set(targetPath);
+    workspaceInput = targetPath;
+    terminalOpen.set(true);
+    closeCloneModal();
+    setTimeout(() => fetchTree(), 2000);
   }
 
   function pin(path) {
@@ -139,6 +182,13 @@
       onclick={setWorkspace}
       title="Set workspace root"
     >Set</button>
+    <button
+      type="button"
+      class="shrink-0 px-2 py-1 rounded text-xs"
+      style="color: var(--ui-text-secondary); border: 1px solid var(--ui-border);"
+      onclick={openCloneModal}
+      title="Clone GitHub repo into workspace"
+    >Clone</button>
     {#if ($pinnedFiles || []).length > 0}
       <button
         type="button"
@@ -149,6 +199,50 @@
       >Unpin all</button>
     {/if}
   </div>
+  {#if cloneModalOpen}
+  <div
+    class="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Clone GitHub repo"
+    onclick={closeCloneModal}
+  >
+    <div
+      class="rounded-xl shadow-xl border p-4 w-full max-w-md"
+      style="background: var(--ui-bg-main); border-color: var(--ui-border);"
+      onclick={(e) => e.stopPropagation()}
+    >
+      <h3 class="text-sm font-semibold mb-2" style="color: var(--ui-text-primary);">Clone repo to workspace</h3>
+      <p class="text-xs mb-3" style="color: var(--ui-text-secondary);">Git clone will run in the terminal. Workspace will switch to the cloned folder.</p>
+      <input
+        type="text"
+        class="w-full rounded border px-3 py-2 text-sm font-mono mb-2"
+        style="background: var(--ui-input-bg); border-color: var(--ui-border); color: var(--ui-text-primary);"
+        placeholder="github.com/owner/repo"
+        bind:value={cloneUrlInput}
+        onkeydown={(e) => e.key === 'Escape' && closeCloneModal()}
+      />
+      {#if cloneError}
+        <p class="text-xs mb-2" style="color: var(--ui-error, #dc2626);">{cloneError}</p>
+      {/if}
+      <div class="flex gap-2 justify-end">
+        <button
+          type="button"
+          class="px-3 py-1.5 rounded text-sm"
+          style="color: var(--ui-text-secondary); border: 1px solid var(--ui-border);"
+          onclick={closeCloneModal}
+        >Cancel</button>
+        <button
+          type="button"
+          class="px-3 py-1.5 rounded text-sm font-medium"
+          style="background: var(--ui-accent); color: white;"
+          onclick={doClone}
+        >Clone</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
   <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-1.5">
     {#if !(get(workspaceRoot) || '').trim()}
       <p class="text-xs py-2" style="color: var(--ui-text-secondary);">Set a workspace path to browse files.</p>

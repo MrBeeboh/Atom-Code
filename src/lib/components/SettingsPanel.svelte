@@ -1,7 +1,7 @@
 <script>
   import { fly } from 'svelte/transition';
   import { backOut, quintOut } from 'svelte/easing';
-  import { globalDefault, updateGlobalDefault, selectedModelId, models, presetDefaultModels, lmStudioBaseUrl, voiceServerUrl, lmStudioUnloadHelperUrl, terminalServerUrl, fileServerUrl, workspaceRoot, deepSeekApiKey, grokApiKey, togetherApiKey, deepinfraApiKey, braveApiKey } from '$lib/stores.js';
+  import { globalDefault, updateGlobalDefault, selectedModelId, models, presetDefaultModels, lmStudioBaseUrl, voiceServerUrl, lmStudioUnloadHelperUrl, terminalServerUrl, fileServerUrl, workspaceRoot, deepSeekApiKey, grokApiKey, togetherApiKey, deepinfraApiKey, braveApiKey, githubToken } from '$lib/stores.js';
   import { syncBraveKeyToProxy } from '$lib/duckduckgo.js';
 
   let { onclose } = $props();
@@ -147,6 +147,17 @@
               placeholder="Paste your Brave Search API key"
               class="w-full rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400" />
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Web search (globe). <a href="https://search.brave.com/help/api" target="_blank" rel="noopener noreferrer" class="underline">search.brave.com/help/api</a></p>
+          </div>
+          <div>
+            <label for="settings-github-token" class="block text-sm font-medium text-zinc-600 dark:text-zinc-400">GitHub token (optional, for private repos)</label>
+            <input
+              id="settings-github-token"
+              type="password"
+              autocomplete="off"
+              bind:value={$githubToken}
+              placeholder="ghp_… (only for private repo fetch)"
+              class="w-full rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400" />
+            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Paste a GitHub URL in chat to fetch repo context. Token only needed for private repos. Never sent to the model.</p>
           </div>
           <div>
             <label for="settings-deepinfra-key" class="block text-sm font-medium text-zinc-600 dark:text-zinc-400">DeepInfra API key (image + video when DeepSeek)</label>

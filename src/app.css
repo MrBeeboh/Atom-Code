@@ -279,6 +279,32 @@ html { --metrics-axis: #d4d4d4; --metrics-grid: #e5e5e5; }
   stroke: var(--atom-amber);
 }
 
+/* Header atom: animate when preparing message (e.g. fetching GitHub) or streaming */
+.atom-logo-icon-active .atom-logo-orbit-1 {
+  transform-origin: 16px 16px;
+  animation: atom-orbit-spin 4s linear infinite;
+}
+.atom-logo-icon-active .atom-logo-orbit-2 {
+  transform-origin: 16px 16px;
+  animation: atom-orbit-spin-reverse 3s linear infinite;
+}
+.atom-logo-icon-active .atom-logo-orbit-3 {
+  transform-origin: 16px 16px;
+  animation: atom-orbit-spin 5s linear infinite;
+}
+.atom-logo-icon-active .atom-logo-nucleus {
+  transform-origin: 16px 16px;
+  animation: atom-nucleus-pulse var(--duration-long) var(--ease-in-out) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .atom-logo-icon-active .atom-logo-orbit-1,
+  .atom-logo-icon-active .atom-logo-orbit-2,
+  .atom-logo-icon-active .atom-logo-orbit-3,
+  .atom-logo-icon-active .atom-logo-nucleus {
+    animation: none;
+  }
+}
+
 /* Max tokens: hide native spinner so only double/half buttons are used */
 .max-tokens-step-input::-webkit-inner-spin-button,
 .max-tokens-step-input::-webkit-outer-spin-button {
