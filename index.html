@@ -13,10 +13,11 @@
     <script>
       (function() {
         var t = localStorage.getItem('theme');
-        var dark = t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var dark = t === 'dark' || ((t === 'system' || !t) && window.matchMedia('(prefers-color-scheme: dark)').matches);
         if (dark) document.documentElement.classList.add('dark');
         var ui = localStorage.getItem('uiTheme');
-        if (ui) document.documentElement.dataset.uiTheme = ui;
+        if (ui === 'light' || ui === 'dark' || ui === 'coder') document.documentElement.dataset.uiTheme = ui;
+        else document.documentElement.dataset.uiTheme = 'light';
       })();
     </script>
     <div id="app"></div>

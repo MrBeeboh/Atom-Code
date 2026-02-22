@@ -13,24 +13,6 @@
   import { generateId, resizeImageDataUrlsForVision, shouldSkipImageResizeForVision } from '$lib/utils.js';
 
   const convId = $derived($activeConversationId);
-  /** Lazy-loaded for neural empty-state center stack (code-split). */
-  let NeuralSceneComponent = $state(null);
-  /** Lazy-loaded for signal theme: upper-left sonar/radar scope. */
-  let SignalScopeComponent = $state(null);
-  $effect(() => {
-    if ($uiTheme === 'neural') {
-      import('../../neural/NeuralScene.svelte').then((m) => (NeuralSceneComponent = m.default));
-    } else {
-      NeuralSceneComponent = null;
-    }
-  });
-  $effect(() => {
-    if ($uiTheme === 'signal') {
-      import('$lib/components/SignalScope.svelte').then((m) => (SignalScopeComponent = m.default));
-    } else {
-      SignalScopeComponent = null;
-    }
-  });
 
   $effect(() => {
     const msgs = $activeMessages;
@@ -793,12 +775,6 @@
         </div>
       </div>
     </div>
-  {/if}
-  {#if $uiTheme === 'neural' && NeuralSceneComponent}
-    <NeuralSceneComponent />
-  {/if}
-  {#if $uiTheme === 'signal' && SignalScopeComponent}
-    <SignalScopeComponent />
   {/if}
   <div class="chat-view-content flex flex-col min-h-0">
   {#if convId}

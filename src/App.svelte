@@ -13,6 +13,7 @@
   import FileExplorer from '$lib/components/FileExplorer.svelte';
   import TerminalPanel from '$lib/components/TerminalPanel.svelte';
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+import UiThemeSelect from '$lib/components/UiThemeSelect.svelte';
   import PresetSelect from '$lib/components/PresetSelect.svelte';
   import ModelSelector from '$lib/components/ModelSelector.svelte';
   import SettingsPanel from '$lib/components/SettingsPanel.svelte';
@@ -75,28 +76,38 @@
     else lmStatusMessage = COCKPIT_LM_CHECKING;
   });
 
-  onMount(() => {
-    function applyTheme(want) {
-      const t = want ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('theme') : null) ?? 'system';
-      const isDark = t === 'dark' || (t === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-      document.documentElement.classList.toggle('dark', isDark);
+  function getResolvedUiTheme() {
+    const u = get(uiTheme);
+    const t = get(theme);
+    if (u === 'coder') return 'coder';
+    if (t === 'system' && typeof window !== 'undefined') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
-    applyTheme(get(theme));
-    const unsub = theme.subscribe((v) => applyTheme(v));
+    return t === 'dark' ? 'dark' : 'light';
+  }
+  function applyResolvedTheme() {
+    const resolved = getResolvedUiTheme();
+    if (typeof document !== 'undefined') {
+      document.documentElement.dataset.uiTheme = resolved;
+      document.documentElement.classList.toggle('dark', resolved !== 'light');
+    }
+  }
+  onMount(() => {
+    applyResolvedTheme();
+    const unsubTheme = theme.subscribe(() => applyResolvedTheme());
+    const unsubUi = uiTheme.subscribe(() => applyResolvedTheme());
     const mq = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)');
-    mq?.addEventListener?.('change', () => applyTheme());
+    mq?.addEventListener?.('change', () => applyResolvedTheme());
     return () => {
-      unsub();
-      mq?.removeEventListener?.('change', () => applyTheme());
+      unsubTheme();
+      unsubUi();
+      mq?.removeEventListener?.('change', () => applyResolvedTheme());
     };
   });
   theme.subscribe((v) => { if (typeof localStorage !== 'undefined') localStorage.setItem('theme', v); });
-  uiTheme.subscribe((v) => {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('uiTheme', v);
-    if (typeof document !== 'undefined') document.documentElement.dataset.uiTheme = v;
-  });
+  uiTheme.subscribe((v) => { if (typeof localStorage !== 'undefined') localStorage.setItem('uiTheme', v); });
   layout.subscribe((v) => { if (typeof localStorage !== 'undefined') localStorage.setItem('layout', v); });
-  onMount(() => { document.documentElement.dataset.uiTheme = get(uiTheme); });
+  onMount(() => applyResolvedTheme());
 
   isStreaming.subscribe((streaming) => {
     if (typeof document !== 'undefined') {
@@ -190,7 +201,7 @@
 
 <div
   class="h-screen w-full min-w-0 overflow-hidden"
-  style="position: relative; z-index: 1; background-color: {$uiTheme === 'neural' || $uiTheme === 'signal' ? 'transparent' : 'var(--ui-bg-main)'}; max-width: 100vw; box-sizing: border-box;"
+  style="position: relative; z-index: 1; background-color: var(--ui-bg-main); max-width: 100vw; box-sizing: border-box;"
 >
 
   <AudioManager />
@@ -222,9 +233,10 @@
             <div class="shrink-0" style="{HEADER_PRESET_MIN}"><PresetSelect compact={true} /></div>
           </div>
         </div>
-        <!-- Right: theme mode (light/dark) + status — no extra background -->
+        <!-- Right: theme (Light/Dark/Coder) + Auto toggle + status -->
         <div class="flex items-center gap-3 shrink-0">
-          <div class="flex items-center shrink-0" role="group" aria-label="Theme">
+          <div class="flex items-center shrink-0 gap-2" role="group" aria-label="Theme">
+            <UiThemeSelect compact={true} />
             <ThemeToggle />
           </div>
           <div class="flex items-center gap-1.5 shrink-0 pr-1" role="group" aria-label="Status">

@@ -1,5 +1,5 @@
 <script>
-  import { uiTheme } from '$lib/stores.js';
+  import { uiTheme, theme } from '$lib/stores.js';
   import { UI_THEME_OPTIONS } from '$lib/themeOptions.js';
   import { fade, scale } from 'svelte/transition';
 
@@ -7,38 +7,15 @@
 
   function selectTheme(value) {
     uiTheme.set(value);
+    if (value === 'light') theme.set('light');
+    else if (value === 'dark' || value === 'coder') theme.set('dark');
     open = false;
   }
 
-  /** Preview colors extracted from app.css theme definitions. bg + accent for swatch. */
   const PREVIEW = {
-    atom:             { bg: '#0c0c0c', accent: '#00d4aa', text: '#f5f5f5' },
-    default:          { bg: '#fafafa', accent: '#B22234', text: '#18181b' },
-    newsprint:        { bg: '#f4f1ea', accent: '#8b2500', text: '#1c1917' },
-    dailyedition:     { bg: '#f2efe6', accent: '#8b6914', text: '#1a1a1a' },
-    neural:           { bg: '#0b0c10', accent: '#66fcf1', text: '#c5c6c7' },
-    arctic:           { bg: '#f8fafc', accent: '#f97316', text: '#0f172a' },
-    neon:             { bg: '#ffffff', accent: '#eab308', text: '#171717' },
-    mint:             { bg: '#f0fdf4', accent: '#10b981', text: '#064e3b' },
-    coral:            { bg: '#fffbeb', accent: '#f97316', text: '#1c1917' },
-    highcontrast:     { bg: '#ffffff', accent: '#2563eb', text: '#000000' },
-    cybercitrus:      { bg: '#fefce8', accent: '#65a30d', text: '#14532d' },
-    industrialhazard: { bg: '#ffffff', accent: '#facc15', text: '#000000' },
-    fireice:          { bg: '#0c4a6e', accent: '#ff6b35', text: '#f0f9ff' },
-    hacker:           { bg: '#001a00', accent: '#00ff41', text: '#33ff77' },
-    medical:          { bg: '#f8f9fa', accent: '#0077b6', text: '#212529' },
-    radioactivelab:   { bg: '#0a0a0a', accent: '#ccff00', text: '#ffffff' },
-    coppercircuit:    { bg: '#1a1410', accent: '#ff6b35', text: '#fef5e7' },
-    arcticneon:       { bg: '#e8f4f8', accent: '#00d9ff', text: '#001a1f' },
-    sunsetgradient:   { bg: '#fff8f2', accent: '#e85c2a', text: '#2d1b0e' },
-    racingstripe:     { bg: '#ffffff', accent: '#e30613', text: '#000000' },
-    jungleterminal:   { bg: '#f0f4f0', accent: '#2d5016', text: '#1a1a1a' },
-    magmaflow:        { bg: '#1a0a00', accent: '#ff4500', text: '#fff5ee' },
-    chromeglass:      { bg: '#f8f9fa', accent: '#0066cc', text: '#212529' },
-    toxicwaste:       { bg: '#000000', accent: '#ffff00', text: '#ffff00' },
-    cathedral:        { bg: '#f5f5f0', accent: '#1a1a1a', text: '#1a1a1a' },
-    temporal:         { bg: '#f0f0ed', accent: '#2563eb', text: '#1a1a1a' },
-    signal:           { bg: '#000000', accent: '#00ffff', text: '#00ffff' },
+    light: { bg: '#ffffff', accent: '#2563eb', text: '#1a1a1a' },
+    dark:  { bg: '#1a1a1a', accent: '#3b82f6', text: '#e5e5e5' },
+    coder: { bg: '#0d1117', accent: '#39d353', text: '#c9d1d9' },
   };
 </script>
 

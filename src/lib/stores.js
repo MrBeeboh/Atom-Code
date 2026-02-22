@@ -84,15 +84,14 @@ export const cockpitIntelOpen = writable(false);
 export const pinnedContent = writable(null);
 
 
-/** Color scheme: default (red) | newsprint | neural | quantum | ... (see themeOptions.js) */
+/** UI theme: light | dark | coder. Legacy values mapped to light. */
+const VALID_UI_THEMES = ['light', 'dark', 'coder'];
 function getInitialUiTheme() {
-  if (typeof localStorage === 'undefined') return 'default';
-  const raw = localStorage.getItem('uiTheme') || 'default';
-  if (raw === 'cyberpunk') {
-    localStorage.setItem('uiTheme', 'default');
-    return 'default';
-  }
-  return raw;
+  if (typeof localStorage === 'undefined') return 'light';
+  const raw = localStorage.getItem('uiTheme') || 'light';
+  if (VALID_UI_THEMES.includes(raw)) return raw;
+  localStorage.setItem('uiTheme', 'light');
+  return 'light';
 }
 export const uiTheme = writable(getInitialUiTheme());
 
