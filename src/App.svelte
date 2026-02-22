@@ -4,7 +4,7 @@
   import { get } from 'svelte/store';
   import { fly } from 'svelte/transition';
   import { backOut, quintOut } from 'svelte/easing';
-  import { theme, sidebarOpen, settingsOpen, layout, activeConversationId, conversations, selectedModelId, uiTheme, cockpitIntelOpen, models, lmStudioConnected, cloudApisAvailable, activeMessages, isStreaming, messagePreparing, terminalOpen, terminalHeight, fileExplorerOpen, diffViewerState, workspaceRoot, fileServerUrl, repoMapText, repoMapFileList, repoMapLoading, repoMapError } from '$lib/stores.js';
+  import { theme, sidebarOpen, settingsOpen, layout, activeConversationId, conversations, selectedModelId, uiTheme, cockpitIntelOpen, models, lmStudioConnected, cloudApisAvailable, activeMessages, isStreaming, messagePreparing, terminalOpen, terminalHeight, fileExplorerOpen, editorOpen, diffViewerState, workspaceRoot, fileServerUrl, repoMapText, repoMapFileList, repoMapLoading, repoMapError } from '$lib/stores.js';
 import { getRepoMap } from '$lib/repoMap.js';
   import { startTemporalController } from '$lib/temporalController.js';
   import { createConversation, listConversations, getMessageCount, getMessages } from '$lib/db.js';
@@ -13,6 +13,7 @@ import { getRepoMap } from '$lib/repoMap.js';
   import ChatView from '$lib/components/ChatView.svelte';
   import FileExplorer from '$lib/components/FileExplorer.svelte';
   import TerminalPanel from '$lib/components/TerminalPanel.svelte';
+  import EditorPanel from '$lib/components/EditorPanel.svelte';
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 import UiThemeSelect from '$lib/components/UiThemeSelect.svelte';
   import PresetSelect from '$lib/components/PresetSelect.svelte';
@@ -108,6 +109,10 @@ import UiThemeSelect from '$lib/components/UiThemeSelect.svelte';
   });
 
   $effect(() => {
+    if ($editorOpen && !$terminalOpen) terminalOpen.set(true);
+  });
+
+  $effect(() => {
     const c = $lmStudioConnected;
     const cloud = $cloudApisAvailable;
     if (c === true) lmStatusMessage = COCKPIT_LM_CONNECTED;
@@ -169,7 +174,12 @@ import UiThemeSelect from '$lib/components/UiThemeSelect.svelte';
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
         e.preventDefault();
-        fileExplorerOpen.update((v) => !v);
+        if (get(terminalOpen)) {
+          editorOpen.update((v) => !v);
+        } else {
+          terminalOpen.set(true);
+          editorOpen.set(true);
+        }
       }
     }
     document.addEventListener('keydown', onKeydown);
@@ -305,14 +315,34 @@ import UiThemeSelect from '$lib/components/UiThemeSelect.svelte';
               class="terminal-resize-handle shrink-0 cursor-ns-resize hover:bg-[color-mix(in_srgb,var(--ui-accent)_20%,transparent)] transition-colors"
               style="height: 4px; min-height: 4px;"
               role="separator"
-              aria-label="Resize terminal"
+              aria-label="Resize bottom panel"
               onmousedown={onTerminalResizeStart}
             ></div>
             <div
               class="terminal-slot shrink-0 overflow-hidden flex flex-col"
               style="height: {$terminalHeight}px; min-height: {MIN_TERMINAL_HEIGHT}px;"
             >
-              <TerminalPanel />
+              <div class="bottom-panel-tabs shrink-0 flex items-stretch gap-0 border-b" style="height: 30px; min-height: 30px; border-color: var(--ui-border); background: var(--ui-bg-sidebar);">
+                <button
+                  type="button"
+                  class="px-3 text-xs font-medium transition-colors"
+                  style="color: {$editorOpen ? 'var(--ui-text-secondary)' : 'var(--ui-text-primary)'}; border-bottom: 2px solid {$editorOpen ? 'transparent' : 'var(--ui-accent)'}; background: {$editorOpen ? 'transparent' : 'transparent'};"
+                  onclick={() => editorOpen.set(false)}
+                >Terminal</button>
+                <button
+                  type="button"
+                  class="px-3 text-xs font-medium transition-colors"
+                  style="color: {$editorOpen ? 'var(--ui-text-primary)' : 'var(--ui-text-secondary)'}; border-bottom: 2px solid {$editorOpen ? 'var(--ui-accent)' : 'transparent'}; background: transparent;"
+                  onclick={() => { editorOpen.set(true); terminalOpen.set(true); }}
+                >Editor</button>
+              </div>
+              <div class="flex-1 min-h-0 overflow-hidden">
+                {#if $editorOpen}
+                  <EditorPanel />
+                {:else}
+                  <TerminalPanel />
+                {/if}
+              </div>
             </div>
           {:else}
             <div

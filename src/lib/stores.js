@@ -419,6 +419,12 @@ if (typeof localStorage !== 'undefined') {
 /** One-shot: when set, TerminalPanel writes this to the pty then clears. Used by "Run in Terminal" from code blocks. */
 export const terminalCommand = writable(null);
 
+/** Phase 11: Code editor panel. */
+export const editorOpen = writable(false);
+export const editorContent = writable('');
+export const editorLanguage = writable('javascript');
+export const editorFilePath = writable(null);
+
 /** Last code sent to terminal via Run button (for error feedback loop). */
 export const lastExecutedCode = writable(null);
 

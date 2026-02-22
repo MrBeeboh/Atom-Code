@@ -1,0 +1,253 @@
+<script>
+  import { onMount, onDestroy } from 'svelte';
+  import { get } from 'svelte/store';
+  import { EditorView, keymap, lineNumbers } from '@codemirror/view';
+  import { EditorState } from '@codemirror/state';
+  import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+  import { javascript } from '@codemirror/lang-javascript';
+  import { python } from '@codemirror/lang-python';
+  import { html } from '@codemirror/lang-html';
+  import { css } from '@codemirror/lang-css';
+  import { json } from '@codemirror/lang-json';
+  import { oneDark } from '@codemirror/theme-one-dark';
+  import {
+    editorContent,
+    editorLanguage,
+    editorFilePath,
+    terminalCommand,
+    terminalOpen,
+    fileServerUrl,
+  } from '$lib/stores.js';
+
+  let containerEl = $state(null);
+  let view = $state(null);
+  let savedToast = $state(false);
+  let savePathPrompt = $state(null);
+  let savePathInput = $state('');
+
+  const LANG_MAP = {
+    javascript: javascript,
+    python: python,
+    html: html,
+    css: css,
+    json: json,
+  };
+
+  function langFromPath(path) {
+    if (!path) return 'javascript';
+    const ext = path.split('.').pop()?.toLowerCase() || '';
+    if (['js', 'jsx', 'mjs', 'cjs', 'ts', 'tsx'].includes(ext)) return 'javascript';
+    if (ext === 'py') return 'python';
+    if (['html', 'htm', 'svelte'].includes(ext)) return 'html';
+    if (ext === 'css') return 'css';
+    if (ext === 'json') return 'json';
+    return 'javascript';
+  }
+
+  function getLanguageExtension() {
+    const path = get(editorFilePath);
+    const lang = path ? langFromPath(path) : get(editorLanguage) || 'javascript';
+    return LANG_MAP[lang]?.() ?? javascript();
+  }
+
+  function getExtensions() {
+    return [
+      lineNumbers(),
+      history(),
+      keymap.of([...defaultKeymap, ...historyKeymap]),
+      getLanguageExtension(),
+      oneDark,
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged && view) {
+          const text = update.state.doc.toString();
+          editorContent.set(text);
+        }
+      }),
+      EditorView.theme({
+        '&': { backgroundColor: 'var(--editor-bg, var(--ui-code-bg, #1e1e2e))' },
+        '&.cm-editor .cm-scroller': { backgroundColor: 'var(--editor-bg, var(--ui-code-bg, #1e1e2e))' },
+        '&.cm-editor .cm-content': { color: '#d4d4d4' },
+        '&.cm-editor .cm-gutters': { backgroundColor: 'color-mix(in srgb, var(--ui-code-bg, #1e1e2e) 85%, black)', borderRightColor: 'var(--ui-border, #333)' },
+        '&.cm-editor .cm-activeLineGutter': { backgroundColor: 'color-mix(in srgb, var(--ui-code-bg, #1e1e2e) 75%, black)' },
+        '.cm-lineNumbers .cm-gutterElement': { color: 'var(--ui-text-secondary, #6b7280)' },
+        '&.cm-editor .cm-selectionBackground': { backgroundColor: 'rgba(var(--ui-accent-rgb, 59, 130, 246), 0.2)' },
+        '.cm-lineNumbers .cm-activeLineGutter': { backgroundColor: 'rgba(var(--ui-accent-rgb, 59, 130, 246), 0.2)' }
+      }),
+    ];
+  }
+
+  onMount(() => {
+    if (!containerEl) return;
+    const content = get(editorContent) ?? '';
+    const state = EditorState.create({
+      doc: content,
+      extensions: getExtensions(),
+    });
+    view = new EditorView({
+      state,
+      parent: containerEl,
+    });
+  });
+
+  $effect(() => {
+    const content = $editorContent;
+    if (!view || typeof content !== 'string') return;
+    const current = view.state.doc.toString();
+    if (current !== content) {
+      view.dispatch({
+        changes: { from: 0, to: current.length, insert: content },
+      });
+    }
+  });
+
+  function runCode() {
+    const content = get(editorContent) ?? '';
+    terminalCommand.set(content);
+    terminalOpen.set(true);
+  }
+
+  async function save() {
+    const path = get(editorFilePath);
+    const content = get(editorContent) ?? '';
+    if (!path?.trim()) {
+      savePathPrompt = true;
+      savePathInput = '';
+      return;
+    }
+    await doSave(path.trim(), content);
+  }
+
+  async function doSave(path, content) {
+    const base = (get(fileServerUrl) || 'http://localhost:8768').replace(/\/$/, '');
+    try {
+      const res = await fetch(`${base}/write`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path, content }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || res.statusText);
+      }
+      savedToast = true;
+      setTimeout(() => (savedToast = false), 2000);
+      savePathPrompt = null;
+    } catch (e) {
+      console.error('[EditorPanel] save failed', e);
+      alert(e?.message || 'Save failed');
+    }
+  }
+
+  function saveWithPath() {
+    const p = savePathInput?.trim();
+    if (!p) return;
+    doSave(p, get(editorContent) ?? '').then(() => {
+      editorFilePath.set(p);
+      savePathInput = '';
+    });
+    savePathPrompt = null;
+  }
+
+  function copyContent() {
+    const content = get(editorContent) ?? '';
+    navigator.clipboard.writeText(content).catch(() => {});
+  }
+
+  onDestroy(() => {
+    if (view) {
+      view.destroy();
+      view = null;
+    }
+  });
+</script>
+
+<div class="editor-panel flex flex-col h-full min-h-[200px]" style="background: var(--ui-code-bg, #1e1e2e);">
+  <div
+    class="editor-toolbar shrink-0 flex items-center justify-between gap-2 px-2 py-1 border-b"
+    style="height: 32px; min-height: 32px; border-color: var(--ui-border); background: var(--ui-bg-sidebar); color: var(--ui-text-secondary);"
+  >
+    <span class="truncate text-xs font-mono" style="color: var(--ui-text-primary);" title={$editorFilePath || 'Untitled'}>
+      {$editorFilePath || 'Untitled'}
+    </span>
+    <div class="flex items-center gap-1 shrink-0">
+      <button
+        type="button"
+        class="px-2 py-1 rounded text-xs font-medium transition-colors"
+        style="color: var(--ui-text-secondary); border: 1px solid var(--ui-border);"
+        title="Run in terminal"
+        onclick={runCode}
+      >Run</button>
+      <button
+        type="button"
+        class="px-2 py-1 rounded text-xs font-medium transition-colors"
+        style="color: var(--ui-text-secondary); border: 1px solid var(--ui-border);"
+        title="Save to file"
+        onclick={save}
+      >Save</button>
+      <button
+        type="button"
+        class="px-2 py-1 rounded text-xs font-medium transition-colors"
+        style="color: var(--ui-text-secondary); border: 1px solid var(--ui-border);"
+        title="Copy to clipboard"
+        onclick={copyContent}
+      >Copy</button>
+    </div>
+  </div>
+  <div class="editor-container flex-1 min-h-[200px] overflow-auto" bind:this={containerEl}></div>
+  {#if savedToast}
+    <div
+      class="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded text-xs font-medium"
+      style="background: var(--ui-accent); color: white;"
+    >Saved!</div>
+  {/if}
+  {#if savePathPrompt}
+    <div
+      class="absolute inset-0 flex items-center justify-center z-10"
+      style="background: rgba(0,0,0,0.5);"
+      role="dialog"
+      aria-label="Enter file path to save"
+    >
+      <div class="rounded-lg border p-4 shadow-xl max-w-sm w-full mx-2" style="background: var(--ui-bg-main); border-color: var(--ui-border);">
+        <p class="text-sm mb-2" style="color: var(--ui-text-primary);">No file path set. Enter path to save (absolute):</p>
+        <input
+          type="text"
+          class="w-full rounded border px-3 py-2 text-sm font-mono mb-3"
+          style="background: var(--ui-input-bg); border-color: var(--ui-border); color: var(--ui-text-primary);"
+          placeholder="/path/to/file.js"
+          bind:value={savePathInput}
+          onkeydown={(e) => {
+            if (e.key === 'Escape') savePathPrompt = null;
+            if (e.key === 'Enter') saveWithPath();
+          }}
+        />
+        <div class="flex gap-2 justify-end">
+          <button
+            type="button"
+            class="px-3 py-1.5 rounded text-sm"
+            style="color: var(--ui-text-secondary); border: 1px solid var(--ui-border);"
+            onclick={() => { savePathPrompt = null; savePathInput = ''; }}
+          >Cancel</button>
+          <button
+            type="button"
+            class="px-3 py-1.5 rounded text-sm font-medium"
+            style="background: var(--ui-accent); color: white;"
+            onclick={saveWithPath}
+          >Save</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+</div>
+
+<style>
+  .editor-panel {
+    position: relative;
+  }
+  .editor-container :global(.cm-editor) {
+    height: 100%;
+    min-height: 200px;
+  }
+  .editor-container :global(.cm-scroller) {
+    min-height: 200px;
+  }
+</style>
