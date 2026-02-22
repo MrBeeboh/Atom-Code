@@ -1,0 +1,19 @@
+---
+description: Protected files and features — do not modify without explicit permission
+alwaysApply: true
+---
+
+# Protected Files and Features
+
+NEVER modify these files or features. Do not touch, refactor, or "fix" them. Do not change startup order, ports, or proxy targets. The full stack (LM Studio, terminal, file server, search proxy, voice, Vite) is working — leave it alone.
+
+- **start-atom-code.sh** — startup script; all services and order are final, do not change
+- **scripts/search-proxy.mjs** — Brave search proxy on 5174; do not modify
+- **voice-server/** (entire directory) — voice/Whisper integration; do not touch
+- **vite.config.js** — proxy configuration; do not modify proxy rules or targets
+- **src/lib/api.js** — API routing layer; do not change endpoint URLs or proxy paths
+- **src/lib/components/ChatInput.svelte** — voice recording logic; do not restructure
+- **services/** (terminal-server, file-server) — backend services; do not refactor
+- **CORS configuration** in any file — security settings; do not change
+
+If a task would require changing any of the above: STOP. Do not make edits. Ask the user for explicit permission and explain exactly what and why before touching anything.
