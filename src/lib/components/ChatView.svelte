@@ -320,45 +320,27 @@ import { injectGitHubContextIfPresent } from '$lib/github.js';
     }
 
     if (pathsToFetch.length > 0) {
-      const toRemove = []; // paths that 404 or are invalid — remove from pinned so we stop retrying
       const fileContextParts = await Promise.all(
         pathsToFetch.map(async (filePath) => {
           const pathForFetch = (typeof filePath === 'string' && filePath.trim())
             ? filePath.trim().replace(/:(\d+)$/, '')  // strip :line for file server
             : '';
-          if (!pathForFetch || pathForFetch.includes('%') || !pathForFetch.startsWith('/')) {
-            if (pinned.includes(filePath)) toRemove.push(filePath);
-            return null;
-          }
-          if (pathForFetch.includes('.code-workspace') || pathForFetch.includes('/.cursor/projects/')) {
-            if (pinned.includes(filePath)) toRemove.push(filePath);
-            return null;
-          }
+          if (!pathForFetch || pathForFetch.includes('%') || !pathForFetch.startsWith('/')) return null;
+          if (pathForFetch.includes('.code-workspace') || pathForFetch.includes('/.cursor/projects/')) return null;
           try {
             const res = await fetch(`${fileServerBase}/content?path=${encodeURIComponent(pathForFetch)}`);
             if (!res.ok) {
-              const data = await res.json().catch(() => ({}));
-              const msg = data?.error || res.statusText;
-              if (pinned.includes(filePath)) {
-                console.warn('[ChatView] Pinned file fetch failed:', pathForFetch, '—', msg, '(removing from pinned)');
-                toRemove.push(filePath);
-              }
+              console.warn('[ChatView] File fetch failed (kept in pinned):', pathForFetch, res.status);
               return null;
             }
             const data = await res.json();
             return data?.content != null ? `--- ${pathForFetch} ---\n${data.content}` : null;
           } catch (e) {
-            if (pinned.includes(filePath)) {
-              console.warn('[ChatView] Pinned file fetch error:', pathForFetch, '(removing from pinned)', e);
-              toRemove.push(filePath);
-            }
+            console.warn('[ChatView] File fetch error (kept in pinned):', pathForFetch, e);
             return null;
           }
         })
       );
-      if (toRemove.length > 0) {
-        pinnedFiles.set(pinned.filter((p) => !toRemove.includes(p)));
-      }
       fileContext = fileContextParts.filter(Boolean).join('\n\n');
     }
 

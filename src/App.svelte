@@ -176,12 +176,7 @@ import UiThemeSelect from '$lib/components/UiThemeSelect.svelte';
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
         e.preventDefault();
-        if (get(terminalOpen)) {
-          editorOpen.update((v) => !v);
-        } else {
-          terminalOpen.set(true);
-          editorOpen.set(true);
-        }
+        fileExplorerOpen.update((v) => !v);
       }
     }
     document.addEventListener('keydown', onKeydown);

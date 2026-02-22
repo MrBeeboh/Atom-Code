@@ -6,7 +6,7 @@ A voice-first local coding assistant. No cloud APIs, no subscriptions, no sendin
 
 - **Voice-first chat** — Talk to your AI model using local Whisper speech-to-text. No audio leaves your machine.
 - **Integrated terminal** — Real bash shell in the browser via xterm.js and node-pty. Run code directly from chat.
-- **File explorer** — Browse your project, pin files as context for the AI model.
+- **File explorer** — Browse your project, pin files as context for the AI model. **Pinned files** are set in the file tree (right-click a file → “Pin as context”); they show a pin icon and “Unpin all” in the explorer. The sidebar **Pinned** list is for **pinned conversations** (chats), not files. Pinned files are never auto-removed when a fetch fails; they stay in the list until you unpin.
 - **Code block actions** — Every code block has Copy, Run (sends to terminal), Save (downloads file), and Apply (diff viewer with before/after comparison and one-click write to disk).
 - **Diff viewer** — See exactly what changes the AI wants to make to your files. Green for added, red for removed. Apply or reject.
 - **Quick actions** — One-click Explain, Fix, Refactor, Test, Document buttons that pre-fill coding prompts.
