@@ -5,7 +5,29 @@
   import { FitAddon } from '@xterm/addon-fit';
   import { WebLinksAddon } from '@xterm/addon-web-links';
   import 'xterm/css/xterm.css';
-  import { terminalOpen, terminalServerUrl, terminalCommand } from '$lib/stores.js';
+  import { terminalOpen, terminalServerUrl, terminalCommand, lastExecutedCode, terminalErrorBanner, errorFeedbackRequest } from '$lib/stores.js';
+
+  const ERROR_PATTERNS = [
+    /\bTraceback\s*\(/i,
+    /\bSyntaxError\b/,
+    /\bNameError\b/,
+    /\bTypeError\b/,
+    /\bReferenceError\b/,
+    /\bIndentationError\b/,
+    /\bFileNotFoundError\b/,
+    /Error:\s*\S/,
+    /Exception:\s*\S/,
+    /command not found/i,
+    /exit code [1-9]\d*/i,
+    /ModuleNotFoundError\b/,
+    /\bEADDRINUSE\b/,
+    /\bENOENT\b/,
+  ];
+
+  function hasErrorInOutput(output) {
+    if (!output || typeof output !== 'string') return false;
+    return ERROR_PATTERNS.some((p) => p.test(output));
+  }
 
   const DANGEROUS_PATTERNS = [
     /\brm\s+(-rf?|--recursive)/i,
@@ -28,8 +50,56 @@
   let ws = $state(null);
   let connected = $state(false);
   let pendingDangerousCommand = $state(null);
+  let captureBuffer = $state('');
+  let captureTimeoutId = $state(null);
+  let isCapturing = $state(false);
 
   let unsubCommand = null;
+
+  function startCapture(code) {
+    if (captureTimeoutId != null) clearTimeout(captureTimeoutId);
+    lastExecutedCode.set(code);
+    captureBuffer = '';
+    isCapturing = true;
+    captureTimeoutId = null;
+  }
+
+  function finalizeCapture() {
+    if (captureTimeoutId != null) {
+      clearTimeout(captureTimeoutId);
+      captureTimeoutId = null;
+    }
+    if (!isCapturing) return;
+    isCapturing = false;
+    const code = get(lastExecutedCode);
+    if (code && captureBuffer && hasErrorInOutput(captureBuffer)) {
+      terminalErrorBanner.set({ code, output: captureBuffer });
+    }
+  }
+
+  function onTerminalData(data) {
+    if (terminal && typeof data === 'string') terminal.write(data);
+    else if (terminal && data instanceof Uint8Array) terminal.write(data);
+    if (isCapturing && typeof data === 'string') {
+      captureBuffer += data;
+      if (captureTimeoutId != null) clearTimeout(captureTimeoutId);
+      captureTimeoutId = setTimeout(finalizeCapture, 3500);
+    }
+  }
+
+  function sendToModelForFix() {
+    const payload = get(terminalErrorBanner);
+    if (payload) {
+      errorFeedbackRequest.set(payload);
+      terminalErrorBanner.set(null);
+      lastExecutedCode.set(null);
+    }
+  }
+
+  function dismissErrorBanner() {
+    terminalErrorBanner.set(null);
+    lastExecutedCode.set(null);
+  }
 
   function connect() {
     const url = get(terminalServerUrl) || 'ws://localhost:8767';
@@ -50,8 +120,8 @@
         connected = false;
       };
       socket.onmessage = (ev) => {
-        if (terminal && typeof ev.data === 'string') terminal.write(ev.data);
-        else if (terminal && ev.data instanceof ArrayBuffer) terminal.write(new Uint8Array(ev.data));
+        const data = typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data);
+        onTerminalData(data);
       };
       ws = socket;
     } catch (_) {
@@ -73,15 +143,18 @@
       return;
     }
     if (ws && ws.readyState === WebSocket.OPEN) {
+      startCapture(code);
       send(code + '\n');
     }
   }
 
   function confirmRunDangerous() {
-    if (pendingDangerousCommand && ws && ws.readyState === WebSocket.OPEN) {
-      send(pendingDangerousCommand + '\n');
-    }
+    const code = pendingDangerousCommand;
     pendingDangerousCommand = null;
+    if (code && ws && ws.readyState === WebSocket.OPEN) {
+      startCapture(code);
+      send(code + '\n');
+    }
   }
 
   function cancelDangerous() {
@@ -136,6 +209,7 @@
     trySendPendingCommand();
 
     return () => {
+      if (captureTimeoutId != null) clearTimeout(captureTimeoutId);
       resizeObserver.disconnect();
       unsubCommand?.();
       if (ws) {
@@ -150,6 +224,26 @@
 </script>
 
 <div class="terminal-panel" style="position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--ui-bg-main); border-top: 1px solid var(--ui-border);">
+  {#if $terminalErrorBanner}
+    <div
+      class="terminal-error-banner"
+      style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0.75rem; background: color-mix(in srgb, var(--ui-accent-hot, #dc2626) 15%, var(--ui-bg-sidebar)); border-bottom: 1px solid var(--ui-border); font-size: 0.8rem; color: var(--ui-text-primary);"
+    >
+      <span>⚠️ Error detected — Send to model for fix?</span>
+      <div style="display: flex; gap: 0.35rem;">
+        <button
+          type="button"
+          style="padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--ui-border); background: transparent; color: var(--ui-text-secondary); cursor: pointer; font-size: 0.75rem;"
+          onclick={dismissErrorBanner}
+        >Dismiss</button>
+        <button
+          type="button"
+          style="padding: 0.25rem 0.5rem; border-radius: 4px; border: none; background: var(--ui-accent); color: white; cursor: pointer; font-size: 0.75rem;"
+          onclick={sendToModelForFix}
+        >Send to model</button>
+      </div>
+    </div>
+  {/if}
   {#if pendingDangerousCommand}
     <div
       class="dangerous-cmd-overlay"

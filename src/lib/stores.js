@@ -412,6 +412,15 @@ if (typeof localStorage !== 'undefined') {
 /** One-shot: when set, TerminalPanel writes this to the pty then clears. Used by "Run in Terminal" from code blocks. */
 export const terminalCommand = writable(null);
 
+/** Last code sent to terminal via Run button (for error feedback loop). */
+export const lastExecutedCode = writable(null);
+
+/** When set, show "Error detected — Send to model for fix?" banner. Value: { code, output } or null. */
+export const terminalErrorBanner = writable(null);
+
+/** When set, ChatView sends this as a user message (error feedback). Value: { code, output } or null. */
+export const errorFeedbackRequest = writable(null);
+
 /** Diff viewer state: { originalCode, modifiedCode, filePath } or null. When set, App renders DiffViewer. */
 export const diffViewerState = writable(null);
 

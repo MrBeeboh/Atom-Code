@@ -1,6 +1,6 @@
 <script>
   import { get } from 'svelte/store';
-  import { activeConversationId, activeMessages, streamingContent, conversations, settings, effectiveModelId, isStreaming, chatError, chatCommand, pendingDroppedFiles, webSearchForNextMessage, webSearchInProgress, webSearchConnected, grokApiKey, deepinfraApiKey, uiTheme, contextUsage, summarizeAndContinueTrigger } from '$lib/stores.js';
+  import { activeConversationId, activeMessages, streamingContent, conversations, settings, effectiveModelId, isStreaming, chatError, chatCommand, pendingDroppedFiles, webSearchForNextMessage, webSearchInProgress, webSearchConnected, grokApiKey, deepinfraApiKey, uiTheme, contextUsage, summarizeAndContinueTrigger, errorFeedbackRequest } from '$lib/stores.js';
   import { getMessages, addMessage, clearMessages, deleteMessage, getMessageCount, createConversation } from '$lib/db.js';
   import { streamChatCompletionWithMetrics } from '$lib/streamReporter.js';
   import { requestGrokImageGeneration, requestDeepInfraImageGeneration, requestDeepInfraVideoGeneration, isGrokModel, isDeepSeekModel, requestChatCompletion } from '$lib/api.js';
@@ -37,6 +37,17 @@
       summarizeAndContinueTrigger.set(0);
       runSummarizeAndContinue();
     }
+  });
+
+  $effect(() => {
+    const req = $errorFeedbackRequest;
+    if (!req?.code) return;
+    errorFeedbackRequest.set(null);
+    const msg = `The following code failed when I ran it:\n\n\`\`\`\n${req.code}\n\`\`\`\n\nError output:\n\n\`\`\`\n${(req.output || '').trim()}\n\`\`\`\n\nPlease fix the code.`;
+    sendUserMessage(msg).catch((e) => {
+      console.error('[ChatView] Error feedback send failed:', e);
+      chatError.set(e?.message || 'Failed to send error to model.');
+    });
   });
 
   async function runSummarizeAndContinue() {
