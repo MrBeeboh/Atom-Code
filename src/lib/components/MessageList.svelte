@@ -4,11 +4,11 @@
   import MessageBubble from '$lib/components/MessageBubble.svelte';
 
   let listEl;
-  let lastScrollTime = 0;
   let prevStreaming = false;
+  let scrollThrottleTimer = null;
 
-  const NEAR_BOTTOM_PX = 100;
-  const SCROLL_THROTTLE_MS = 50;
+  const NEAR_BOTTOM_PX = 150;
+  const SCROLL_THROTTLE_MS = 60;
 
   $: msgs = $activeMessages;
 
@@ -25,7 +25,20 @@
   function isNearBottom(scrollParent) {
     if (!scrollParent) return false;
     const gap = scrollParent.scrollHeight - scrollParent.scrollTop - scrollParent.clientHeight;
-    return gap <= NEAR_BOTTOM_PX;
+    return gap < NEAR_BOTTOM_PX;
+  }
+
+  function throttledScroll() {
+    if (scrollThrottleTimer != null) return;
+    scrollThrottleTimer = setTimeout(() => {
+      scrollThrottleTimer = null;
+      const container = listEl?.parentElement;
+      if (!container) return;
+      const near = container.scrollHeight - container.scrollTop - container.clientHeight < NEAR_BOTTOM_PX;
+      if (near) {
+        container.scrollTop = container.scrollHeight;
+      }
+    }, SCROLL_THROTTLE_MS);
   }
 
   $: msgs, (() => {
@@ -47,21 +60,19 @@
 
       prevStreaming = true;
       if (!wasNearBottom) return;
-
-      const now = Date.now();
-      if (now - lastScrollTime >= SCROLL_THROTTLE_MS) {
-        lastScrollTime = now;
-        scrollToBottom(false);
-      }
+      throttledScroll();
     });
   })();
 </script>
 
 <div class="chat-message-list max-w-[56rem] mx-auto w-full px-4 pt-6 pb-10" bind:this={listEl}>
   <div class="space-y-6">
-    {#each msgs as msg (msg.id)}
+    {#each msgs as msg, index (msg.id)}
       <div class="message-entrance">
-        <MessageBubble message={msg} />
+        <MessageBubble
+          message={msg}
+          streaming={$isStreaming && index === msgs.length - 1 && msg.role === 'assistant'}
+        />
       </div>
     {/each}
   </div>

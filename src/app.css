@@ -458,8 +458,9 @@ html { --metrics-axis: #d4d4d4; --metrics-grid: #e5e5e5; }
   contain: layout;
 }
 
-/* Chat scroll area: thin, subtle scrollbar and smooth scroll */
+/* Chat scroll area: thin, subtle scrollbar and smooth scroll; anchor for stable streaming */
 .chat-scroll-area {
+  overflow-anchor: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
 }

@@ -20,7 +20,7 @@
     return () => unsub();
   });
 
-  let { message } = $props();
+  let { message, streaming = false } = $props();
   const isUser = $derived(message.role === "user");
   const isAssistant = $derived(message.role === "assistant");
   const content = $derived(
@@ -191,7 +191,8 @@
     class="message-bubble-inner w-full rounded-[12px] px-4 py-3 shadow-sm relative overflow-hidden
       {isUser
       ? 'ui-user-bubble'
-      : 'bg-white dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100 border border-zinc-200/80 dark:border-zinc-700/80'}"
+      : 'bg-white dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100 border border-zinc-200/80 dark:border-zinc-700/80'}
+      {streaming ? ' streaming-bubble' : ''}"
   >
     {#if isUser}
       {#if contentArray.length}
@@ -492,6 +493,10 @@
   .message-bubble-inner {
     font-size: 14px;
     line-height: 1.5;
+  }
+  .message-bubble-inner.streaming-bubble {
+    will-change: contents;
+    contain: layout style;
   }
   .apply-picker-backdrop {
     position: fixed;

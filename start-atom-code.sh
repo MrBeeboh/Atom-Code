@@ -18,7 +18,7 @@ if [ -f voice-server/app.py ]; then
 fi
 
 # Dev server
-npm run dev &
+npm run dev -- --open &
 DEV_PID=$!
 
 echo ""
