@@ -241,6 +241,42 @@ import { injectGitHubContextIfPresent } from '$lib/github.js';
     return Math.max(0, Math.ceil(chars / 4));
   }
 
+  /** Conservative token estimate for trimming (chars/3). Actual tokens often higher than chars/4. */
+  function estimateTokensForTrim(messages) {
+    let chars = 0;
+    for (const m of messages || []) {
+      if (typeof m.content === 'string') chars += m.content.length;
+      else if (Array.isArray(m.content)) for (const p of m.content) chars += (p?.text ?? '').length;
+    }
+    return Math.max(0, Math.ceil(chars / 3));
+  }
+
+  /** Trim messages to fit within maxPromptTokens. Keeps system (first) and newest messages. */
+  function trimMessagesToFit(messages, maxPromptTokens) {
+    if (!messages?.length || maxPromptTokens <= 0) return messages;
+    if (estimateTokensForTrim(messages) <= maxPromptTokens) return messages;
+    const system = messages[0]?.role === 'system' ? [messages[0]] : [];
+    const rest = system.length ? messages.slice(1) : [...messages];
+    for (let i = 0; i < rest.length; i++) {
+      const trimmed = [...system, ...rest.slice(i)];
+      if (estimateTokensForTrim(trimmed) <= maxPromptTokens) return trimmed;
+    }
+    const last = rest[rest.length - 1];
+    let out = [...system];
+    const systemEst = estimateTokensForTrim(system);
+    const budgetForLast = maxPromptTokens - systemEst - 100;
+    if (budgetForLast > 0) {
+      const maxChars = Math.max(0, budgetForLast * 3);
+      const truncated = typeof last?.content === 'string' ? last.content.slice(-maxChars) : last?.content;
+      out.push({ ...last, content: truncated });
+    }
+    if (estimateTokensForTrim(out) > maxPromptTokens && out[0]?.content && typeof out[0].content === 'string') {
+      const maxSystemChars = Math.max(1000, (maxPromptTokens - 500) * 3);
+      out[0] = { ...out[0], content: out[0].content.slice(-maxSystemChars) };
+    }
+    return out;
+  }
+
   async function sendUserMessage(text, imageDataUrls = [], videoDataUrls = [], mentionedFilePaths = []) {
     const hasText = (text || '').trim().length > 0;
     const hasImages = imageDataUrls?.length > 0;
@@ -354,28 +390,28 @@ import { injectGitHubContextIfPresent } from '$lib/github.js';
     let lastUserContent = userContent;
     const contextPrefix = [githubContext, fileContext].filter(Boolean).join('\n\n');
     if (contextPrefix) {
-      const contextIntro = 'Optional context (pinned files, etc.). Use it only if the user\'s message below asks about code or these files. Otherwise answer the user\'s message directly.\n\n--- Context ---\n';
-      const userLabel = '\n\n--- User message ---\n';
       if (typeof userContent === 'string') {
-        lastUserContent = contextIntro + contextPrefix + userLabel + (userContent || '');
+        lastUserContent = contextPrefix + '\n\n' + userContent;
       } else if (Array.isArray(userContent)) {
         const textPart = userContent.find((p) => p.type === 'text');
         const rest = userContent.filter((p) => p.type !== 'text');
-        const userText = (textPart?.text ?? '').trim() || '(no text)';
-        const text = contextIntro + contextPrefix + userLabel + userText;
+        const text = (textPart?.text ?? '') ? contextPrefix + '\n\n' + textPart.text : contextPrefix;
         lastUserContent = [{ type: 'text', text }, ...rest];
       }
     }
     const msgsForApi = [...history, { role: 'user', content: lastUserContent }];
-    // Phase 9A: Inject repo map into system prompt for codebase awareness (read settings at send time so preset changes apply without refresh)
+    // Phase 9A: Inject repo map into system prompt for codebase awareness
     const currentSettings = get(settings);
     const systemPromptRaw = (currentSettings?.system_prompt || '').trim();
     const repoMap = (get(repoMapText) || '').trim();
-    const repoMapInstruction = 'Answer the user\'s message directly. Use the project structure below only when the user asks about the codebase or specific files.';
-    const systemPrompt = repoMap
-      ? (systemPromptRaw ? systemPromptRaw + '\n\n' + repoMapInstruction + '\n\n' + repoMap : repoMapInstruction + '\n\n' + repoMap)
-      : systemPromptRaw;
-    const apiMessages = buildApiMessages(msgsForApi, systemPrompt);
+    const systemPrompt = repoMap ? (systemPromptRaw ? systemPromptRaw + '\n\n' + repoMap : repoMap) : systemPromptRaw;
+    let apiMessages = buildApiMessages(msgsForApi, systemPrompt);
+    const contextMax = 100000;
+    const completionReserve = Math.min(8192, Number(currentSettings?.max_tokens) || 8192);
+    const maxPromptTokens = Math.max(1000, contextMax - completionReserve);
+    if (estimateTokensForTrim(apiMessages) > maxPromptTokens) {
+      apiMessages = trimMessagesToFit(apiMessages, maxPromptTokens);
+    }
     const estimatedPromptTokens = estimatePromptTokens(apiMessages);
 
     const assistantMsgId = generateId();
@@ -403,15 +439,15 @@ import { injectGitHubContextIfPresent } from '$lib/github.js';
         model: $effectiveModelId,
         messages: apiMessages,
         options: {
-          temperature: currentSettings.temperature,
-          max_tokens: currentSettings.max_tokens,
-          top_p: currentSettings.top_p,
-          top_k: currentSettings.top_k,
-          repeat_penalty: currentSettings.repeat_penalty,
-          presence_penalty: currentSettings.presence_penalty,
-          frequency_penalty: currentSettings.frequency_penalty,
-          stop: currentSettings.stop?.length ? currentSettings.stop : undefined,
-          ttl: currentSettings.model_ttl_seconds,
+          temperature: $settings.temperature,
+          max_tokens: $settings.max_tokens,
+          top_p: $settings.top_p,
+          top_k: $settings.top_k,
+          repeat_penalty: $settings.repeat_penalty,
+          presence_penalty: $settings.presence_penalty,
+          frequency_penalty: $settings.frequency_penalty,
+          stop: $settings.stop?.length ? $settings.stop : undefined,
+          ttl: $settings.model_ttl_seconds,
         },
         signal: controller.signal,
         onChunk(chunk) {
@@ -430,9 +466,12 @@ import { injectGitHubContextIfPresent } from '$lib/github.js';
     } catch (err) {
       const raw = err?.message || '';
       const isLoadError = raw.includes('Failed to load model') || raw.includes('Error loading model');
+      const isContextLength = /maximum context length|reduce the length of the messages/i.test(raw);
       const friendly = isLoadError
         ? 'Model failed to load in LM Studio. Load the model in LM Studio first (or check memory). If it still fails, try re-downloading the model in case the file is corrupted.'
-        : raw || 'Failed to get response. Is your model server running and the model loaded?';
+        : isContextLength
+          ? 'Context too long for this model. Start a new chat or unpin some files, then try again.'
+          : raw || 'Failed to get response. Is your model server running and the model loaded?';
       chatError.set(friendly);
       activeMessages.update((arr) => arr.filter((m) => m.id !== assistantMsgId));
       return;

@@ -36,9 +36,10 @@ else
   SEARCH_PID=""
 fi
 
-# Voice server (optional) — use venv Python so uvicorn/whisper deps are found
+# Voice server (optional) — faster-whisper; venv must have deps from voice-server/requirements.txt
 if [ -f voice-server/app.py ]; then
   if [ -x voice-server/venv/bin/python3 ]; then
+    (cd voice-server && ./venv/bin/python3 -m pip install -r requirements.txt -q 2>/dev/null)
     (cd voice-server && ./venv/bin/python3 -m uvicorn app:app --host 0.0.0.0 --port 8765) &
     VOICE_PID=$!
     echo "  Voice:      starting (http://localhost:8765)"
