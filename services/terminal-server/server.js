@@ -5,8 +5,8 @@ import os from 'os';
 const PORT = parseInt(process.env.TERMINAL_PORT || '8767', 10);
 const SHELL = process.env.SHELL || (os.platform() === 'win32' ? 'powershell.exe' : '/bin/bash');
 
-const wss = new WebSocketServer({ port: PORT });
-console.log(`Terminal server listening on ws://localhost:${PORT}`);
+const wss = new WebSocketServer({ port: PORT, host: '127.0.0.1' });
+console.log(`Terminal server listening on ws://127.0.0.1:${PORT}`);
 
 wss.on('connection', (ws) => {
   const ptyProcess = pty.spawn(SHELL, [], {

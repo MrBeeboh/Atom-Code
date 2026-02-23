@@ -112,4 +112,4 @@ app.post('/write', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`File server on http://localhost:${PORT}`));
+app.listen(PORT, '127.0.0.1', () => console.log(`File server on http://127.0.0.1:${PORT}`));
