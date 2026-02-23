@@ -7,7 +7,8 @@ Solid additions to make the app more polished and professional for open-source v
 ## Already strong
 
 - Chat + streaming, code blocks (copy / run in terminal / save to file)
-- File explorer + pinned context, integrated terminal, voice input, web search
+- File explorer + pinned context, integrated terminal, voice input (faster-whisper), web search
+- Code editor panel (bottom panel; open from chat or file explorer)
 - Quick actions (Explain, Fix, Refactor, Test, Document), presets, diff/apply to file
 - Command palette, export chat, keyboard shortcuts, multiple themes
 

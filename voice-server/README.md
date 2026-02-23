@@ -1,24 +1,25 @@
-# Voice-to-text server (insanely-fast-whisper stack)
+# Voice-to-text server (faster-whisper)
 
-Backend for the ATOM UI mic button. Uses the same stack as [insanely-fast-whisper](https://github.com/Vaibhavs10/insanely-fast-whisper): Hugging Face Transformers + Whisper.
+Backend for the ATOM UI mic button. Uses [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (CTranslate2) with int8 quantization for local speech-to-text. No PyTorch or Hugging Face Transformers.
 
 ## Quick start
 
-1. **Create and activate a venv** (recommended):
+1. **Create and activate a venv** (recommended; the main startup script expects `venv` in this directory):
 
    ```bash
    cd voice-server
-   python -m venv .venv
-   .venv\Scripts\activate   # Windows
-   # source .venv/bin/activate   # macOS/Linux
+   python3 -m venv venv
+   source venv/bin/activate   # Linux/macOS
+   # Windows: venv\Scripts\activate
    ```
 
-2. **Install dependencies** (first run can take a few minutes; downloads PyTorch and Whisper).  
-   **Windows:** For browser-recorded WebM audio, install [ffmpeg](https://ffmpeg.org/download.html) and add it to your PATH (librosa uses it to load webm).
+2. **Install dependencies** (first run may download the model, ~1.5 GB for large-v3):
 
    ```bash
    pip install -r requirements.txt
    ```
+
+   For browser-recorded WebM audio you need **ffmpeg** on your system (librosa uses it to load webm). Install via your package manager or [ffmpeg.org](https://ffmpeg.org/download.html).
 
 3. **Run the server**:
 
@@ -26,36 +27,39 @@ Backend for the ATOM UI mic button. Uses the same stack as [insanely-fast-whispe
    uvicorn app:app --host 0.0.0.0 --port 8765
    ```
 
-4. In ATOM UI, open **Settings** and set **Voice-to-text server** to `http://localhost:8765` (default). Use the **mic button** in the chat input to record and transcribe.
+   Or from the project root, use `./start-atom-code.sh`; it will run `pip install -r requirements.txt` and then start this server if `voice-server/venv/bin/python3` exists.
+
+4. In ATOM Code, open **Settings** and set **Voice server URL** to `http://localhost:8765` (default). Use the **mic button** in the chat input to record and transcribe.
 
 ## Options
 
-- **Smaller model (less VRAM/RAM):** Before starting the server:
+- **Model:** Default is `large-v3`. Override with env:
   ```bash
-  set WHISPER_MODEL=openai/whisper-base
+  export WHISPER_MODEL=large-v3    # default
+  export WHISPER_MODEL=tiny        # less RAM/VRAM, lower accuracy
+  export WHISPER_MODEL=small       # middle ground
   uvicorn app:app --host 0.0.0.0 --port 8765
   ```
-  Default is `openai/whisper-base`. For better accuracy and a powerful GPU, use `openai/whisper-large-v3` (needs more VRAM).
+
+- **Compute type:** Default is `int8`. For GPU you can use `float16`:
+  ```bash
+  export WHISPER_COMPUTE_TYPE=float16
+  ```
 
 - **Port:** Change `8765` if something else uses it.
 
-## Limits (to avoid overloading your system)
+## Health check
+
+- **GET** `http://localhost:8765/health`  
+  Returns `{"status":"ok","engine":"faster-whisper","model":"<WHISPER_MODEL>"}`.
+
+## Limits
 
 - Max upload: **10 MB** per request.
 - Max audio length: **2 minutes** per request.
-- **One transcription at a time** (queue); others wait or get 503.
+- One transcription at a time (queue); concurrent requests get 503 until the current one finishes.
 
-## Revert voice feature
+## Disabling voice
 
-If the voice feature causes problems:
-
-1. **Stop the voice server** (close the terminal running `uvicorn`).
-2. **Disable in UI:** Settings → Voice-to-text server → clear the URL or set to empty and save. The mic will show an error if used.
-3. **Fully remove the feature:** In the project root, revert to the commit before voice was added:
-   ```bash
-   git revert --no-commit HEAD
-   # or reset to the marked revert point:
-   git log --oneline
-   git reset --hard <REVERT_POINT_COMMIT>
-   ```
-   The revert-point commit message is: **"REVERT POINT: before voice-to-text (insanely-fast-whisper). Revert to this if voice feature causes issues."**
+1. Stop the voice server (close the terminal running uvicorn, or stop the process started by `start-atom-code.sh`).
+2. In ATOM Code: **Settings** → **Voice server URL** → clear the URL or set to empty. The mic will show an error if used.

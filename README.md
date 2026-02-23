@@ -13,7 +13,7 @@ A voice-first local coding assistant. No cloud APIs, no subscriptions, no sendin
 - **Coding presets** — Switch between Code, Debug, Review, Refactor, Explain, and General system prompts.
 - **Model switching** — Use any model loaded in LM Studio. Switch models mid-conversation.
 - **Performance stats** — Live tokens/sec, token count, and latency on every response.
-- **Context usage indicator** — Visual ring showing how much of the model's context window you're using.
+- **Context usage indicator** — Visual ring showing how much of the model's context window you're using. Long conversations and pinned context are automatically trimmed to stay within the model's limit.
 - **100% local** — Everything runs on your hardware. Voice processing, AI inference, file access, terminal — all local.
 
 ## Who It's For
@@ -27,7 +27,7 @@ People who want to build software by talking to an AI, not by typing code. ATOM 
 - **AI Backend:** LM Studio (OpenAI-compatible API, runs locally)
 - **Terminal Server:** Node.js + node-pty (WebSocket on port 8767)
 - **File Server:** Express.js (read/write project files, port 8768)
-- **Voice Server:** Python + FastAPI + Whisper (local STT, port 8765)
+- **Voice Server:** Python + FastAPI + faster-whisper (local STT, port 8765)
 
 ## Quick Start
 
@@ -40,16 +40,17 @@ Open http://localhost:5173. Requires LM Studio running with a model loaded.
 
 ### Full Stack (all features):
 ```bash
-# Install dependencies
+# Install dependencies (one time)
 npm install
 cd services/terminal-server && npm install && cd ../..
 cd services/file-server && npm install && cd ../..
-cd voice-server && pip install -r requirements.txt && cd ..
+cd voice-server && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt && cd ..
 
-# Start everything
+# Start everything (script starts voice server and installs voice deps if needed)
 chmod +x start-atom-code.sh
 ./start-atom-code.sh
 ```
+Open http://localhost:5173. Voice uses port 8765; see `voice-server/README.md` and `VOICE-SETUP.md`.
 
 ### Requirements
 - Node.js 18+
@@ -69,7 +70,7 @@ chmod +x start-atom-code.sh
 - [x] Quick actions and coding presets
 - [ ] Error feedback loop (auto-detect terminal errors, one-click fix)
 - [ ] Codebase-aware context (auto-index project files)
-- [ ] Code editor panel
+- [x] Code editor panel (bottom panel, open from chat or file explorer)
 - [ ] Voice commands ("fix it", "run it", "apply it")
 - [ ] Vision integration (screenshot-to-fix)
 
