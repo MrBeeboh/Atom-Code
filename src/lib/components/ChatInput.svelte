@@ -470,12 +470,77 @@
     return null;
   }
 
+  /** Web Audio API: short high ping when mic activates */
+  function audioReady() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 800;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.05);
+    } catch (_) {}
+  }
+
+  /** Web Audio API: two-tone chime when voice command matches */
+  function audioSuccess() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const playTone = (freq, start, dur) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.12, start);
+        gain.gain.exponentialRampToValueAtTime(0.01, start + dur);
+        osc.start(start);
+        osc.stop(start + dur);
+      };
+      playTone(523, ctx.currentTime, 0.06);
+      playTone(659, ctx.currentTime + 0.08, 0.08);
+    } catch (_) {}
+  }
+
+  /** Web Audio API: low buzz when transcription is empty */
+  function audioError() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 150;
+      osc.type = 'sawtooth';
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.1);
+    } catch (_) {}
+  }
+
   function handleVoiceCommand(action) {
+    audioSuccess();
     switch (action) {
       case 'run_last': {
         const block = get(lastCodeBlock);
         if (block) {
-          terminalCommand.set(block.code);
+          const lang = (block.language || '').toLowerCase().trim();
+          const code = block.code || '';
+          const esc = (s) => String(s).replace(/'/g, "'\\''");
+          let commandToRun = code;
+          if (/^(python|python3|py)$/.test(lang)) {
+            commandToRun = `python3 -c '${esc(code)}'`;
+          } else if (/^(javascript|js)$/.test(lang)) {
+            commandToRun = `node -e '${esc(code)}'`;
+          }
+          terminalCommand.set(commandToRun);
           terminalOpen.set(true);
           editorOpen.set(false);
         }
@@ -583,7 +648,9 @@
           }
           const data = await res.json();
           const transcribed = (data && data.text) ? String(data.text).trim() : '';
-          if (transcribed) {
+          if (!transcribed) {
+            audioError();
+          } else {
             console.log('[voice] transcribed:', JSON.stringify(transcribed));
             const codingPresets = ['Code', 'Debug', 'Review', 'Refactor', 'Explain'];
             const command = codingPresets.includes(get(activePresetName)) ? matchVoiceCommand(transcribed) : null;
@@ -603,6 +670,7 @@
       };
       rec.start(1000);
       recording = true;
+      audioReady();
       recordingStartMs = Date.now();
       voiceProcessing = true;
       recordingTimerId = setTimeout(() => stopRecording(), MAX_RECORDING_MS);
