@@ -458,11 +458,11 @@
     { patterns: [/^show terminal$/i, /^open terminal$/i], action: 'show_terminal' },
     { patterns: [/^hide terminal$/i, /^close terminal$/i], action: 'hide_terminal' },
     { patterns: [/^show editor$/i, /^open editor$/i], action: 'show_editor' },
-    { patterns: [/^hide editor$/i, /^close editor$/i], action: 'hide_editor' },
+const trimmed = text.replace(/[.!?,]+$/g, '').trim();    { patterns: [/^hide editor$/i, /^close editor$/i], action: 'hide_editor' },
   ];
 
   function matchVoiceCommand(text) {
-    const trimmed = text.replace(/[.!?,]+$/g, '').trim();
+    const trimmed = text.trim();
     for (const cmd of VOICE_COMMANDS) {
       if (cmd.patterns.some((p) => p.test(trimmed))) return cmd.action;
     }
@@ -583,10 +583,8 @@
           const data = await res.json();
           const transcribed = (data && data.text) ? String(data.text).trim() : '';
           if (transcribed) {
-            console.log('[voice] transcribed:', JSON.stringify(transcribed));
             const command = matchVoiceCommand(transcribed);
             if (command) {
-              console.log('[voice-cmd] matched:', command, 'from:', transcribed);
               handleVoiceCommand(command);
               voiceProcessing = false;
               return;
