@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { isStreaming, voiceServerUrl, pendingDroppedFiles, webSearchForNextMessage, webSearchInProgress, webSearchConnected, braveApiKey, chatInputPrefill, terminalErrorBanner, errorFeedbackRequest, repoMapFileList, workspaceRoot, terminalCommand, terminalOpen, editorOpen, openInEditorFromChat, lastCodeBlock, activePresetName } from '$lib/stores.js';
   import ThinkingAtom from '$lib/components/ThinkingAtom.svelte';
@@ -619,6 +620,39 @@
     if (voiceProcessing) return; // still uploading/transcribing
     startVoiceInput();
   }
+
+  /** Guard: true if focus is in an input, textarea, or contenteditable (skip push-to-talk). */
+  function isInputFocused() {
+    const el = document.activeElement;
+    if (!el) return false;
+    const tag = el.tagName && el.tagName.toUpperCase();
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return true;
+    if (el.isContentEditable) return true;
+    return false;
+  }
+
+  onMount(() => {
+    function onKeyDown(e) {
+      if ((e.key !== ' ' && e.code !== 'Space') || e.repeat) return;
+      if (isInputFocused()) return;
+      if (recording || voiceProcessing) return;
+      e.preventDefault();
+      startVoiceInput();
+    }
+    function onKeyUp(e) {
+      if ((e.key !== ' ' && e.code !== 'Space') || e.repeat) return;
+      if (isInputFocused()) return;
+      if (!recording) return;
+      e.preventDefault();
+      stopRecording();
+    }
+    window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('keyup', onKeyUp, true);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('keyup', onKeyUp, true);
+    };
+  });
 </script>
 
 <div
