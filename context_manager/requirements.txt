@@ -1,0 +1,5 @@
+# Dynamic Summarization Context Manager
+requests>=2.28.0
+
+# Optional RAG (Chroma) – local vector DB for "recall that fix from Tuesday"
+chromadb>=0.4.0

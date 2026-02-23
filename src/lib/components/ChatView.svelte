@@ -5,8 +5,7 @@
   import { streamChatCompletionWithMetrics } from '$lib/streamReporter.js';
   import { requestGrokImageGeneration, requestDeepInfraImageGeneration, requestDeepInfraVideoGeneration, isGrokModel, isDeepSeekModel, requestChatCompletion } from '$lib/api.js';
   import { searchDuckDuckGo, formatSearchResultForChat } from '$lib/duckduckgo.js';
-  import { pinnedFiles, fileServerUrl, repoMapText, repoMapFileList, githubToken, messagePreparing } from '$lib/stores.js';
-import { findRelevantFiles } from '$lib/repoMap.js';
+  import { githubToken, messagePreparing } from '$lib/stores.js';
 import { injectGitHubContextIfPresent } from '$lib/github.js';
   import MessageList from '$lib/components/MessageList.svelte';
   import QuickActions from '$lib/components/QuickActions.svelte';
@@ -332,54 +331,7 @@ import { injectGitHubContextIfPresent } from '$lib/github.js';
       console.warn('[ChatView] GitHub context fetch failed:', e?.message);
     }
 
-    // Prepend pinned file contents as context when sending (file server is 8768; 8766 is unload helper)
-    let fileContext = '';
-    let fileServerBase = (get(fileServerUrl) || 'http://localhost:8768').replace(/\/$/, '');
-    if (fileServerBase.includes(':8766')) fileServerBase = fileServerBase.replace(':8766', ':8768');
-
-    const pinned = get(pinnedFiles) || [];
-    const pinnedSet = new Set(pinned.map((p) => (p || '').trim().replace(/:(\d+)$/, '')));
-
-    // Phase 9B: Smart context — auto-include up to 3 relevant files by keyword match
-    const repoList = get(repoMapFileList) || [];
-    const smartPaths = findRelevantFiles(effectiveText, repoList, 3).filter((p) => !pinnedSet.has(p));
-    const pathsToFetch = [...pinned];
-    for (const p of smartPaths) {
-      if (pathsToFetch.length >= 8) break;
-      if (!pathsToFetch.includes(p)) pathsToFetch.push(p);
-    }
-    // Phase 9C: @file mentions — explicitly included files (deduped)
-    const mentioned = [...new Set((mentionedFilePaths || []).map((p) => (p || '').trim()))].filter(Boolean);
-    for (const p of mentioned) {
-      const pathForFetch = p.replace(/:(\d+)$/, '');
-      if (pathForFetch && !pathsToFetch.includes(pathForFetch)) pathsToFetch.push(pathForFetch);
-    }
-
-    if (pathsToFetch.length > 0) {
-      const fileContextParts = await Promise.all(
-        pathsToFetch.map(async (filePath) => {
-          const pathForFetch = (typeof filePath === 'string' && filePath.trim())
-            ? filePath.trim().replace(/:(\d+)$/, '')  // strip :line for file server
-            : '';
-          if (!pathForFetch || pathForFetch.includes('%') || !pathForFetch.startsWith('/')) return null;
-          if (pathForFetch.includes('.code-workspace') || pathForFetch.includes('/.cursor/projects/')) return null;
-          try {
-            const res = await fetch(`${fileServerBase}/content?path=${encodeURIComponent(pathForFetch)}`);
-            if (!res.ok) {
-              console.warn('[ChatView] File fetch failed (kept in pinned):', pathForFetch, res.status);
-              return null;
-            }
-            const data = await res.json();
-            return data?.content != null ? `--- ${pathForFetch} ---\n${data.content}` : null;
-          } catch (e) {
-            console.warn('[ChatView] File fetch error (kept in pinned):', pathForFetch, e);
-            return null;
-          }
-        })
-      );
-      fileContext = fileContextParts.filter(Boolean).join('\n\n');
-    }
-
+    // No repo or file dump: presets only change system prompt. Avoids context overload and models answering with huge code blocks.
     const history = await getMessages(convId);
     await addMessage(convId, {
       role: 'user',
@@ -388,7 +340,7 @@ import { injectGitHubContextIfPresent } from '$lib/github.js';
     });
     await loadMessages();
     let lastUserContent = userContent;
-    const contextPrefix = [githubContext, fileContext].filter(Boolean).join('\n\n');
+    const contextPrefix = githubContext ? githubContext + '\n\n' : '';
     if (contextPrefix) {
       if (typeof userContent === 'string') {
         lastUserContent = contextPrefix + '\n\n' + userContent;
@@ -400,15 +352,17 @@ import { injectGitHubContextIfPresent } from '$lib/github.js';
       }
     }
     const msgsForApi = [...history, { role: 'user', content: lastUserContent }];
-    // Phase 9A: Inject repo map into system prompt for codebase awareness
     const currentSettings = get(settings);
-    const systemPromptRaw = (currentSettings?.system_prompt || '').trim();
-    const repoMap = (get(repoMapText) || '').trim();
-    const systemPrompt = repoMap ? (systemPromptRaw ? systemPromptRaw + '\n\n' + repoMap : repoMap) : systemPromptRaw;
+    const systemPrompt = (currentSettings?.system_prompt || '').trim();
     let apiMessages = buildApiMessages(msgsForApi, systemPrompt);
-    const contextMax = 100000;
+    const userContextLen = Number(currentSettings?.context_length) || 0;
+    const storeContextMax = get(contextUsage)?.contextMax || 0;
+    const contextMax = userContextLen > 0 ? userContextLen
+      : storeContextMax > 0 ? storeContextMax
+      : 8192;
     const completionReserve = Math.min(8192, Number(currentSettings?.max_tokens) || 8192);
     const maxPromptTokens = Math.max(1000, contextMax - completionReserve);
+    console.log('[context] contextMax:', contextMax, 'estimated:', estimateTokensForTrim(apiMessages), 'maxPromptTokens:', maxPromptTokens);
     if (estimateTokensForTrim(apiMessages) > maxPromptTokens) {
       apiMessages = trimMessagesToFit(apiMessages, maxPromptTokens);
     }

@@ -1,0 +1,12 @@
+---
+description: How to implement features — match pro tools; push back on bad instructions
+alwaysApply: true
+---
+
+# Implementation approach
+
+- **When instructions would lead to a fragile or naive implementation, push back.** Propose the approach that pro tools (Cursor, Windsurf, Codeium) use instead of "make it work" hacks.
+- **Codebase context:** Do it like they do: *scoped* and *bounded*. Send only what's relevant (e.g. current file, or 1–2 files that match the user's question), with strict character/token limits. Use retrieval or "what's open" — never dump the whole repo or many full files into the message.
+- **Presets:** Changing system prompt (personality/mode) is the main lever. Optional context should be opt-in or narrowly scoped (e.g. "file open in editor only").
+- **Mode/preset change (local LM Studio models):** Always eject first, then load. When the user selects a preset/mode, unload all loaded models (`unloadAllModelsNative`), then load the model for that mode (`loadModel`). Do not load on top of an already-loaded model — that can double up and crash. Only run eject-then-load for local models (`isLocalModel`); skip for cloud (DeepSeek, Grok).
+- **Chat history:** Use a sliding window (e.g. last 3 turns = 6 messages) so the API payload stays bounded. Never send full unbounded history. Preserve turn boundaries (no consecutive user messages).
