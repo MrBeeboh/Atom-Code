@@ -5,7 +5,7 @@
   import { get } from "svelte/store";
   import PerfStats from "$lib/components/PerfStats.svelte";
   import AuthVideo from "$lib/components/AuthVideo.svelte";
-  import { pinnedContent, deepinfraApiKey, terminalCommand, terminalOpen, fileServerUrl, workspaceRoot, pinnedFiles, diffViewerState, editorOpen, openInEditorFromChat } from "$lib/stores.js";
+  import { pinnedContent, deepinfraApiKey, terminalCommand, terminalOpen, fileServerUrl, workspaceRoot, pinnedFiles, diffViewerState, editorOpen, openInEditorFromChat, lastCodeBlock } from "$lib/stores.js";
 
   /** DeepInfra key: init from store + env so it's there on first paint; subscribe to stay in sync with Settings. */
   let deepinfraKey = $state(
@@ -57,6 +57,18 @@
       ? renderMarkdown(displayContent)
       : "",
   );
+
+  /** When assistant message content changes, update lastCodeBlock with the last code block for voice commands. */
+  $effect(() => {
+    if (!isAssistant || !displayContent) return;
+    const re = /```(\S*)\n([\s\S]*?)```/g;
+    let match;
+    let last = null;
+    while ((match = re.exec(displayContent)) !== null) last = match;
+    if (last) {
+      lastCodeBlock.set({ language: (last[1] || "text").trim() || "text", code: last[2].trim() });
+    }
+  });
 
   let copyFeedback = $state(false);
   let pinFeedback = $state(false);

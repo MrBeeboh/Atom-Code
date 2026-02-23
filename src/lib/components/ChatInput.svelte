@@ -1,6 +1,6 @@
 <script>
   import { get } from 'svelte/store';
-  import { isStreaming, voiceServerUrl, pendingDroppedFiles, webSearchForNextMessage, webSearchInProgress, webSearchConnected, braveApiKey, chatInputPrefill, terminalErrorBanner, errorFeedbackRequest, repoMapFileList, workspaceRoot } from '$lib/stores.js';
+  import { isStreaming, voiceServerUrl, pendingDroppedFiles, webSearchForNextMessage, webSearchInProgress, webSearchConnected, braveApiKey, chatInputPrefill, terminalErrorBanner, errorFeedbackRequest, repoMapFileList, workspaceRoot, terminalCommand, terminalOpen, editorOpen, openInEditorFromChat, lastCodeBlock } from '$lib/stores.js';
   import ThinkingAtom from '$lib/components/ThinkingAtom.svelte';
   import ContextRing from '$lib/components/ContextRing.svelte';
   import { COCKPIT_SENDING, COCKPIT_SEARCHING, pickWitty } from '$lib/cockpitCopy.js';
@@ -451,6 +451,69 @@
     }
   });
 
+  const VOICE_COMMANDS = [
+    { patterns: [/^run it$/i, /^run that$/i, /^run the code$/i, /^run this$/i], action: 'run_last' },
+    { patterns: [/^apply it$/i, /^apply that$/i, /^apply the code$/i], action: 'apply_last' },
+    { patterns: [/^fix it$/i, /^fix that$/i, /^fix the error$/i, /^fix this$/i, /^can you fix/i, /^please fix/i], action: 'fix_error' },
+    { patterns: [/^show terminal$/i, /^open terminal$/i], action: 'show_terminal' },
+    { patterns: [/^hide terminal$/i, /^close terminal$/i], action: 'hide_terminal' },
+    { patterns: [/^show editor$/i, /^open editor$/i], action: 'show_editor' },
+    { patterns: [/^hide editor$/i, /^close editor$/i], action: 'hide_editor' },
+  ];
+
+  function matchVoiceCommand(text) {
+    const trimmed = text.trim();
+    for (const cmd of VOICE_COMMANDS) {
+      if (cmd.patterns.some((p) => p.test(trimmed))) return cmd.action;
+    }
+    return null;
+  }
+
+  function handleVoiceCommand(action) {
+    switch (action) {
+      case 'run_last': {
+        const block = get(lastCodeBlock);
+        if (block) {
+          terminalCommand.set(block.code);
+          terminalOpen.set(true);
+          editorOpen.set(false);
+        }
+        break;
+      }
+      case 'apply_last': {
+        const block = get(lastCodeBlock);
+        if (block) {
+          openInEditorFromChat.set({ content: block.code, language: block.language });
+          terminalOpen.set(true);
+          editorOpen.set(true);
+        }
+        break;
+      }
+      case 'fix_error': {
+        const banner = get(terminalErrorBanner);
+        if (banner) {
+          errorFeedbackRequest.set({ code: banner.code, output: banner.output ?? '' });
+          terminalErrorBanner.set(null);
+        }
+        break;
+      }
+      case 'show_terminal':
+        terminalOpen.set(true);
+        editorOpen.set(false);
+        break;
+      case 'show_editor':
+        terminalOpen.set(true);
+        editorOpen.set(true);
+        break;
+      case 'hide_terminal':
+        terminalOpen.set(false);
+        break;
+      case 'hide_editor':
+        editorOpen.set(false);
+        break;
+    }
+  }
+
   function stopRecording() {
     if (recordingTimerId != null) {
       clearTimeout(recordingTimerId);
@@ -519,23 +582,14 @@
           }
           const data = await res.json();
           const transcribed = (data && data.text) ? String(data.text).trim() : '';
-          const fixPatterns = [
-            /^fix it$/i,
-            /^fix that$/i,
-            /^fix the error$/i,
-            /^fix this$/i,
-            /^can you fix/i,
-            /^please fix/i,
-          ];
           if (transcribed) {
-            const isFixCommand = fixPatterns.some((p) => p.test(transcribed));
-            const banner = get(terminalErrorBanner);
-            if (isFixCommand && banner?.code != null) {
-              errorFeedbackRequest.set({ code: banner.code, output: banner.output ?? '' });
-              terminalErrorBanner.set(null);
-            } else {
-              text = text ? text + ' ' + transcribed : transcribed;
+            const command = matchVoiceCommand(transcribed);
+            if (command) {
+              handleVoiceCommand(command);
+              voiceProcessing = false;
+              return;
             }
+            text = text ? text + ' ' + transcribed : transcribed;
           }
         } catch (e) {
           voiceError = e?.message || 'Voice server error. Is it running on ' + url + '?';
