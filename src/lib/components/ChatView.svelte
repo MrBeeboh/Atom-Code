@@ -354,20 +354,27 @@ import { injectGitHubContextIfPresent } from '$lib/github.js';
     let lastUserContent = userContent;
     const contextPrefix = [githubContext, fileContext].filter(Boolean).join('\n\n');
     if (contextPrefix) {
+      const contextIntro = 'Optional context (pinned files, etc.). Use it only if the user\'s message below asks about code or these files. Otherwise answer the user\'s message directly.\n\n--- Context ---\n';
+      const userLabel = '\n\n--- User message ---\n';
       if (typeof userContent === 'string') {
-        lastUserContent = contextPrefix + '\n\n' + userContent;
+        lastUserContent = contextIntro + contextPrefix + userLabel + (userContent || '');
       } else if (Array.isArray(userContent)) {
         const textPart = userContent.find((p) => p.type === 'text');
         const rest = userContent.filter((p) => p.type !== 'text');
-        const text = (textPart?.text ?? '') ? contextPrefix + '\n\n' + textPart.text : contextPrefix;
+        const userText = (textPart?.text ?? '').trim() || '(no text)';
+        const text = contextIntro + contextPrefix + userLabel + userText;
         lastUserContent = [{ type: 'text', text }, ...rest];
       }
     }
     const msgsForApi = [...history, { role: 'user', content: lastUserContent }];
-    // Phase 9A: Inject repo map into system prompt for codebase awareness
-    const systemPromptRaw = ($settings.system_prompt || '').trim();
+    // Phase 9A: Inject repo map into system prompt for codebase awareness (read settings at send time so preset changes apply without refresh)
+    const currentSettings = get(settings);
+    const systemPromptRaw = (currentSettings?.system_prompt || '').trim();
     const repoMap = (get(repoMapText) || '').trim();
-    const systemPrompt = repoMap ? (systemPromptRaw ? systemPromptRaw + '\n\n' + repoMap : repoMap) : systemPromptRaw;
+    const repoMapInstruction = 'Answer the user\'s message directly. Use the project structure below only when the user asks about the codebase or specific files.';
+    const systemPrompt = repoMap
+      ? (systemPromptRaw ? systemPromptRaw + '\n\n' + repoMapInstruction + '\n\n' + repoMap : repoMapInstruction + '\n\n' + repoMap)
+      : systemPromptRaw;
     const apiMessages = buildApiMessages(msgsForApi, systemPrompt);
     const estimatedPromptTokens = estimatePromptTokens(apiMessages);
 
@@ -396,15 +403,15 @@ import { injectGitHubContextIfPresent } from '$lib/github.js';
         model: $effectiveModelId,
         messages: apiMessages,
         options: {
-          temperature: $settings.temperature,
-          max_tokens: $settings.max_tokens,
-          top_p: $settings.top_p,
-          top_k: $settings.top_k,
-          repeat_penalty: $settings.repeat_penalty,
-          presence_penalty: $settings.presence_penalty,
-          frequency_penalty: $settings.frequency_penalty,
-          stop: $settings.stop?.length ? $settings.stop : undefined,
-          ttl: $settings.model_ttl_seconds,
+          temperature: currentSettings.temperature,
+          max_tokens: currentSettings.max_tokens,
+          top_p: currentSettings.top_p,
+          top_k: currentSettings.top_k,
+          repeat_penalty: currentSettings.repeat_penalty,
+          presence_penalty: currentSettings.presence_penalty,
+          frequency_penalty: currentSettings.frequency_penalty,
+          stop: currentSettings.stop?.length ? currentSettings.stop : undefined,
+          ttl: currentSettings.model_ttl_seconds,
         },
         signal: controller.signal,
         onChunk(chunk) {

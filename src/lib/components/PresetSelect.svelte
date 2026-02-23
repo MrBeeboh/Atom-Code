@@ -24,6 +24,7 @@
   function applyPreset(name) {
     const preset = PRESETS.find((p) => p.name === name);
     if (!preset) return;
+    currentPresetName = name; // update UI immediately so preset change is visible without refresh
     const byPreset = get(presetDefaultModels) ?? {};
     const defaultModel = byPreset[name];
     const list = get(models) ?? [];
