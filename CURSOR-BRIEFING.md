@@ -30,9 +30,9 @@ Imports and sets `activePresetName` on load and on every preset change.
 
 ### `src/lib/components/ChatInput.svelte`
 
-Imports `activePresetName`, strips trailing punctuation from voice transcription, and gates voice commands to coding presets only.
+Imports `activePresetName`, strips trailing punctuation from voice transcription, gates voice commands to coding presets only, Phase 12B push-to-talk (hold Space), Phase 12C audio cues (audioReady/audioSuccess/audioError), and run_last uses correct interpreter (python3 -c / node -e / raw).
 
-**Verify:** `grep "activePresetName\|codingPresets" src/lib/components/ChatInput.svelte` — must return results.
+**Verify:** `grep "activePresetName\|codingPresets\|audioReady\|python3 -c" src/lib/components/ChatInput.svelte` — all four must return results.
 
 ### Servers bound to localhost only
 
@@ -43,16 +43,17 @@ Imports `activePresetName`, strips trailing punctuation from voice transcription
 
 ## Current restore point tag
 
-`stable-phase12a-presetfix-hardened`
+`stable-phase12c`
 
 ---
 
-## Next task — Phase 12B: Push-to-talk
+## Completed
 
-Add **hold-spacebar-to-record** to `src/lib/components/ChatInput.svelte` only.
+- **Phase 12B:** Push-to-talk (hold Space to record, release to send; guard when input focused; `onMount` keydown/keyup on window).
+- **Phase 12C:** Audio cues (audioReady when mic on, audioSuccess when voice command matches, audioError when transcription empty); run_last uses correct interpreter (python/python3/py → `python3 -c`, javascript/js → `node -e`, else raw).
 
-- **Hold Space** = start recording
-- **Release Space** = stop recording
-- **Guard:** Do not trigger if `document.activeElement` is an input, textarea, or contenteditable element.
-- Use `onMount` to attach/detach the keydown/keyup listeners on `window`.
-- **Do not touch any other files.**
+---
+
+## Next task
+
+TBD (e.g. docs, polish, or next phase).
