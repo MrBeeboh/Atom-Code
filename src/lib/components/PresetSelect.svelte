@@ -1,6 +1,6 @@
 <script>
   import { get } from 'svelte/store';
-  import { setPerModelOverride, presetDefaultModels, selectedModelId, models, settings } from '$lib/stores.js';
+  import { setPerModelOverride, presetDefaultModels, selectedModelId, models, settings, activePresetName } from '$lib/stores.js';
 
   const PRESETS = [
     { name: 'Code', prompt: 'You are an expert programmer. Be concise. Prefer code over prose. Use fenced code blocks with language tags.' },
@@ -17,6 +17,7 @@
   $effect(() => {
     const unsub = settings.subscribe((s) => {
       currentPresetName = PRESETS.find((p) => (s?.system_prompt ?? '').trim() === p.prompt.trim())?.name ?? '';
+      activePresetName.set(currentPresetName);
     });
     return () => unsub();
   });
@@ -25,6 +26,7 @@
     const preset = PRESETS.find((p) => p.name === name);
     if (!preset) return;
     currentPresetName = name; // update UI immediately so preset change is visible without refresh
+    activePresetName.set(name);
     const byPreset = get(presetDefaultModels) ?? {};
     const defaultModel = byPreset[name];
     const list = get(models) ?? [];

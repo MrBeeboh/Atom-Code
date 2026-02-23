@@ -1,6 +1,6 @@
 <script>
   import { get } from 'svelte/store';
-  import { isStreaming, voiceServerUrl, pendingDroppedFiles, webSearchForNextMessage, webSearchInProgress, webSearchConnected, braveApiKey, chatInputPrefill, terminalErrorBanner, errorFeedbackRequest, repoMapFileList, workspaceRoot, terminalCommand, terminalOpen, editorOpen, openInEditorFromChat, lastCodeBlock } from '$lib/stores.js';
+  import { isStreaming, voiceServerUrl, pendingDroppedFiles, webSearchForNextMessage, webSearchInProgress, webSearchConnected, braveApiKey, chatInputPrefill, terminalErrorBanner, errorFeedbackRequest, repoMapFileList, workspaceRoot, terminalCommand, terminalOpen, editorOpen, openInEditorFromChat, lastCodeBlock, activePresetName } from '$lib/stores.js';
   import ThinkingAtom from '$lib/components/ThinkingAtom.svelte';
   import ContextRing from '$lib/components/ContextRing.svelte';
   import { COCKPIT_SENDING, COCKPIT_SEARCHING, pickWitty } from '$lib/cockpitCopy.js';
@@ -584,7 +584,8 @@
           const transcribed = (data && data.text) ? String(data.text).trim() : '';
           if (transcribed) {
             console.log('[voice] transcribed:', JSON.stringify(transcribed));
-            const command = matchVoiceCommand(transcribed);
+            const codingPresets = ['Code', 'Debug', 'Review', 'Refactor', 'Explain'];
+            const command = codingPresets.includes(get(activePresetName)) ? matchVoiceCommand(transcribed) : null;
             if (command) {
               console.log('[voice-cmd] matched:', command, 'from:', transcribed);
               handleVoiceCommand(command);

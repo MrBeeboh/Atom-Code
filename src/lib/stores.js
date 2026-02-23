@@ -434,6 +434,9 @@ export const lastExecutedCode = writable(null);
 /** Last code block from assistant message (for voice commands "run it" / "apply it"). Shape: { code: string, language: string } or null. */
 export const lastCodeBlock = writable(null);
 
+/** Active preset name set by PresetSelect. Gates voice commands to coding presets only. */
+export const activePresetName = writable('');
+
 /** When set, show "Error detected — Send to model for fix?" banner. Value: { code, output } or null. */
 export const terminalErrorBanner = writable(null);
 
