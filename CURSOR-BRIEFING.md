@@ -1,3 +1,9 @@
+## REPO SEPARATION — READ FIRST
+- ATOM Code: ~/atom-code → https://github.com/MrBeeboh/Atom-Code (THIS REPO)
+- ATOM Chat: ~/atom-chat → https://github.com/MrBeeboh/Atom-Chat (SEPARATE PRODUCT — never work in atom-chat when tasked with atom-code and vice versa)
+
+---
+
 # ATOM Code — Current State Briefing for Cursor
 
 **Read this at the start of any Cursor session. Do not revert or undo the completed work below.**
