@@ -739,7 +739,82 @@
     aria-label="Attach image or PDF"
   />
   <div class="chat-input-box">
-    <div class="chat-input-content">
+    <div class="chat-input-bar">
+      <div class="chat-input-bar-attach">
+        <div class="attach-button-wrap">
+          {#if clippyBubble}
+            <div class="clippy-bubble" role="status" aria-live="polite">
+              <span class="clippy-bubble-text">{clippyBubble}</span>
+              <span class="clippy-bubble-tail" aria-hidden="true"></span>
+            </div>
+          {/if}
+          <button
+            type="button"
+            class="attach-button"
+            class:clippy-active={clippyBubble}
+            title="Attach image or PDF (or drag & drop, paste)"
+            disabled={$isStreaming || attachProcessing}
+            onclick={() => fileInputEl?.click()}
+            onmouseenter={onAttachHover}
+            onmouseleave={onAttachLeave}
+            aria-label="Attach files"
+          >
+            {#if attachProcessing}
+              <span class="mic-spinner" aria-hidden="true">⟳</span>
+            {:else}
+              <span class="attach-icon" aria-hidden="true">📎</span>
+            {/if}
+          </button>
+        </div>
+        {#if onGenerateImageGrok || onGenerateImageDeepSeek || onGenerateVideoDeepSeek}
+          <div class="media-toolbar media-toolbar-dropdown">
+            {#if onGenerateImageGrok || onGenerateImageDeepSeek}
+              <button
+                type="button"
+                class="media-icon-btn {imageGenerating ? 'media-icon-btn-active' : ''}"
+                disabled={$isStreaming || imageGenerating || !text.trim()}
+                onclick={handleImageClick}
+                title={imageGenerating ? 'Generating image…' : (onGenerateImageGrok ? 'Generate image (Grok)' : 'Generate image (DeepInfra)')}
+                aria-label={imageGenerating ? 'Generating image' : 'Generate image'}
+              >
+                {#if imageGenerating}
+                  <ThinkingAtom size={16} />
+                {:else}
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="2.5" y="2.5" width="19" height="19" rx="3" stroke="currentColor" stroke-width="1.5"/>
+                    <circle cx="8" cy="8" r="2" fill="currentColor" opacity="0.5"/>
+                    <path d="M2.5 16l5-5.5 3.5 3.5 3-3L21.5 16v3.5a3 3 0 0 1-3 3h-13a3 3 0 0 1-3-3V16z" fill="currentColor" opacity="0.2"/>
+                    <path d="M2.5 16l5-5.5 3.5 3.5 3-3L21.5 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <span class="media-icon-label">Image</span>
+                {/if}
+              </button>
+            {/if}
+            {#if onGenerateVideoDeepSeek}
+              <button
+                type="button"
+                class="media-icon-btn {videoGenerating ? 'media-icon-btn-active' : ''}"
+                disabled={$isStreaming || videoGenerating || !text.trim()}
+                onclick={handleVideoClick}
+                title={videoGenerating ? `Generating video… ${videoGenElapsed}` : 'Generate video (DeepInfra)'}
+                aria-label={videoGenerating ? 'Generating video' : 'Generate video'}
+              >
+                {#if videoGenerating}
+                  <span class="media-icon-generating"><ThinkingAtom size={16} /><span class="media-elapsed">{videoGenElapsed}</span></span>
+                {:else}
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="2.5" y="3.5" width="19" height="17" rx="3" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M10 8.5v7l5.5-3.5L10 8.5z" fill="currentColor" opacity="0.35"/>
+                    <path d="M10 8.5v7l5.5-3.5L10 8.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <span class="media-icon-label">Video</span>
+                {/if}
+              </button>
+            {/if}
+          </div>
+        {/if}
+      </div>
+      <div class="chat-input-main">
     {#if attachments.length > 0}
       <div class="attachments-row">
         {#each attachments as att, i}
@@ -785,141 +860,63 @@
         {/each}
       </div>
     {/if}
-    {#if onGenerateImageGrok || onGenerateImageDeepSeek || onGenerateVideoDeepSeek}
-      <div class="media-toolbar">
-        {#if onGenerateImageGrok || onGenerateImageDeepSeek}
-          <button
-            type="button"
-            class="media-icon-btn {imageGenerating ? 'media-icon-btn-active' : ''}"
-            disabled={$isStreaming || imageGenerating || !text.trim()}
-            onclick={handleImageClick}
-            title={imageGenerating ? 'Generating image…' : (onGenerateImageGrok ? 'Generate image (Grok)' : 'Generate image (DeepInfra)')}
-            aria-label={imageGenerating ? 'Generating image' : 'Generate image'}
-          >
-            {#if imageGenerating}
-              <ThinkingAtom size={16} />
-            {:else}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <rect x="2.5" y="2.5" width="19" height="19" rx="3" stroke="currentColor" stroke-width="1.5"/>
-                <circle cx="8" cy="8" r="2" fill="currentColor" opacity="0.5"/>
-                <path d="M2.5 16l5-5.5 3.5 3.5 3-3L21.5 16v3.5a3 3 0 0 1-3 3h-13a3 3 0 0 1-3-3V16z" fill="currentColor" opacity="0.2"/>
-                <path d="M2.5 16l5-5.5 3.5 3.5 3-3L21.5 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span class="media-icon-label">Image</span>
-            {/if}
-          </button>
-        {/if}
-        {#if onGenerateVideoDeepSeek}
-          <button
-            type="button"
-            class="media-icon-btn {videoGenerating ? 'media-icon-btn-active' : ''}"
-            disabled={$isStreaming || videoGenerating || !text.trim()}
-            onclick={handleVideoClick}
-            title={videoGenerating ? `Generating video… ${videoGenElapsed}` : 'Generate video (DeepInfra)'}
-            aria-label={videoGenerating ? 'Generating video' : 'Generate video'}
-          >
-            {#if videoGenerating}
-              <span class="media-icon-generating"><ThinkingAtom size={16} /><span class="media-elapsed">{videoGenElapsed}</span></span>
-            {:else}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <rect x="2.5" y="3.5" width="19" height="17" rx="3" stroke="currentColor" stroke-width="1.5"/>
-                <path d="M10 8.5v7l5.5-3.5L10 8.5z" fill="currentColor" opacity="0.35"/>
-                <path d="M10 8.5v7l5.5-3.5L10 8.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span class="media-icon-label">Video</span>
-            {/if}
-          </button>
-        {/if}
       </div>
-    {/if}
-    </div>
-    <div class="context-ring-row" aria-label="Context usage">
-      <ContextRing inline={true} />
-    </div>
-    <div class="chat-input-footer">
-      <div class="chat-input-footer-icons">
-        <div class="attach-button-wrap">
-          {#if clippyBubble}
-            <div class="clippy-bubble" role="status" aria-live="polite">
-              <span class="clippy-bubble-text">{clippyBubble}</span>
-              <span class="clippy-bubble-tail" aria-hidden="true"></span>
-            </div>
-          {/if}
-          <button
-            type="button"
-            class="attach-button"
-            class:clippy-active={clippyBubble}
-            title="Attach image or PDF (or drag & drop, paste)"
-            disabled={$isStreaming || attachProcessing}
-            onclick={() => fileInputEl?.click()}
-            onmouseenter={onAttachHover}
-            onmouseleave={onAttachLeave}
-            aria-label="Attach files"
-          >
-            {#if attachProcessing}
-              <span class="mic-spinner" aria-hidden="true">⟳</span>
-            {:else}
-              <span class="attach-icon" aria-hidden="true">📎</span>
-            {/if}
-          </button>
-        </div>
-        <button
-          type="button"
-          class="mic-button"
-          title={recording ? 'Stop recording (click again)' : 'Voice input – start Python server first'}
-          disabled={$isStreaming || (voiceProcessing && !recording)}
-          onclick={toggleVoice}
-          aria-label={recording ? 'Stop recording' : 'Start voice input'}
-        >
-          {#if voiceProcessing && !recording}
-            <span class="mic-spinner" aria-hidden="true">⟳</span>
-          {:else if recording}
-            <span class="mic-dot" aria-hidden="true"></span>
-          {:else}
-            <span class="mic-icon" aria-hidden="true">🎤</span>
-          {/if}
-        </button>
-        <button
-          type="button"
-          class="web-search-button"
-          class:active={$webSearchForNextMessage}
-          title={webSearchWarmingUp ? 'Connecting…' : $webSearchForNextMessage ? ($webSearchConnected ? 'Web search on – connected (click to turn off)' : 'Web search on – not connected yet (click globe again to retry)') : 'Search the web for next message'}
-          disabled={$isStreaming}
-          onclick={() => {
-            const on = $webSearchForNextMessage;
-            const connected = $webSearchConnected;
-            if (on && !connected && !webSearchWarmingUp) {
-              webSearchWarmingUpAttempted = false;
-              runWarmUp();
-              return;
-            }
-            if (on) {
-              webSearchForNextMessage.set(false);
-              webSearchConnected.set(false);
-              return;
-            }
-            webSearchForNextMessage.set(true);
+      <button
+        type="button"
+        class="mic-button"
+        title={recording ? 'Stop recording (click again)' : 'Voice input – start Python server first'}
+        disabled={$isStreaming || (voiceProcessing && !recording)}
+        onclick={toggleVoice}
+        aria-label={recording ? 'Stop recording' : 'Start voice input'}
+      >
+        {#if voiceProcessing && !recording}
+          <span class="mic-spinner" aria-hidden="true">⟳</span>
+        {:else if recording}
+          <span class="mic-dot" aria-hidden="true"></span>
+        {:else}
+          <span class="mic-icon" aria-hidden="true">🎤</span>
+        {/if}
+      </button>
+      <button
+        type="button"
+        class="web-search-button"
+        class:active={$webSearchForNextMessage}
+        title={webSearchWarmingUp ? 'Connecting…' : $webSearchForNextMessage ? ($webSearchConnected ? 'Web search on – connected (click to turn off)' : 'Web search on – not connected yet (click globe again to retry)') : 'Search the web for next message'}
+        disabled={$isStreaming}
+        onclick={() => {
+          const on = $webSearchForNextMessage;
+          const connected = $webSearchConnected;
+          if (on && !connected && !webSearchWarmingUp) {
+            webSearchWarmUpAttempted = false;
             runWarmUp();
-          }}
-          aria-label={webSearchWarmingUp ? 'Connecting' : $webSearchForNextMessage ? 'Web search on' : 'Search web for next message'}
-          aria-pressed={$webSearchForNextMessage}
-          aria-busy={webSearchWarmingUp}
-        >
-          <span
-            class="web-search-icon"
-            class:web-search-icon-spin={webSearchWarmingUp}
-            aria-hidden="true"
-            title="Internet"
-          >🌐</span>
-          {#if $webSearchForNextMessage}
-            {#if $webSearchConnected}
-              <span class="web-search-dot web-search-dot-green" aria-hidden="true" title="Connected"></span>
-            {:else}
-              <span class="web-search-dot web-search-dot-red" class:web-search-dot-pulse={webSearchWarmingUp} aria-hidden="true" title="Not connected"></span>
-            {/if}
+            return;
+          }
+          if (on) {
+            webSearchForNextMessage.set(false);
+            webSearchConnected.set(false);
+            return;
+          }
+          webSearchForNextMessage.set(true);
+          runWarmUp();
+        }}
+        aria-label={webSearchWarmingUp ? 'Connecting' : $webSearchForNextMessage ? 'Web search on' : 'Search web for next message'}
+        aria-pressed={$webSearchForNextMessage}
+        aria-busy={webSearchWarmingUp}
+      >
+        <span
+          class="web-search-icon"
+          class:web-search-icon-spin={webSearchWarmingUp}
+          aria-hidden="true"
+          title="Internet"
+        >🌐</span>
+        {#if $webSearchForNextMessage}
+          {#if $webSearchConnected}
+            <span class="web-search-dot web-search-dot-green" aria-hidden="true" title="Connected"></span>
+          {:else}
+            <span class="web-search-dot web-search-dot-red" class:web-search-dot-pulse={webSearchWarmingUp} aria-hidden="true" title="Not connected"></span>
           {/if}
-        </button>
-      </div>
+        {/if}
+      </button>
       {#if $isStreaming && onStop}
         <button type="button" class="chat-send-button" data-state="stop" onclick={() => onStop()} title="Stop">Stop</button>
       {:else}
@@ -937,6 +934,9 @@
           {/if}
         </button>
       {/if}
+    </div>
+    <div class="context-ring-row" aria-label="Context usage">
+      <ContextRing inline={true} />
     </div>
   </div>
   {#if voiceError}
@@ -972,6 +972,99 @@
   .chat-input-box:focus-within {
     border-color: var(--ui-accent, #3b82f6);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent, #3b82f6) 12%, transparent);
+  }
+
+  .chat-input-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    min-height: 48px;
+    padding: 6px 8px 6px 10px;
+    flex-shrink: 0;
+  }
+
+  .chat-input-bar-attach {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .chat-input-bar-attach .media-toolbar-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    padding: 6px 8px;
+    gap: 4px;
+    background: var(--ui-input-bg, #fff);
+    border: 1px solid color-mix(in srgb, var(--ui-border, #e5e7eb) 50%, transparent);
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    z-index: 20;
+  }
+
+  .chat-input-bar-attach:hover .media-toolbar-dropdown {
+    display: flex;
+  }
+
+  .chat-input-bar .chat-input-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .chat-input-bar .attach-button-wrap {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .chat-input-bar .attach-button,
+  .chat-input-bar .mic-button,
+  .chat-input-bar .web-search-button {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    color: var(--ui-text-secondary, #6b7280);
+    opacity: 1;
+  }
+
+  .chat-input-bar .attach-button:hover:not(:disabled),
+  .chat-input-bar .mic-button:hover:not(:disabled),
+  .chat-input-bar .web-search-button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--ui-accent, #3b82f6) 10%, transparent);
+    color: var(--ui-accent, #3b82f6);
+  }
+
+  .chat-input-bar .web-search-button.active {
+    background: color-mix(in srgb, var(--ui-accent, #3b82f6) 12%, transparent);
+    color: var(--ui-accent, #3b82f6);
+  }
+
+  .chat-input-bar .chat-send-button {
+    flex-shrink: 0;
+    margin: 0;
   }
 
   .chat-input-content {
@@ -1121,12 +1214,12 @@
   textarea {
     flex: 0 0 auto;
     width: 100%;
-    padding: var(--space-3);
+    padding: 10px 12px;
     border: none;
     font-family: inherit;
     font-size: 14px;
     resize: none;
-    min-height: 72px;
+    min-height: 44px;
     max-height: 200px;
     overflow-y: auto;
     background: transparent;
@@ -1180,8 +1273,11 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-1) var(--space-2) var(--space-2);
     flex-shrink: 0;
+  }
+
+  .media-toolbar:not(.media-toolbar-dropdown) {
+    padding: var(--space-1) var(--space-2) var(--space-2);
   }
 
   .media-icon-btn {
