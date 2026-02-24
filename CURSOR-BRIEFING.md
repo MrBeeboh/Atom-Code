@@ -2,6 +2,11 @@
 
 **Read this at the start of any Cursor session. Do not revert or undo the completed work below.**
 
+## Repos
+
+- **ATOM Code:** `~/atom-code` → https://github.com/MrBeeboh/Atom-Code (THIS REPO)
+- **ATOM Chat:** `~/atom-chat` → https://github.com/MrBeeboh/Atom-Chat (SEPARATE — do not confuse)
+
 ---
 
 ## Do NOT modify these files under any circumstances
