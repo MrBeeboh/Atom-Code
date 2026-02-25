@@ -275,7 +275,7 @@ function loadGlobalDefault() {
         return cockpit;
       }
     }
-  } catch (_) {}
+  } catch (_) { }
   return {};
 }
 export const globalDefault = writable(loadGlobalDefault());
@@ -400,12 +400,12 @@ if (typeof localStorage !== 'undefined') {
   terminalOpen.subscribe((v) => localStorage.setItem('terminalOpen', v ? 'true' : 'false'));
 }
 
-/** Terminal panel height in px (resizable; min 100, default 250). */
-export const terminalHeight = writable(
-  typeof localStorage !== 'undefined' ? Number(localStorage.getItem('terminalHeight')) || 250 : 250
+/** Secondary panel width in px (resizable; min 250, default 400). */
+export const secondaryPanelWidth = writable(
+  typeof localStorage !== 'undefined' ? Number(localStorage.getItem('secondaryPanelWidth')) || 400 : 400
 );
 if (typeof localStorage !== 'undefined') {
-  terminalHeight.subscribe((v) => localStorage.setItem('terminalHeight', String(v)));
+  secondaryPanelWidth.subscribe((v) => localStorage.setItem('secondaryPanelWidth', String(v)));
 }
 
 /** Terminal WebSocket URL (e.g. ws://localhost:8767). */
@@ -420,13 +420,18 @@ if (typeof localStorage !== 'undefined') {
 export const terminalCommand = writable(null);
 
 /** Phase 11: Code editor panel. */
-export const editorOpen = writable(false);
+export const editorOpen = writable(
+  typeof localStorage !== 'undefined' ? localStorage.getItem('editorOpen') === 'true' : false
+);
+if (typeof localStorage !== 'undefined') {
+  editorOpen.subscribe((v) => localStorage.setItem('editorOpen', v ? 'true' : 'false'));
+}
 export const editorContent = writable('');
 export const editorLanguage = writable('javascript');
 export const editorFilePath = writable(null);
 
 /** When set to { content, language }, EditorPanel opens this content in the editor (e.g. from a code block Edit). Cleared by EditorPanel after applying. */
-export const openInEditorFromChat = writable(/** @type {{ content: string, language: string } | null} */ (null));
+export const openInEditorFromChat = writable(/** @type {{ content: string, language: string } | null} */(null));
 
 /** Last code sent to terminal via Run button (for error feedback loop). */
 export const lastExecutedCode = writable(null);
@@ -471,10 +476,10 @@ if (typeof localStorage !== 'undefined') {
 }
 
 /** Phase 9A: Repo map — project structure text and file list for codebase awareness. */
-export const repoMapText = writable(/** @type {string} */ (''));
-export const repoMapFileList = writable(/** @type {string[]} */ ([]));
+export const repoMapText = writable(/** @type {string} */(''));
+export const repoMapFileList = writable(/** @type {string[]} */([]));
 export const repoMapLoading = writable(false);
-export const repoMapError = writable(/** @type {string | null} */ (null));
+export const repoMapError = writable(/** @type {string | null} */(null));
 
 /** File explorer panel open (toggle with Ctrl+E). */
 export const fileExplorerOpen = writable(
@@ -485,7 +490,7 @@ if (typeof localStorage !== 'undefined') {
 }
 
 /** When set to a string, ChatInput sets its value to it and focuses (then clears). Used by QuickActions. */
-export const chatInputPrefill = writable(/** @type {string | null} */ (null));
+export const chatInputPrefill = writable(/** @type {string | null} */(null));
 
 /** Context usage for the current conversation: { promptTokens, contextMax }. Updated from stream usage and from last message when switching conv. Used by ContextRing. */
 export const contextUsage = writable({ promptTokens: 0, contextMax: 128000 });

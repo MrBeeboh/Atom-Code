@@ -6,7 +6,7 @@ function highlightCode(code, lang) {
   if (lang && hljs.getLanguage(lang)) {
     try {
       return hljs.highlight(code, { language: lang }).value;
-    } catch (_) {}
+    } catch (_) { }
   }
   return hljs.highlightAuto(code).value;
 }
@@ -21,6 +21,7 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
+// @ts-ignore
 marked.setOptions({
   highlight(code, lang) {
     return highlightCode(code, lang);
@@ -38,11 +39,14 @@ marked.use({
   <div class="code-block-header">
     <span class="code-block-lang">${langLabel}</span>
     <div class="code-block-actions">
-      <button type="button" class="code-action-btn" data-action="copy" title="Copy code">📋</button>
-      <button type="button" class="code-action-btn" data-action="run" title="Run in terminal">▶</button>
-      <button type="button" class="code-action-btn" data-action="save" title="Save to file">💾</button>
-      <button type="button" class="code-action-btn" data-action="edit" title="Edit in editor">✎</button>
-      <button type="button" class="code-action-btn" data-action="apply" title="Apply to file">✏️</button>
+      <button type="button" class="code-action-btn" data-action="copy" title="Copy code">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        Copy
+      </button>
+      <button type="button" class="code-action-btn code-action-apply" data-action="edit" title="Apply to Editor">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        Apply to Editor
+      </button>
     </div>
   </div>
   <pre><code class="hljs language-${langAttr}">${highlighted}</code></pre>
@@ -68,6 +72,7 @@ export function renderMarkdown(raw) {
 export function splitThinkingAndAnswer(raw) {
   if (!raw || typeof raw !== 'string') return [];
   const thinkRe = /<(?:think|reasoning|thought)>([\s\S]*?)<\/(?:think|reasoning|thought)>/gi;
+  /** @type {{ type: 'thinking'|'answer', html: string }[]} */
   const parts = [];
   let lastEnd = 0;
   let m;

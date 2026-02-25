@@ -30,7 +30,8 @@ async function searchDuckDuckGoLite(query) {
   const results = braveResults.slice(0, 5).map(r => ({
     title: r.title || '',
     url: r.url || '',
-    thumbnail: r.thumbnail || ''
+    thumbnail: r.thumbnail || '',
+    snippet: r.description || ''
   })).filter(r => r.title && r.url);
   return results;
 }
@@ -108,9 +109,11 @@ export function warmUpSearchConnection() {
  */
 export function formatSearchResultForChat(query, result) {
   const lines = [
+    '<details class="bg-zinc-100 dark:bg-zinc-800/60 p-3 rounded-lg text-sm mb-4 border border-zinc-200 dark:border-zinc-700">',
+    `<summary class="cursor-pointer font-medium text-blue-600 dark:text-blue-400 select-none">🔍 Searched the web for: "${query}"</summary>`,
+    '<div class="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300">',
     'The user asked a question that required a web search. Use the following search results to answer. Base your answer on these results.',
     '',
-    `Web search for: "${query}"`,
   ];
   if (result.abstract) {
     lines.push('');
@@ -131,6 +134,7 @@ export function formatSearchResultForChat(query, result) {
       }
     });
   }
-  if (lines.length <= 3) lines.push('', '(No results found for this query.)');
+  if (lines.length <= 5) lines.push('', '(No results found for this query.)');
+  lines.push('</div></details>');
   return lines.join('\n');
 }

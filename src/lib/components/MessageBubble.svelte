@@ -5,16 +5,40 @@
   import { get } from "svelte/store";
   import PerfStats from "$lib/components/PerfStats.svelte";
   import AuthVideo from "$lib/components/AuthVideo.svelte";
-  import { pinnedContent, deepinfraApiKey, terminalCommand, terminalOpen, fileServerUrl, workspaceRoot, pinnedFiles, diffViewerState, editorOpen, openInEditorFromChat, lastCodeBlock } from "$lib/stores.js";
+  import ModelCapabilityBadges from "$lib/components/ModelCapabilityBadges.svelte";
+  import { modelDisplayName } from "$lib/api.js";
+  import {
+    pinnedContent,
+    deepinfraApiKey,
+    terminalCommand,
+    terminalOpen,
+    fileServerUrl,
+    workspaceRoot,
+    pinnedFiles,
+    diffViewerState,
+    editorOpen,
+    openInEditorFromChat,
+    lastCodeBlock,
+  } from "$lib/stores.js";
 
   /** DeepInfra key: init from store + env so it's there on first paint; subscribe to stay in sync with Settings. */
   let deepinfraKey = $state(
-    (get(deepinfraApiKey)?.trim() || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEEPINFRA_API_KEY) || '').trim(),
+    (
+      get(deepinfraApiKey)?.trim() ||
+      (typeof import.meta !== "undefined" &&
+        import.meta.env?.VITE_DEEPINFRA_API_KEY) ||
+      ""
+    ).trim(),
   );
   $effect(() => {
     const unsub = deepinfraApiKey.subscribe((v) => {
-      const k = (typeof v === 'string' ? v : '').trim()
-        || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEEPINFRA_API_KEY || '').trim();
+      const k =
+        (typeof v === "string" ? v : "").trim() ||
+        (
+          (typeof import.meta !== "undefined" &&
+            import.meta.env?.VITE_DEEPINFRA_API_KEY) ||
+          ""
+        ).trim();
       deepinfraKey = k;
     });
     return () => unsub();
@@ -48,9 +72,11 @@
   );
   const hasThinkingOrAnswer = $derived(parts.length > 0);
   const imageThumbUrls = $derived(
-    isAssistant && displayContent && displayContent.includes('[Image: http')
-      ? Array.from(displayContent.matchAll(/\[Image: (https?:\/\/[^\]]+)\]/g)).map((m) => m[1])
-      : []
+    isAssistant && displayContent && displayContent.includes("[Image: http")
+      ? Array.from(
+          displayContent.matchAll(/\[Image: (https?:\/\/[^\]]+)\]/g),
+        ).map((m) => m[1])
+      : [],
   );
   const html = $derived(
     isAssistant && displayContent && !hasThinkingOrAnswer
@@ -66,14 +92,19 @@
     let last = null;
     while ((match = re.exec(displayContent)) !== null) last = match;
     if (last) {
-      lastCodeBlock.set({ language: (last[1] || "text").trim() || "text", code: last[2].trim() });
+      lastCodeBlock.set({
+        language: (last[1] || "text").trim() || "text",
+        code: last[2].trim(),
+      });
     }
   });
 
   let copyFeedback = $state(false);
   let pinFeedback = $state(false);
   /** When user clicks Apply on a code block: { code } to show file picker; null to hide. */
-  let applyToFilePending = $state(/** @type {{ code: string } | null} */ (null));
+  let applyToFilePending = $state(
+    /** @type {{ code: string } | null} */ (null),
+  );
   let applyToFilePathInput = $state("");
   let applyToFileLoading = $state(false);
   let applyToFileError = $state("");
@@ -119,7 +150,19 @@
   function fenceLangToEditorLang(lang) {
     const l = (lang || "").trim().toLowerCase();
     if (["python", "py"].includes(l)) return "python";
-    if (["javascript", "js", "ts", "typescript", "jsx", "tsx", "mjs", "cjs"].includes(l)) return "javascript";
+    if (
+      [
+        "javascript",
+        "js",
+        "ts",
+        "typescript",
+        "jsx",
+        "tsx",
+        "mjs",
+        "cjs",
+      ].includes(l)
+    )
+      return "javascript";
     if (["html", "htm", "svelte"].includes(l)) return "html";
     if (l === "css") return "css";
     if (l === "json") return "json";
@@ -156,7 +199,8 @@
     }
     if (action === "save") {
       const lang = (wrapper?.dataset.language || "txt").toLowerCase();
-      const lineCount = (code.match(/\n/g) || []).length + (code.trimEnd() !== "" ? 1 : 0);
+      const lineCount =
+        (code.match(/\n/g) || []).length + (code.trimEnd() !== "" ? 1 : 0);
       if (lineCount >= 10) {
         openCodeInEditor(code, lang);
       } else {
@@ -186,7 +230,9 @@
     if (!raw) return null;
     if (raw.startsWith("/")) return raw.replace(/\/+/g, "/");
     const root = (get(workspaceRoot) || "").replace(/\/+$/, "");
-    return (root ? root + "/" : "") + raw.replace(/^\/+/, "").replace(/\/+/g, "/");
+    return (
+      (root ? root + "/" : "") + raw.replace(/^\/+/, "").replace(/\/+/g, "/")
+    );
   }
 
   async function openDiffForApply() {
@@ -195,9 +241,14 @@
     applyToFileError = "";
     applyToFileLoading = true;
     try {
-      let base = (get(fileServerUrl) || "http://localhost:8768").replace(/\/$/, "");
-      if (base.includes(':8766')) base = base.replace(':8766', ':8768');
-      const res = await fetch(`${base}/content?path=${encodeURIComponent(path)}`);
+      let base = (get(fileServerUrl) || "http://localhost:8768").replace(
+        /\/$/,
+        "",
+      );
+      if (base.includes(":8766")) base = base.replace(":8766", ":8768");
+      const res = await fetch(
+        `${base}/content?path=${encodeURIComponent(path)}`,
+      );
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `Failed to read file: ${res.status}`);
@@ -232,7 +283,7 @@
   in:fly={{ y: 20, duration: 380, easing: quintOut }}
 >
   <div
-    class="message-bubble-inner w-full rounded-[12px] px-4 py-3 shadow-sm relative overflow-hidden
+    class="message-bubble-inner w-full rounded-[10px] px-3 py-2 shadow-sm relative overflow-hidden
       {isUser
       ? 'ui-user-bubble'
       : 'bg-white dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100 border border-zinc-200/80 dark:border-zinc-700/80'}
@@ -275,62 +326,81 @@
         </div>
       {/if}
     {:else if isAssistant}
-      <div class="message-assistant-body" onclick={handleCodeAction} role="presentation">
-      {#if !displayContent}
-        <div class="flex items-center py-1" aria-label="Thinking">
-          <svg
-            class="thinking-atom-icon w-8 h-8"
-            viewBox="0 0 32 32"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <circle cx="16" cy="16" r="3" class="thinking-atom-nucleus" />
-            <ellipse
-              cx="16"
-              cy="16"
-              rx="10"
-              ry="4"
-              class="thinking-atom-orbit"
-            />
-            <ellipse
-              cx="16"
-              cy="16"
-              rx="12"
-              ry="5"
-              class="thinking-atom-orbit-2"
-            />
-            <ellipse
-              cx="16"
-              cy="16"
-              rx="11"
-              ry="4.5"
-              class="thinking-atom-orbit-3"
-            />
-          </svg>
-        </div>
-      {:else if hasThinkingOrAnswer}
-        <div class="prose-chat prose dark:prose-invert max-w-none space-y-3">
-          {#each parts as part}
-            <div
-              class:assistant-thinking={part.type === "thinking"}
-              class:assistant-answer={part.type === "answer"}
+      <div
+        class="message-assistant-body"
+        onclick={handleCodeAction}
+        role="presentation"
+      >
+        {#if message.modelId}
+          <div class="flex items-center gap-2 mb-2 px-1 opacity-80 select-none">
+            <span
+              class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400"
             >
-              {@html part.html}
-            </div>
-          {/each}
-        </div>
-      {:else}
-        <div class="prose-chat prose dark:prose-invert max-w-none">
-          {@html html}
-          {#if displayContent && displayContent.includes('[Image: http')}
-            <div class="mt-2 flex flex-wrap gap-3">
-              {#each imageThumbUrls as url}
-                <img src={url} alt="Result image" class="max-h-32 rounded border border-zinc-200 dark:border-zinc-600" loading="lazy" />
-              {/each}
-            </div>
-          {/if}
-        </div>
-      {/if}
+              {modelDisplayName(message.modelId)}
+            </span>
+            <ModelCapabilityBadges modelId={message.modelId} />
+          </div>
+        {/if}
+        {#if !displayContent}
+          <div class="flex items-center py-1" aria-label="Thinking">
+            <svg
+              class="thinking-atom-icon w-8 h-8"
+              viewBox="0 0 32 32"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle cx="16" cy="16" r="3" class="thinking-atom-nucleus" />
+              <ellipse
+                cx="16"
+                cy="16"
+                rx="10"
+                ry="4"
+                class="thinking-atom-orbit"
+              />
+              <ellipse
+                cx="16"
+                cy="16"
+                rx="12"
+                ry="5"
+                class="thinking-atom-orbit-2"
+              />
+              <ellipse
+                cx="16"
+                cy="16"
+                rx="11"
+                ry="4.5"
+                class="thinking-atom-orbit-3"
+              />
+            </svg>
+          </div>
+        {:else if hasThinkingOrAnswer}
+          <div class="prose-chat prose dark:prose-invert max-w-none space-y-3">
+            {#each parts as part}
+              <div
+                class:assistant-thinking={part.type === "thinking"}
+                class:assistant-answer={part.type === "answer"}
+              >
+                {@html part.html}
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <div class="prose-chat prose dark:prose-invert max-w-none">
+            {@html html}
+            {#if displayContent && displayContent.includes("[Image: http")}
+              <div class="mt-2 flex flex-wrap gap-3">
+                {#each imageThumbUrls as url}
+                  <img
+                    src={url}
+                    alt="Result image"
+                    class="max-h-32 rounded border border-zinc-200 dark:border-zinc-600"
+                    loading="lazy"
+                  />
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
       </div>
       {#if applyToFilePending}
         <div
@@ -340,23 +410,37 @@
           aria-label="Apply code to file"
           tabindex="-1"
           onclick={(e) => e.target === e.currentTarget && cancelApplyToFile()}
-          onkeydown={(e) => e.key === 'Escape' && cancelApplyToFile()}
+          onkeydown={(e) => e.key === "Escape" && cancelApplyToFile()}
         >
-          <div class="apply-picker-panel" role="document" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+          <div
+            class="apply-picker-panel"
+            role="document"
+            tabindex="-1"
+            onclick={(e) => e.stopPropagation()}
+            onkeydown={(e) => e.stopPropagation()}
+          >
             <div class="apply-picker-title">Apply to file</div>
-            <p class="apply-picker-hint">Path relative to workspace or absolute</p>
+            <p class="apply-picker-hint">
+              Path relative to workspace or absolute
+            </p>
             <input
               type="text"
               class="apply-picker-input"
-              placeholder={get(workspaceRoot) ? get(workspaceRoot) + "/" : "e.g. src/App.svelte"}
+              placeholder={get(workspaceRoot)
+                ? get(workspaceRoot) + "/"
+                : "e.g. src/App.svelte"}
               bind:value={applyToFilePathInput}
-              onkeydown={(e) => e.key === 'Enter' && openDiffForApply()}
+              onkeydown={(e) => e.key === "Enter" && openDiffForApply()}
             />
             {#if get(pinnedFiles)?.length}
               <div class="apply-picker-quick">Quick pick:</div>
               <div class="apply-picker-pinned">
                 {#each get(pinnedFiles) as fp (fp)}
-                  <button type="button" class="apply-picker-pinned-btn" onclick={() => pickPinnedFile(fp)}>
+                  <button
+                    type="button"
+                    class="apply-picker-pinned-btn"
+                    onclick={() => pickPinnedFile(fp)}
+                  >
                     {fp}
                   </button>
                 {/each}
@@ -366,10 +450,19 @@
               <p class="apply-picker-error">{applyToFileError}</p>
             {/if}
             <div class="apply-picker-actions">
-              <button type="button" class="apply-picker-btn apply-picker-btn-primary" disabled={applyToFileLoading} onclick={openDiffForApply}>
+              <button
+                type="button"
+                class="apply-picker-btn apply-picker-btn-primary"
+                disabled={applyToFileLoading}
+                onclick={openDiffForApply}
+              >
                 {applyToFileLoading ? "Loading…" : "Open diff"}
               </button>
-              <button type="button" class="apply-picker-btn apply-picker-btn-cancel" onclick={cancelApplyToFile}>
+              <button
+                type="button"
+                class="apply-picker-btn apply-picker-btn-cancel"
+                onclick={cancelApplyToFile}
+              >
                 Cancel
               </button>
             </div>
@@ -377,24 +470,45 @@
         </div>
       {/if}
       {#if isAssistant && imageRefs.length}
-        <div class="mt-3 flex gap-2 overflow-x-auto pb-1 rounded-lg" role="list" aria-label="Searched images">
+        <div
+          class="mt-3 flex gap-2 overflow-x-auto pb-1 rounded-lg"
+          role="list"
+          aria-label="Searched images"
+        >
           {#each imageRefs as ref (ref.image_id)}
-            <div class="shrink-0 rounded border border-zinc-200 dark:border-zinc-600 overflow-hidden bg-zinc-100 dark:bg-zinc-800/80" role="listitem">
+            <div
+              class="shrink-0 rounded border border-zinc-200 dark:border-zinc-600 overflow-hidden bg-zinc-100 dark:bg-zinc-800/80"
+              role="listitem"
+            >
               <img
-                src={"https://cdn.x.ai/images?id=" + ref.image_id + "&size=" + (ref.size === "SMALL" ? "SMALL" : "LARGE")}
+                src={"https://cdn.x.ai/images?id=" +
+                  ref.image_id +
+                  "&size=" +
+                  (ref.size === "SMALL" ? "SMALL" : "LARGE")}
                 alt={"Searched image (ID: " + ref.image_id + ")"}
                 class="max-h-48 w-auto object-contain"
                 loading="lazy"
               />
-              <p class="p-1.5 text-[10px] text-zinc-500 dark:text-zinc-400 truncate max-w-[120px]">ID: {ref.image_id}</p>
+              <p
+                class="p-1.5 text-[10px] text-zinc-500 dark:text-zinc-400 truncate max-w-[120px]"
+              >
+                ID: {ref.image_id}
+              </p>
             </div>
           {/each}
         </div>
       {/if}
       {#if isAssistant && imageUrls.length}
-        <div class="mt-3 flex gap-2 overflow-x-auto pb-1 rounded-lg" role="list" aria-label="Generated images">
+        <div
+          class="mt-3 flex gap-2 overflow-x-auto pb-1 rounded-lg"
+          role="list"
+          aria-label="Generated images"
+        >
           {#each imageUrls as url (url)}
-            <div class="shrink-0 rounded border border-zinc-200 dark:border-zinc-600 overflow-hidden bg-zinc-100 dark:bg-zinc-800/80" role="listitem">
+            <div
+              class="shrink-0 rounded border border-zinc-200 dark:border-zinc-600 overflow-hidden bg-zinc-100 dark:bg-zinc-800/80"
+              role="listitem"
+            >
               <img
                 src={url}
                 alt=""
@@ -406,16 +520,26 @@
         </div>
       {/if}
       {#if isAssistant && videoUrls.length}
-        <div class="mt-3 flex flex-col gap-2" role="list" aria-label="Generated videos">
+        <div
+          class="mt-3 flex flex-col gap-2"
+          role="list"
+          aria-label="Generated videos"
+        >
           {#each videoUrls as url (url)}
-            <div class="rounded border border-zinc-200 dark:border-zinc-600 overflow-hidden bg-zinc-100 dark:bg-zinc-800/80 max-w-2xl" role="listitem">
-              <AuthVideo url={url} apiKey={deepinfraKey} />
+            <div
+              class="rounded border border-zinc-200 dark:border-zinc-600 overflow-hidden bg-zinc-100 dark:bg-zinc-800/80 max-w-2xl"
+              role="listitem"
+            >
+              <AuthVideo {url} apiKey={deepinfraKey} />
             </div>
           {/each}
         </div>
       {/if}
-      {#if isAssistant && (displayContent.includes('Generated image') || displayContent.includes('Generated video')) && !imageUrls.length && !videoUrls.length}
-        <p class="mt-2 text-sm text-amber-600 dark:text-amber-400">Media could not be loaded. Try generating again and ensure your DeepInfra API key is set in Settings.</p>
+      {#if isAssistant && (displayContent.includes("Generated image") || displayContent.includes("Generated video")) && !imageUrls.length && !videoUrls.length}
+        <p class="mt-2 text-sm text-amber-600 dark:text-amber-400">
+          Media could not be loaded. Try generating again and ensure your
+          DeepInfra API key is set in Settings.
+        </p>
       {/if}
     {/if}
 

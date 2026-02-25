@@ -1,87 +1,109 @@
 <script>
-  import { tick } from 'svelte';
-  import { activeMessages, isStreaming, streamingContent } from '$lib/stores.js';
-  import MessageBubble from '$lib/components/MessageBubble.svelte';
+  import { tick } from "svelte";
+  import {
+    activeMessages,
+    isStreaming,
+    streamingContent,
+  } from "$lib/stores.js";
+  import MessageBubble from "$lib/components/MessageBubble.svelte";
 
-  let listEl;
-  let prevStreaming = false;
-  let scrollThrottleTimer = null;
+  let listEl = $state(null);
+  let prevStreaming = $state(false);
+  let wasNearBottom = $state(true);
 
-  const NEAR_BOTTOM_PX = 150;
-  const SCROLL_THROTTLE_MS = 60;
+  const NEAR_BOTTOM_PX = 200;
 
-  $: msgs = $activeMessages;
+  const msgs = $derived($activeMessages || []);
+  const streamActive = $derived($isStreaming);
+  const streamText = $derived($streamingContent);
 
-  function scrollToBottom(smooth) {
-    const scrollParent = listEl?.parentElement;
+  function isNearBottom(scrollParent) {
+    if (!scrollParent) return false;
+    const gap =
+      scrollParent.scrollHeight -
+      scrollParent.scrollTop -
+      scrollParent.clientHeight;
+    return gap <= NEAR_BOTTOM_PX;
+  }
+
+  function snapToBottom(scrollParent, smooth = false) {
     if (!scrollParent) return;
     if (smooth) {
-      scrollParent.scrollTo({ top: scrollParent.scrollHeight, behavior: 'smooth' });
+      scrollParent.scrollTo({
+        top: scrollParent.scrollHeight,
+        behavior: "smooth",
+      });
     } else {
       scrollParent.scrollTop = scrollParent.scrollHeight;
     }
   }
 
-  function isNearBottom(scrollParent) {
-    if (!scrollParent) return false;
-    const gap = scrollParent.scrollHeight - scrollParent.scrollTop - scrollParent.clientHeight;
-    return gap < NEAR_BOTTOM_PX;
-  }
+  // Effect 1: Message list changes or streaming starts/stops
+  $effect(() => {
+    // track dependencies
+    msgs;
+    const currentStreaming = streamActive;
 
-  function throttledScroll() {
-    if (scrollThrottleTimer != null) return;
-    scrollThrottleTimer = setTimeout(() => {
-      scrollThrottleTimer = null;
-      const container = listEl?.parentElement;
-      if (!container) return;
-      const near = container.scrollHeight - container.scrollTop - container.clientHeight < NEAR_BOTTOM_PX;
-      if (near) {
-        container.scrollTop = container.scrollHeight;
-      }
-    }, SCROLL_THROTTLE_MS);
-  }
-
-  $: msgs, (() => {
     const scrollParent = listEl?.parentElement;
-    const wasNearBottom = scrollParent ? isNearBottom(scrollParent) : false;
-    const streaming = $isStreaming;
+    if (scrollParent) {
+      wasNearBottom = isNearBottom(scrollParent);
+    }
 
     tick().then(() => {
       const parent = listEl?.parentElement;
       if (!parent) return;
 
-      if (!streaming) {
-        if (prevStreaming) {
-          scrollToBottom(true);
+      if (!currentStreaming) {
+        if (prevStreaming && wasNearBottom) {
+          snapToBottom(parent, true);
         }
         prevStreaming = false;
         return;
       }
 
       prevStreaming = true;
-      if (!wasNearBottom) return;
-      throttledScroll();
+      if (wasNearBottom) {
+        snapToBottom(parent, false);
+      }
     });
-  })();
+  });
 
-  $: $streamingContent, $isStreaming, (() => {
-    if (!$isStreaming) return;
-    tick().then(() => {
+  // Effect 2: Content streams in
+  $effect(() => {
+    // Track text changes
+    streamText;
+    const currentStreaming = streamActive;
+
+    if (currentStreaming) {
       const parent = listEl?.parentElement;
-      if (!parent || !isNearBottom(parent)) return;
-      throttledScroll();
-    });
-  })();
+      if (parent && isNearBottom(parent)) {
+        // Fast snap
+        // Use requestAnimationFrame to let DOM update first if needed
+        requestAnimationFrame(() => {
+          snapToBottom(parent, false);
+        });
+      }
+    }
+  });
 </script>
 
-<div class="chat-message-list max-w-[56rem] mx-auto w-full px-4 pt-6 pb-10" bind:this={listEl}>
-  <div class="space-y-6">
+<div
+  class="chat-message-list max-w-[56rem] mx-auto w-full px-4 pt-6 pb-10"
+  bind:this={listEl}
+>
+  <div class="space-y-3">
     {#each msgs as msg, index (msg.id)}
       <div class="message-entrance">
         <MessageBubble
           message={msg}
-          streaming={$isStreaming && index === msgs.length - 1 && msg.role === 'assistant'}
-          streamingContentOverride={$isStreaming && index === msgs.length - 1 && msg.role === 'assistant' ? $streamingContent : undefined}
+          streaming={$isStreaming &&
+            index === msgs.length - 1 &&
+            msg.role === "assistant"}
+          streamingContentOverride={$isStreaming &&
+          index === msgs.length - 1 &&
+          msg.role === "assistant"
+            ? $streamingContent
+            : undefined}
         />
       </div>
     {/each}

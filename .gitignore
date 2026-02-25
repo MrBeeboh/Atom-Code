@@ -29,6 +29,7 @@ dist-ssr
 voice-server/.venv
 voice-server/venv/
 voice-server/__pycache__/
+context_manager/__pycache__/
 
 # Local backups (keep repo clean; backups stay on your machine)
 *.backup

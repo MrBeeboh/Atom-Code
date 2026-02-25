@@ -1,7 +1,7 @@
 <script>
-  import { fade } from 'svelte/transition';
-  import { themeMetrics } from '$lib/stores.js';
-  import { getLabPerformanceConfig } from '$lib/labPerformanceGuard.js';
+  import { fade } from "svelte/transition";
+  import { themeMetrics, liveTokPerSec } from "$lib/stores.js";
+  import { getLabPerformanceConfig } from "$lib/labPerformanceGuard.js";
 
   const config = getLabPerformanceConfig();
   const showWhenCompactMs = 2000;
@@ -38,9 +38,9 @@
 
 {#if visible}
   <div
-  in:fade={{ duration: 200 }}
-  out:fade={{ duration: 250 }}
-  class="lab-overlay"
+    in:fade={{ duration: 200 }}
+    out:fade={{ duration: 250 }}
+    class="lab-overlay"
     class:lab-overlay--live={isLive}
     class:lab-overlay--compact={!isLive}
     style="
@@ -53,12 +53,22 @@
       {#if isLive}
         <div class="lab-overlay__row">
           <span class="lab-overlay__label">Streaming</span>
-          <span class="lab-overlay__value">{$themeMetrics.liveChunks} chunks</span>
+          <span class="lab-overlay__value"
+            >{$themeMetrics.liveChunks} chunks</span
+          >
         </div>
         <div class="lab-overlay__row">
           <span class="lab-overlay__label">Chunks/s</span>
-          <span class="lab-overlay__value">{$themeMetrics.liveChunksPerSec.toFixed(1)}</span>
+          <span class="lab-overlay__value"
+            >{$themeMetrics.liveChunksPerSec.toFixed(1)}</span
+          >
         </div>
+        {#if $liveTokPerSec != null}
+          <div class="lab-overlay__row">
+            <span class="lab-overlay__label">Tokens/s</span>
+            <span class="lab-overlay__value">{$liveTokPerSec.toFixed(1)}</span>
+          </div>
+        {/if}
         {#if $themeMetrics.temperature != null}
           <div class="lab-overlay__row">
             <span class="lab-overlay__label">Temp</span>
@@ -68,11 +78,17 @@
       {:else}
         <div class="lab-overlay__row">
           <span class="lab-overlay__label">Latency</span>
-          <span class="lab-overlay__value">{$themeMetrics.lastLatencyMs != null ? Math.round($themeMetrics.lastLatencyMs) + ' ms' : '—'}</span>
+          <span class="lab-overlay__value"
+            >{$themeMetrics.lastLatencyMs != null
+              ? Math.round($themeMetrics.lastLatencyMs) + " ms"
+              : "—"}</span
+          >
         </div>
         <div class="lab-overlay__row">
           <span class="lab-overlay__label">Tokens</span>
-          <span class="lab-overlay__value">{$themeMetrics.lastTotalTokens ?? '—'}</span>
+          <span class="lab-overlay__value"
+            >{$themeMetrics.lastTotalTokens ?? "—"}</span
+          >
         </div>
       {/if}
     </div>

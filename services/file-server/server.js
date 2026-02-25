@@ -2,7 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs/promises';
 import path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
+const execAsync = promisify(exec);
 const app = express();
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
@@ -107,6 +110,62 @@ app.post('/write', async (req, res) => {
   try {
     await fs.writeFile(normalized, req.body.content ?? '', 'utf-8');
     res.json({ ok: true, path: normalized });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /git/status?root=/path/to/repo
+app.get('/git/status', async (req, res) => {
+  const root = path.resolve(String(req.query.root || WORKSPACE_ROOT).trim());
+  if (!checkPathAccess(root, res)) return;
+  try {
+    const { stdout } = await execAsync('git status --porcelain', { cwd: root });
+    res.json({ status: stdout });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /git/commit { root, message }
+app.post('/git/commit', async (req, res) => {
+  const root = path.resolve(String(req.body.root || WORKSPACE_ROOT).trim());
+  if (!checkPathAccess(root, res)) return;
+  const message = req.body.message;
+  if (!message) return res.status(400).json({ error: 'Commit message required' });
+  try {
+    await execAsync('git add .', { cwd: root });
+    const { stdout } = await execAsync(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd: root });
+    res.json({ ok: true, output: stdout });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /git/push { root }
+app.post('/git/push', async (req, res) => {
+  const root = path.resolve(String(req.body.root || WORKSPACE_ROOT).trim());
+  if (!checkPathAccess(root, res)) return;
+  try {
+    const { stdout, stderr } = await execAsync('git push', { cwd: root });
+    res.json({ ok: true, output: stdout || stderr });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /git/diff?path=/abs/path/to/file&root=/abs/path/to/repo
+app.get('/git/diff', async (req, res) => {
+  const root = path.resolve(String(req.query.root || WORKSPACE_ROOT).trim());
+  if (!checkPathAccess(root, res)) return;
+  const filePath = req.query.path;
+  if (!filePath) return res.status(400).json({ error: 'File path required' });
+
+  try {
+    // Get the relative path for git diff
+    const relPath = path.relative(root, filePath);
+    const { stdout } = await execAsync(`git diff "${relPath}"`, { cwd: root });
+    res.json({ diff: stdout });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

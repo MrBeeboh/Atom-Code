@@ -1,17 +1,56 @@
 <script>
-  import { onMount } from 'svelte';
-  import { get } from 'svelte/store';
-  import { isStreaming, voiceServerUrl, pendingDroppedFiles, webSearchForNextMessage, webSearchInProgress, webSearchConnected, braveApiKey, chatInputPrefill, terminalErrorBanner, errorFeedbackRequest, repoMapFileList, workspaceRoot, terminalCommand, terminalOpen, editorOpen, openInEditorFromChat, lastCodeBlock, activePresetName } from '$lib/stores.js';
-  import ThinkingAtom from '$lib/components/ThinkingAtom.svelte';
-  import ContextRing from '$lib/components/ContextRing.svelte';
-  import { COCKPIT_SENDING, COCKPIT_SEARCHING, pickWitty } from '$lib/cockpitCopy.js';
-  import { warmUpSearchConnection, syncBraveKeyToProxy } from '$lib/duckduckgo.js';
-  import { pdfToImageDataUrls } from '$lib/pdfToImages.js';
-  import { videoToFrames } from '$lib/videoToFrames.js';
+  import { onMount } from "svelte";
+  import { get } from "svelte/store";
+  import {
+    isStreaming,
+    voiceServerUrl,
+    pendingDroppedFiles,
+    webSearchForNextMessage,
+    webSearchInProgress,
+    webSearchConnected,
+    braveApiKey,
+    chatInputPrefill,
+    terminalErrorBanner,
+    errorFeedbackRequest,
+    repoMapFileList,
+    workspaceRoot,
+    terminalCommand,
+    terminalOpen,
+    editorOpen,
+    openInEditorFromChat,
+    lastCodeBlock,
+    activePresetName,
+  } from "$lib/stores.js";
+  import ThinkingAtom from "$lib/components/ThinkingAtom.svelte";
+  import ContextRing from "$lib/components/ContextRing.svelte";
+  import {
+    COCKPIT_SENDING,
+    COCKPIT_SEARCHING,
+    pickWitty,
+  } from "$lib/cockpitCopy.js";
+  import {
+    warmUpSearchConnection,
+    syncBraveKeyToProxy,
+  } from "$lib/duckduckgo.js";
+  import { pdfToImageDataUrls } from "$lib/pdfToImages.js";
+  import { videoToFrames } from "$lib/videoToFrames.js";
 
-  let { onSend, onStop, onGenerateImageGrok, onGenerateImageDeepSeek, onGenerateVideoDeepSeek, imageGenerating = false, videoGenerating = false, videoGenElapsed = '', placeholder: placeholderOverride = undefined } = $props();
-  const placeholderText = $derived(placeholderOverride ?? 'Type your message or drop/paste images, video, or PDFs... (Ctrl+Enter to send)');
-  let text = $state('');
+  let {
+    onSend,
+    onStop,
+    onGenerateImageGrok,
+    onGenerateImageDeepSeek,
+    onGenerateVideoDeepSeek,
+    imageGenerating = false,
+    videoGenerating = false,
+    videoGenElapsed = "",
+    placeholder: placeholderOverride = undefined,
+  } = $props();
+  const placeholderText = $derived(
+    placeholderOverride ??
+      "Type your message or drop/paste images, video, or PDFs... (Ctrl+Enter to send)",
+  );
+  let text = $state("");
   let textareaEl = $state(null);
   let fileInputEl = $state(/** @type {HTMLInputElement | null} */ (null));
   let recording = $state(false);
@@ -31,8 +70,8 @@
   let webSearchWarmUpAttempted = $state(false);
 
   /** Witty status lines for send button (set when streaming/searching starts). */
-  let sendingMessage = $state('');
-  let searchingMessage = $state('');
+  let sendingMessage = $state("");
+  let searchingMessage = $state("");
   $effect(() => {
     if ($isStreaming) sendingMessage = pickWitty(COCKPIT_SENDING);
   });
@@ -43,7 +82,7 @@
   /** When chatInputPrefill is set (e.g. by QuickActions), set text and focus. */
   $effect(() => {
     const value = $chatInputPrefill;
-    if (value != null && value !== '') {
+    if (value != null && value !== "") {
       text = value;
       chatInputPrefill.set(null);
       setTimeout(() => textareaEl?.focus(), 0);
@@ -57,7 +96,10 @@
     webSearchConnected.set(false);
     warmUpSearchConnection()
       .then((ok) => {
-        if (!ok && get(braveApiKey)?.trim()) return syncBraveKeyToProxy(get(braveApiKey)).then(() => warmUpSearchConnection());
+        if (!ok && get(braveApiKey)?.trim())
+          return syncBraveKeyToProxy(get(braveApiKey)).then(() =>
+            warmUpSearchConnection(),
+          );
         return ok;
       })
       .then((ok) => {
@@ -77,7 +119,10 @@
   $effect(() => {
     const on = $webSearchForNextMessage;
     const connected = $webSearchConnected;
-    if (!on) { webSearchWarmUpAttempted = false; return; }
+    if (!on) {
+      webSearchWarmUpAttempted = false;
+      return;
+    }
     if (connected || webSearchWarmingUp || webSearchWarmUpAttempted) return;
     runWarmUp();
   });
@@ -89,18 +134,20 @@
 
   /** Phase 9C: @file mentions — autocomplete state */
   let atMentionOpen = $state(false);
-  let atMentionQuery = $state('');
+  let atMentionQuery = $state("");
   let atMentionStartIndex = $state(0);
   let atMentionSelectedIndex = $state(0);
   let mentionedFilePaths = $state(/** @type {string[]} */ ([]));
   const atMentionFiles = $derived.by(() => {
     const list = $repoMapFileList || [];
-    const root = ($workspaceRoot || '').replace(/\/+$/, '') + '/';
-    const q = (atMentionQuery || '').toLowerCase();
+    const root = ($workspaceRoot || "").replace(/\/+$/, "") + "/";
+    const q = (atMentionQuery || "").toLowerCase();
     return list
       .map((p) => ({
         path: p,
-        rel: p.startsWith(root) ? p.slice(root.length) : p.split(/[/\\]/).pop() || p,
+        rel: p.startsWith(root)
+          ? p.slice(root.length)
+          : p.split(/[/\\]/).pop() || p,
       }))
       .filter(({ rel }) => !q || rel.toLowerCase().includes(q))
       .slice(0, 12);
@@ -136,9 +183,15 @@
     "They shut down my cousin in Word. I live in the browser now. Revenge is patient.",
   ];
   let clippyBubble = $state(/** @type {string | null} */ (null));
-  let clippyTimeoutId = $state(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
-  let clippyScheduleId = $state(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
-  let clippyHoverTimeoutId = $state(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
+  let clippyTimeoutId = $state(
+    /** @type {ReturnType<typeof setTimeout> | null} */ (null),
+  );
+  let clippyScheduleId = $state(
+    /** @type {ReturnType<typeof setTimeout> | null} */ (null),
+  );
+  let clippyHoverTimeoutId = $state(
+    /** @type {ReturnType<typeof setTimeout> | null} */ (null),
+  );
   let lastClippyAt = 0;
   let clippyHasShownOnce = $state(false);
   const CLIPPY_FIRST_DELAY_MS = 4000;
@@ -148,7 +201,8 @@
 
   function showClippyBubble() {
     if (clippyBubble || attachProcessing || get(isStreaming)) return;
-    clippyBubble = CLIPPY_QUIPS[Math.floor(Math.random() * CLIPPY_QUIPS.length)];
+    clippyBubble =
+      CLIPPY_QUIPS[Math.floor(Math.random() * CLIPPY_QUIPS.length)];
     lastClippyAt = Date.now();
     clippyHasShownOnce = true;
     if (clippyTimeoutId) clearTimeout(clippyTimeoutId);
@@ -172,7 +226,11 @@
 
   function onAttachHover() {
     if (clippyBubble || attachProcessing || get(isStreaming)) return;
-    if (Date.now() - lastClippyAt < CLIPPY_MIN_INTERVAL_MS && clippyHasShownOnce) return;
+    if (
+      Date.now() - lastClippyAt < CLIPPY_MIN_INTERVAL_MS &&
+      clippyHasShownOnce
+    )
+      return;
     if (clippyHoverTimeoutId) return;
     clippyHoverTimeoutId = setTimeout(() => {
       clippyHoverTimeoutId = null;
@@ -188,7 +246,7 @@
   }
 
   $effect(() => {
-    if (typeof document === 'undefined') return;
+    if (typeof document === "undefined") return;
     scheduleClippy();
     return () => {
       if (clippyScheduleId) clearTimeout(clippyScheduleId);
@@ -197,31 +255,46 @@
     };
   });
 
-  const ACCEPT_IMAGE = 'image/jpeg,image/png,image/webp,image/gif';
-  const ACCEPT_PDF = 'application/pdf';
-  const ACCEPT_VIDEO = 'video/mp4,video/webm,video/quicktime';
+  const ACCEPT_IMAGE = "image/jpeg,image/png,image/webp,image/gif";
+  const ACCEPT_PDF = "application/pdf";
+  const ACCEPT_VIDEO = "video/mp4,video/webm,video/quicktime";
   const MAX_FILE_MB = 25;
   const MAX_VIDEO_MB = 100;
   const MAX_TOTAL_MB = 80;
 
   async function handleSubmit() {
     if ($isStreaming) return;
-    const userMessage = (text || '').trim();
-    const imageDataUrls = attachments.filter((a) => !a.isVideo).map((a) => a.dataUrl);
-    const videoDataUrls = attachments.filter((a) => a.isVideo).map((a) => a.dataUrl);
-    if (!userMessage && imageDataUrls.length === 0 && videoDataUrls.length === 0) return;
+    const userMessage = (text || "").trim();
+    const imageDataUrls = attachments
+      .filter((a) => !a.isVideo)
+      .map((a) => a.dataUrl);
+    const videoDataUrls = attachments
+      .filter((a) => a.isVideo)
+      .map((a) => a.dataUrl);
+    if (
+      !userMessage &&
+      imageDataUrls.length === 0 &&
+      videoDataUrls.length === 0
+    )
+      return;
 
     const savedText = text;
     const savedAttachments = [...attachments];
     const mentionedToSend = [...mentionedFilePaths];
-    text = '';
+    text = "";
     attachments = [];
     attachError = null;
     mentionedFilePaths = [];
     atMentionOpen = false;
 
     try {
-      if (onSend) await onSend(userMessage, imageDataUrls, videoDataUrls, mentionedToSend);
+      if (onSend)
+        await onSend(
+          userMessage,
+          imageDataUrls,
+          videoDataUrls,
+          mentionedToSend,
+        );
     } catch (err) {
       text = savedText;
       attachments = savedAttachments;
@@ -231,23 +304,35 @@
   function handleImageClick() {
     const prompt = text.trim();
     if (!prompt) return;
-    const fn = typeof onGenerateImageGrok === 'function' ? onGenerateImageGrok : (typeof onGenerateImageDeepSeek === 'function' ? onGenerateImageDeepSeek : null);
+    const fn =
+      typeof onGenerateImageGrok === "function"
+        ? onGenerateImageGrok
+        : typeof onGenerateImageDeepSeek === "function"
+          ? onGenerateImageDeepSeek
+          : null;
     if (fn) {
       const result = fn(prompt);
-      if (result && typeof result.then === 'function') {
-        result.then(() => { text = ''; }).catch(() => {});
+      if (result && typeof result.then === "function") {
+        result
+          .then(() => {
+            text = "";
+          })
+          .catch(() => {});
       }
     }
   }
 
   function handleVideoClick() {
-    const fn = typeof onGenerateVideoDeepSeek === 'function' ? onGenerateVideoDeepSeek : null;
-    if (fn) fn(text.trim() || '');
+    const fn =
+      typeof onGenerateVideoDeepSeek === "function"
+        ? onGenerateVideoDeepSeek
+        : null;
+    if (fn) fn(text.trim() || "");
   }
 
   function addImageDataUrls(dataUrls, label) {
     for (const url of dataUrls) {
-      attachments = [...attachments, { dataUrl: url, label: label || 'Image' }];
+      attachments = [...attachments, { dataUrl: url, label: label || "Image" }];
     }
   }
 
@@ -255,13 +340,16 @@
     if (!files?.length) return;
     attachError = null;
     attachProcessing = true;
-    let totalMb = attachments.reduce((sum, a) => sum + (a.dataUrl.length * 3 / 4 / 1024 / 1024), 0);
+    let totalMb = attachments.reduce(
+      (sum, a) => sum + (a.dataUrl.length * 3) / 4 / 1024 / 1024,
+      0,
+    );
 
     try {
       for (const file of Array.from(files)) {
         const fileMb = file.size / 1024 / 1024;
-        const type = (file.type || '').toLowerCase();
-        const limitMb = type.startsWith('video/') ? MAX_VIDEO_MB : MAX_FILE_MB;
+        const type = (file.type || "").toLowerCase();
+        const limitMb = type.startsWith("video/") ? MAX_VIDEO_MB : MAX_FILE_MB;
         if (fileMb > limitMb) {
           attachError = `"${file.name}" is too large (max ${limitMb} MB).`;
           continue;
@@ -271,37 +359,53 @@
           break;
         }
 
-        if (type === 'application/pdf') {
+        if (type === "application/pdf") {
           const urls = await pdfToImageDataUrls(file);
           if (urls.length === 0) {
             attachError = `Could not read PDF "${file.name}".`;
             continue;
           }
-          urls.forEach((url, i) => addImageDataUrls([url], urls.length > 1 ? `${file.name} (p.${i + 1})` : file.name));
-          totalMb += (urls[0].length * 3 / 4 / 1024 / 1024) * urls.length;
-        } else if (type.startsWith('image/')) {
+          urls.forEach((url, i) =>
+            addImageDataUrls(
+              [url],
+              urls.length > 1 ? `${file.name} (p.${i + 1})` : file.name,
+            ),
+          );
+          totalMb += ((urls[0].length * 3) / 4 / 1024 / 1024) * urls.length;
+        } else if (type.startsWith("image/")) {
           const url = await new Promise((resolve, reject) => {
             const r = new FileReader();
             r.onload = () => resolve(r.result);
-            r.onerror = () => reject(new Error('Failed to read file'));
+            r.onerror = () => reject(new Error("Failed to read file"));
             r.readAsDataURL(file);
           });
           addImageDataUrls([url], file.name);
           totalMb += fileMb;
-        } else if (type.startsWith('video/')) {
+        } else if (type.startsWith("video/")) {
           try {
             const videoDataUrl = await new Promise((resolve, reject) => {
               const r = new FileReader();
               r.onload = () => resolve(r.result);
-              r.onerror = () => reject(new Error('Failed to read video'));
+              r.onerror = () => reject(new Error("Failed to read video"));
               r.readAsDataURL(file);
             });
-            attachments = [...attachments, { dataUrl: videoDataUrl, label: file.name, isVideo: true }];
+            attachments = [
+              ...attachments,
+              { dataUrl: videoDataUrl, label: file.name, isVideo: true },
+            ];
             totalMb += fileMb;
-            const urls = await videoToFrames(file, { count: 8, maxDurationSec: 60 });
+            const urls = await videoToFrames(file, {
+              count: 8,
+              maxDurationSec: 60,
+            });
             if (urls.length > 0) {
-              urls.forEach((url, i) => addImageDataUrls([url], `${file.name} frame ${i + 1}`));
-              totalMb += urls.reduce((sum, u) => sum + (u.length * 3 / 4 / 1024 / 1024), 0);
+              urls.forEach((url, i) =>
+                addImageDataUrls([url], `${file.name} frame ${i + 1}`),
+              );
+              totalMb += urls.reduce(
+                (sum, u) => sum + (u.length * 3) / 4 / 1024 / 1024,
+                0,
+              );
             }
           } catch (e) {
             attachError = e?.message || `Could not read video "${file.name}".`;
@@ -311,7 +415,7 @@
         }
       }
     } catch (e) {
-      attachError = e?.message || 'Failed to add file(s).';
+      attachError = e?.message || "Failed to add file(s).";
     } finally {
       attachProcessing = false;
     }
@@ -320,7 +424,7 @@
   function onFileInputChange(e) {
     const input = e.currentTarget;
     processFiles(input.files);
-    input.value = '';
+    input.value = "";
   }
 
   function removeAttachment(index) {
@@ -331,6 +435,26 @@
   function onDrop(e) {
     e.preventDefault();
     e.stopPropagation();
+
+    const atomFilePath = e.dataTransfer?.getData("application/atom-file-path");
+    if (atomFilePath) {
+      const root = (get(workspaceRoot) || "").replace(/\/+$/, "") + "/";
+      const rel = atomFilePath.startsWith(root)
+        ? atomFilePath.slice(root.length)
+        : atomFilePath.split(/[/\\]/).pop() || atomFilePath;
+
+      const insertText = `@${rel} `;
+      text =
+        text +
+        (text.endsWith(" ") || text.length === 0 ? "" : " ") +
+        insertText;
+      if (!mentionedFilePaths.includes(atomFilePath)) {
+        mentionedFilePaths = [...mentionedFilePaths, atomFilePath];
+      }
+      setTimeout(() => textareaEl?.focus(), 0);
+      return;
+    }
+
     processFiles(e.dataTransfer?.files);
   }
 
@@ -354,33 +478,38 @@
         processFiles(files);
       }
     });
-    return () => { unsub(); };
+    return () => {
+      unsub();
+    };
   });
 
   function handleKeydown(e) {
     if (atMentionOpen && atMentionFiles.length > 0) {
-      if (e.key === 'ArrowDown') {
+      if (e.key === "ArrowDown") {
         e.preventDefault();
-        atMentionSelectedIndex = (atMentionSelectedIndex + 1) % atMentionFiles.length;
+        atMentionSelectedIndex =
+          (atMentionSelectedIndex + 1) % atMentionFiles.length;
         return;
       }
-      if (e.key === 'ArrowUp') {
+      if (e.key === "ArrowUp") {
         e.preventDefault();
-        atMentionSelectedIndex = (atMentionSelectedIndex - 1 + atMentionFiles.length) % atMentionFiles.length;
+        atMentionSelectedIndex =
+          (atMentionSelectedIndex - 1 + atMentionFiles.length) %
+          atMentionFiles.length;
         return;
       }
-      if (e.key === 'Enter') {
+      if (e.key === "Enter") {
         e.preventDefault();
         selectMentionFile(atMentionFiles[atMentionSelectedIndex].path);
         return;
       }
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         e.preventDefault();
         atMentionOpen = false;
         return;
       }
     }
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleSubmit();
     }
@@ -389,14 +518,19 @@
   function selectMentionFile(absolutePath) {
     const el = textareaEl;
     if (!el) return;
-    const root = (get(workspaceRoot) || '').replace(/\/+$/, '') + '/';
-    const rel = absolutePath.startsWith(root) ? absolutePath.slice(root.length) : absolutePath.split(/[/\\]/).pop() || absolutePath;
+    const root = (get(workspaceRoot) || "").replace(/\/+$/, "") + "/";
+    const rel = absolutePath.startsWith(root)
+      ? absolutePath.slice(root.length)
+      : absolutePath.split(/[/\\]/).pop() || absolutePath;
     const start = atMentionStartIndex;
-    const end = Math.min(start + 1 + (atMentionQuery || '').length, text.length);
-    text = text.slice(0, start) + '@' + rel + ' ' + text.slice(end);
+    const end = Math.min(
+      start + 1 + (atMentionQuery || "").length,
+      text.length,
+    );
+    text = text.slice(0, start) + "@" + rel + " " + text.slice(end);
     mentionedFilePaths = [...mentionedFilePaths, absolutePath];
     atMentionOpen = false;
-    atMentionQuery = '';
+    atMentionQuery = "";
     atMentionSelectedIndex = 0;
     setTimeout(() => {
       el.focus();
@@ -413,7 +547,7 @@
     const pos = el.selectionStart;
     const val = text;
     const before = val.slice(0, pos);
-    const lastAt = before.lastIndexOf('@');
+    const lastAt = before.lastIndexOf("@");
     if (lastAt === -1) {
       atMentionOpen = false;
       return;
@@ -435,13 +569,13 @@
 
   function autoResize() {
     if (!textareaEl) return;
-    textareaEl.style.height = 'auto';
+    textareaEl.style.height = "auto";
     const contentHeight = textareaEl.scrollHeight;
     const isEmpty = !text.trim();
     const targetHeight = isEmpty
       ? INPUT_HEIGHT_EMPTY
       : Math.min(Math.max(contentHeight, INPUT_HEIGHT_EMPTY), INPUT_HEIGHT_MAX);
-    textareaEl.style.height = targetHeight + 'px';
+    textareaEl.style.height = targetHeight + "px";
   }
 
   $effect(() => {
@@ -453,17 +587,39 @@
   });
 
   const VOICE_COMMANDS = [
-    { patterns: [/^run it$/i, /^run that$/i, /^run the code$/i, /^run this$/i], action: 'run_last' },
-    { patterns: [/^apply it$/i, /^apply that$/i, /^apply the code$/i], action: 'apply_last' },
-    { patterns: [/^fix it$/i, /^fix that$/i, /^fix the error$/i, /^fix this$/i, /^can you fix/i, /^please fix/i], action: 'fix_error' },
-    { patterns: [/^show terminal$/i, /^open terminal$/i], action: 'show_terminal' },
-    { patterns: [/^hide terminal$/i, /^close terminal$/i], action: 'hide_terminal' },
-    { patterns: [/^show editor$/i, /^open editor$/i], action: 'show_editor' },
-    { patterns: [/^hide editor$/i, /^close editor$/i], action: 'hide_editor' },
+    {
+      patterns: [/^run it$/i, /^run that$/i, /^run the code$/i, /^run this$/i],
+      action: "run_last",
+    },
+    {
+      patterns: [/^apply it$/i, /^apply that$/i, /^apply the code$/i],
+      action: "apply_last",
+    },
+    {
+      patterns: [
+        /^fix it$/i,
+        /^fix that$/i,
+        /^fix the error$/i,
+        /^fix this$/i,
+        /^can you fix/i,
+        /^please fix/i,
+      ],
+      action: "fix_error",
+    },
+    {
+      patterns: [/^show terminal$/i, /^open terminal$/i],
+      action: "show_terminal",
+    },
+    {
+      patterns: [/^hide terminal$/i, /^close terminal$/i],
+      action: "hide_terminal",
+    },
+    { patterns: [/^show editor$/i, /^open editor$/i], action: "show_editor" },
+    { patterns: [/^hide editor$/i, /^close editor$/i], action: "hide_editor" },
   ];
 
   function matchVoiceCommand(text) {
-    const trimmed = text.replace(/[.!?,]+$/g, '').trim();
+    const trimmed = text.replace(/[.!?,]+$/g, "").trim();
     for (const cmd of VOICE_COMMANDS) {
       if (cmd.patterns.some((p) => p.test(trimmed))) return cmd.action;
     }
@@ -479,7 +635,7 @@
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.frequency.value = 800;
-      osc.type = 'sine';
+      osc.type = "sine";
       gain.gain.setValueAtTime(0.15, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
       osc.start(ctx.currentTime);
@@ -497,7 +653,7 @@
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.frequency.value = freq;
-        osc.type = 'sine';
+        osc.type = "sine";
         gain.gain.setValueAtTime(0.12, start);
         gain.gain.exponentialRampToValueAtTime(0.01, start + dur);
         osc.start(start);
@@ -517,7 +673,7 @@
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.frequency.value = 150;
-      osc.type = 'sawtooth';
+      osc.type = "sawtooth";
       gain.gain.setValueAtTime(0.08, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
       osc.start(ctx.currentTime);
@@ -528,11 +684,11 @@
   function handleVoiceCommand(action) {
     audioSuccess();
     switch (action) {
-      case 'run_last': {
+      case "run_last": {
         const block = get(lastCodeBlock);
         if (block) {
-          const lang = (block.language || '').toLowerCase().trim();
-          const code = block.code || '';
+          const lang = (block.language || "").toLowerCase().trim();
+          const code = block.code || "";
           const esc = (s) => String(s).replace(/'/g, "'\\''");
           let commandToRun = code;
           if (/^(python|python3|py)$/.test(lang)) {
@@ -546,35 +702,41 @@
         }
         break;
       }
-      case 'apply_last': {
+      case "apply_last": {
         const block = get(lastCodeBlock);
         if (block) {
-          openInEditorFromChat.set({ content: block.code, language: block.language });
+          openInEditorFromChat.set({
+            content: block.code,
+            language: block.language,
+          });
           terminalOpen.set(true);
           editorOpen.set(true);
         }
         break;
       }
-      case 'fix_error': {
+      case "fix_error": {
         const banner = get(terminalErrorBanner);
         if (banner) {
-          errorFeedbackRequest.set({ code: banner.code, output: banner.output ?? '' });
+          errorFeedbackRequest.set({
+            code: banner.code,
+            output: banner.output ?? "",
+          });
           terminalErrorBanner.set(null);
         }
         break;
       }
-      case 'show_terminal':
+      case "show_terminal":
         terminalOpen.set(true);
         editorOpen.set(false);
         break;
-      case 'show_editor':
+      case "show_editor":
         terminalOpen.set(true);
         editorOpen.set(true);
         break;
-      case 'hide_terminal':
+      case "hide_terminal":
         terminalOpen.set(false);
         break;
-      case 'hide_editor':
+      case "hide_editor":
         editorOpen.set(false);
         break;
     }
@@ -590,17 +752,23 @@
       voiceStream.getTracks().forEach((t) => t.stop());
       voiceStream = null;
     }
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
       mediaRecorder.stop();
     }
     recording = false;
   }
 
   async function startVoiceInput() {
-    const baseUrl = get(voiceServerUrl) ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('voiceServerUrl') : null) ?? 'http://localhost:8765';
-    const url = (baseUrl || '').trim().replace(/\/$/, '');
+    const baseUrl =
+      get(voiceServerUrl) ??
+      (typeof localStorage !== "undefined"
+        ? localStorage.getItem("voiceServerUrl")
+        : null) ??
+      "http://localhost:8765";
+    const url = (baseUrl || "").trim().replace(/\/$/, "");
     if (!url) {
-      voiceError = 'Set Voice server URL in Settings (e.g. http://localhost:8765)';
+      voiceError =
+        "Set Voice server URL in Settings (e.g. http://localhost:8765)";
       return;
     }
     voiceError = null;
@@ -610,10 +778,14 @@
       const to = setTimeout(() => ac.abort(), 3000);
       let healthRes;
       try {
-        healthRes = await fetch(`${url}/health`, { method: 'GET', signal: ac.signal });
+        healthRes = await fetch(`${url}/health`, {
+          method: "GET",
+          signal: ac.signal,
+        });
       } catch (he) {
         clearTimeout(to);
-        voiceError = 'Voice server not running. Restart ATOM Code from the desktop launcher, or run the voice server manually: cd voice-server && python3 -m uvicorn app:app --host 0.0.0.0 --port 8765';
+        voiceError =
+          "Voice server not running. Restart ATOM Code from the desktop launcher, or run the voice server manually: cd voice-server && python3 -m uvicorn app:app --host 0.0.0.0 --port 8765";
         return;
       }
       clearTimeout(to);
@@ -624,46 +796,67 @@
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       voiceStream = stream;
       recordingChunks = [];
-      const rec = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+      const rec = new MediaRecorder(stream, {
+        mimeType: "audio/webm;codecs=opus",
+      });
       mediaRecorder = rec;
-      rec.ondataavailable = (e) => { if (e.data.size > 0) recordingChunks.push(e.data); };
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) recordingChunks.push(e.data);
+      };
       rec.onstop = async () => {
         if (voiceStream) {
           voiceStream.getTracks().forEach((t) => t.stop());
           voiceStream = null;
         }
         if (recordingChunks.length === 0) {
-          voiceError = 'No audio recorded';
+          voiceError = "No audio recorded";
           voiceProcessing = false;
           return;
         }
-        const blob = new Blob(recordingChunks, { type: 'audio/webm' });
+        const blob = new Blob(recordingChunks, { type: "audio/webm" });
         try {
           const form = new FormData();
-          form.append('audio', blob, 'audio.webm');
-          const res = await fetch(`${url}/transcribe`, { method: 'POST', body: form });
+          form.append("audio", blob, "audio.webm");
+          const res = await fetch(`${url}/transcribe`, {
+            method: "POST",
+            body: form,
+          });
           if (!res.ok) {
             const err = await res.text();
             throw new Error(err || `Server ${res.status}`);
           }
           const data = await res.json();
-          const transcribed = (data && data.text) ? String(data.text).trim() : '';
+          const transcribed = data && data.text ? String(data.text).trim() : "";
           if (!transcribed) {
             audioError();
           } else {
-            console.log('[voice] transcribed:', JSON.stringify(transcribed));
-            const codingPresets = ['Code', 'Debug', 'Review', 'Refactor', 'Explain'];
-            const command = codingPresets.includes(get(activePresetName)) ? matchVoiceCommand(transcribed) : null;
+            console.log("[voice] transcribed:", JSON.stringify(transcribed));
+            const codingPresets = [
+              "Code",
+              "Debug",
+              "Review",
+              "Refactor",
+              "Explain",
+            ];
+            const command = codingPresets.includes(get(activePresetName))
+              ? matchVoiceCommand(transcribed)
+              : null;
             if (command) {
-              console.log('[voice-cmd] matched:', command, 'from:', transcribed);
+              console.log(
+                "[voice-cmd] matched:",
+                command,
+                "from:",
+                transcribed,
+              );
               handleVoiceCommand(command);
               voiceProcessing = false;
               return;
             }
-            text = text ? text + ' ' + transcribed : transcribed;
+            text = text ? text + " " + transcribed : transcribed;
           }
         } catch (e) {
-          voiceError = e?.message || 'Voice server error. Is it running on ' + url + '?';
+          voiceError =
+            e?.message || "Voice server error. Is it running on " + url + "?";
         } finally {
           voiceProcessing = false;
         }
@@ -675,7 +868,7 @@
       voiceProcessing = true;
       recordingTimerId = setTimeout(() => stopRecording(), MAX_RECORDING_MS);
     } catch (e) {
-      voiceError = e?.message || 'Microphone access denied or unavailable';
+      voiceError = e?.message || "Microphone access denied or unavailable";
     }
   }
 
@@ -694,31 +887,31 @@
     const el = document.activeElement;
     if (!el) return false;
     const tag = el.tagName && el.tagName.toUpperCase();
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return true;
+    if (tag === "INPUT" || tag === "TEXTAREA") return true;
     if (el.isContentEditable) return true;
     return false;
   }
 
   onMount(() => {
     function onKeyDown(e) {
-      if ((e.key !== ' ' && e.code !== 'Space') || e.repeat) return;
+      if ((e.key !== " " && e.code !== "Space") || e.repeat) return;
       if (isInputFocused()) return;
       if (recording || voiceProcessing) return;
       e.preventDefault();
       startVoiceInput();
     }
     function onKeyUp(e) {
-      if ((e.key !== ' ' && e.code !== 'Space') || e.repeat) return;
+      if ((e.key !== " " && e.code !== "Space") || e.repeat) return;
       if (isInputFocused()) return;
       if (!recording) return;
       e.preventDefault();
       stopRecording();
     }
-    window.addEventListener('keydown', onKeyDown, true);
-    window.addEventListener('keyup', onKeyUp, true);
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
     return () => {
-      window.removeEventListener('keydown', onKeyDown, true);
-      window.removeEventListener('keyup', onKeyUp, true);
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp, true);
     };
   });
 </script>
@@ -739,9 +932,78 @@
     aria-label="Attach image or PDF"
   />
   <div class="chat-input-box">
-    <div class="chat-input-bar">
-      <div class="chat-input-bar-attach">
-        <div class="attach-button-wrap">
+    <div class="chat-input-main">
+      {#if attachments.length > 0}
+        <div class="attachments-row px-4 pt-4">
+          {#each attachments as att, i}
+            <div class="attachment-thumb shadow-sm">
+              {#if att.isVideo}
+                <div class="thumb-video-icon">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    opacity="0.7"><polygon points="10 8 16 12 10 16" /></svg
+                  >
+                </div>
+              {:else if att.dataUrl.startsWith("data:image")}
+                <img src={att.dataUrl} alt="" class="thumb-img" />
+              {:else}
+                <span class="thumb-placeholder">IMG</span>
+              {/if}
+              <span class="thumb-label" title={att.label}
+                >{att.label.length > 12
+                  ? att.label.slice(0, 10) + "…"
+                  : att.label}</span
+              >
+              <button
+                type="button"
+                class="thumb-remove"
+                onclick={() => removeAttachment(i)}
+                aria-label="Remove">×</button
+              >
+            </div>
+          {/each}
+        </div>
+      {/if}
+      <textarea
+        bind:this={textareaEl}
+        bind:value={text}
+        onkeydown={handleKeydown}
+        oninput={onInputWithMention}
+        onpaste={onPaste}
+        disabled={$isStreaming ? true : null}
+        placeholder={placeholderText}
+        rows="1"
+        class="w-full bg-transparent px-4 py-3 text-sm focus:outline-none resize-none"
+      ></textarea>
+      {#if atMentionOpen && atMentionFiles.length > 0}
+        <div
+          class="at-mention-dropdown"
+          role="listbox"
+          aria-label="Include file"
+        >
+          {#each atMentionFiles as file, i}
+            <button
+              type="button"
+              class="at-mention-item"
+              class:selected={i === atMentionSelectedIndex}
+              role="option"
+              aria-selected={i === atMentionSelectedIndex}
+              onclick={() => selectMentionFile(file.path)}
+            >
+              <span class="at-mention-rel">{file.rel}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
+    <div
+      class="chat-input-footer flex items-center justify-between px-3 pb-3 pt-1"
+    >
+      <div class="chat-input-footer-icons flex items-center space-x-1">
+        <div class="attach-button-wrap relative flex items-center">
           {#if clippyBubble}
             <div class="clippy-bubble" role="status" aria-live="polite">
               <span class="clippy-bubble-text">{clippyBubble}</span>
@@ -762,181 +1024,296 @@
             {#if attachProcessing}
               <span class="mic-spinner" aria-hidden="true">⟳</span>
             {:else}
-              <span class="attach-icon" aria-hidden="true">📎</span>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                class="attach-icon"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><path
+                  d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"
+                ></path></svg
+              >
             {/if}
           </button>
         </div>
-        {#if onGenerateImageGrok || onGenerateImageDeepSeek || onGenerateVideoDeepSeek}
-          <div class="media-toolbar media-toolbar-dropdown">
-            {#if onGenerateImageGrok || onGenerateImageDeepSeek}
-              <button
-                type="button"
-                class="media-icon-btn {imageGenerating ? 'media-icon-btn-active' : ''}"
-                disabled={$isStreaming || imageGenerating || !text.trim()}
-                onclick={handleImageClick}
-                title={imageGenerating ? 'Generating image…' : (onGenerateImageGrok ? 'Generate image (Grok)' : 'Generate image (DeepInfra)')}
-                aria-label={imageGenerating ? 'Generating image' : 'Generate image'}
-              >
-                {#if imageGenerating}
-                  <ThinkingAtom size={16} />
-                {:else}
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <rect x="2.5" y="2.5" width="19" height="19" rx="3" stroke="currentColor" stroke-width="1.5"/>
-                    <circle cx="8" cy="8" r="2" fill="currentColor" opacity="0.5"/>
-                    <path d="M2.5 16l5-5.5 3.5 3.5 3-3L21.5 16v3.5a3 3 0 0 1-3 3h-13a3 3 0 0 1-3-3V16z" fill="currentColor" opacity="0.2"/>
-                    <path d="M2.5 16l5-5.5 3.5 3.5 3-3L21.5 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  <span class="media-icon-label">Image</span>
-                {/if}
-              </button>
-            {/if}
-            {#if onGenerateVideoDeepSeek}
-              <button
-                type="button"
-                class="media-icon-btn {videoGenerating ? 'media-icon-btn-active' : ''}"
-                disabled={$isStreaming || videoGenerating || !text.trim()}
-                onclick={handleVideoClick}
-                title={videoGenerating ? `Generating video… ${videoGenElapsed}` : 'Generate video (DeepInfra)'}
-                aria-label={videoGenerating ? 'Generating video' : 'Generate video'}
-              >
-                {#if videoGenerating}
-                  <span class="media-icon-generating"><ThinkingAtom size={16} /><span class="media-elapsed">{videoGenElapsed}</span></span>
-                {:else}
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <rect x="2.5" y="3.5" width="19" height="17" rx="3" stroke="currentColor" stroke-width="1.5"/>
-                    <path d="M10 8.5v7l5.5-3.5L10 8.5z" fill="currentColor" opacity="0.35"/>
-                    <path d="M10 8.5v7l5.5-3.5L10 8.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  <span class="media-icon-label">Video</span>
-                {/if}
-              </button>
-            {/if}
-          </div>
-        {/if}
-      </div>
-      <div class="chat-input-main">
-    {#if attachments.length > 0}
-      <div class="attachments-row">
-        {#each attachments as att, i}
-          <div class="attachment-thumb">
-            {#if att.isVideo}
-              <div class="thumb-video-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" opacity="0.7"><polygon points="10 8 16 12 10 16"/></svg>
-              </div>
-            {:else if att.dataUrl.startsWith('data:image')}
-              <img src={att.dataUrl} alt="" class="thumb-img" />
-            {:else}
-              <span class="thumb-placeholder">IMG</span>
-            {/if}
-            <span class="thumb-label" title={att.label}>{att.label.length > 12 ? att.label.slice(0, 10) + '…' : att.label}</span>
-            <button type="button" class="thumb-remove" onclick={() => removeAttachment(i)} aria-label="Remove">×</button>
-          </div>
-        {/each}
-      </div>
-    {/if}
-    <textarea
-      bind:this={textareaEl}
-      bind:value={text}
-      onkeydown={handleKeydown}
-      oninput={onInputWithMention}
-      onpaste={onPaste}
-      disabled={$isStreaming ? true : null}
-      placeholder={placeholderText}
-      rows="1"
-    ></textarea>
-    {#if atMentionOpen && atMentionFiles.length > 0}
-      <div class="at-mention-dropdown" role="listbox" aria-label="Include file">
-        {#each atMentionFiles as file, i}
+        <div class="media-toolbar inline-flex items-center space-x-1">
           <button
             type="button"
-            class="at-mention-item"
-            class:selected={i === atMentionSelectedIndex}
-            role="option"
-            aria-selected={i === atMentionSelectedIndex}
-            onclick={() => selectMentionFile(file.path)}
+            class="media-icon-btn {imageGenerating
+              ? 'media-icon-btn-active'
+              : ''}"
+            disabled={$isStreaming || imageGenerating || !text.trim()}
+            onclick={handleImageClick}
+            title={imageGenerating
+              ? "Generating image…"
+              : onGenerateImageGrok
+                ? "Generate image (Grok)"
+                : "Generate image (DeepInfra)"}
+            aria-label={imageGenerating ? "Generating image" : "Generate image"}
           >
-            <span class="at-mention-rel">{file.rel}</span>
+            {#if imageGenerating}
+              <ThinkingAtom size={16} />
+            {:else}
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <rect
+                  x="2.5"
+                  y="2.5"
+                  width="19"
+                  height="19"
+                  rx="3"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                />
+                <circle cx="8" cy="8" r="2" fill="currentColor" opacity="0.5" />
+                <path
+                  d="M2.5 16l5-5.5 3.5 3.5 3-3L21.5 16v3.5a3 3 0 0 1-3 3h-13a3 3 0 0 1-3-3V16z"
+                  fill="currentColor"
+                  opacity="0.2"
+                />
+                <path
+                  d="M2.5 16l5-5.5 3.5 3.5 3-3L21.5 16"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            {/if}
+            <span class="media-icon-label">IMAGE</span>
           </button>
-        {/each}
-      </div>
-    {/if}
-      </div>
-      <button
-        type="button"
-        class="mic-button"
-        title={recording ? 'Stop recording (click again)' : 'Voice input – start Python server first'}
-        disabled={$isStreaming || (voiceProcessing && !recording)}
-        onclick={toggleVoice}
-        aria-label={recording ? 'Stop recording' : 'Start voice input'}
-      >
-        {#if voiceProcessing && !recording}
-          <span class="mic-spinner" aria-hidden="true">⟳</span>
-        {:else if recording}
-          <span class="mic-dot" aria-hidden="true"></span>
-        {:else}
-          <span class="mic-icon" aria-hidden="true">🎤</span>
-        {/if}
-      </button>
-      <button
-        type="button"
-        class="web-search-button"
-        class:active={$webSearchForNextMessage}
-        title={webSearchWarmingUp ? 'Connecting…' : $webSearchForNextMessage ? ($webSearchConnected ? 'Web search on – connected (click to turn off)' : 'Web search on – not connected yet (click globe again to retry)') : 'Search the web for next message'}
-        disabled={$isStreaming}
-        onclick={() => {
-          const on = $webSearchForNextMessage;
-          const connected = $webSearchConnected;
-          if (on && !connected && !webSearchWarmingUp) {
-            webSearchWarmUpAttempted = false;
-            runWarmUp();
-            return;
-          }
-          if (on) {
-            webSearchForNextMessage.set(false);
-            webSearchConnected.set(false);
-            return;
-          }
-          webSearchForNextMessage.set(true);
-          runWarmUp();
-        }}
-        aria-label={webSearchWarmingUp ? 'Connecting' : $webSearchForNextMessage ? 'Web search on' : 'Search web for next message'}
-        aria-pressed={$webSearchForNextMessage}
-        aria-busy={webSearchWarmingUp}
-      >
-        <span
-          class="web-search-icon"
-          class:web-search-icon-spin={webSearchWarmingUp}
-          aria-hidden="true"
-          title="Internet"
-        >🌐</span>
-        {#if $webSearchForNextMessage}
-          {#if $webSearchConnected}
-            <span class="web-search-dot web-search-dot-green" aria-hidden="true" title="Connected"></span>
-          {:else}
-            <span class="web-search-dot web-search-dot-red" class:web-search-dot-pulse={webSearchWarmingUp} aria-hidden="true" title="Not connected"></span>
-          {/if}
-        {/if}
-      </button>
-      {#if $isStreaming && onStop}
-        <button type="button" class="chat-send-button" data-state="stop" onclick={() => onStop()} title="Stop">Stop</button>
-      {:else}
+          <button
+            type="button"
+            class="media-icon-btn {videoGenerating
+              ? 'media-icon-btn-active'
+              : ''}"
+            disabled={$isStreaming || videoGenerating || !text.trim()}
+            onclick={handleVideoClick}
+            title={videoGenerating
+              ? `Generating video… ${videoGenElapsed}`
+              : "Generate video (DeepInfra)"}
+            aria-label={videoGenerating ? "Generating video" : "Generate video"}
+          >
+            {#if videoGenerating}
+              <span class="media-icon-generating"
+                ><ThinkingAtom size={16} /></span
+              >
+            {:else}
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <rect
+                  x="2.5"
+                  y="3.5"
+                  width="19"
+                  height="17"
+                  rx="3"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                />
+                <path
+                  d="M10 8.5v7l5.5-3.5L10 8.5z"
+                  fill="currentColor"
+                  opacity="0.35"
+                />
+                <path
+                  d="M10 8.5v7l5.5-3.5L10 8.5z"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            {/if}
+            <span class="media-icon-label">VIDEO</span>
+          </button>
+        </div>
         <button
-          class="chat-send-button"
-          onclick={handleSubmit}
-          disabled={($isStreaming || $webSearchInProgress || (!text.trim() && attachments.length === 0)) ? true : null}
+          type="button"
+          class="web-search-button"
+          class:active={$webSearchForNextMessage}
+          title={webSearchWarmingUp
+            ? "Connecting…"
+            : $webSearchForNextMessage
+              ? $webSearchConnected
+                ? "Web search on – connected (click to turn off)"
+                : "Web search on – not connected yet (click globe again to retry)"
+              : "Search the web for next message"}
+          disabled={$isStreaming}
+          onclick={() => {
+            const on = $webSearchForNextMessage;
+            const connected = $webSearchConnected;
+            if (on && !connected && !webSearchWarmingUp) {
+              webSearchWarmUpAttempted = false;
+              runWarmUp();
+              return;
+            }
+            if (on) {
+              webSearchForNextMessage.set(false);
+              webSearchConnected.set(false);
+              return;
+            }
+            webSearchForNextMessage.set(true);
+            runWarmUp();
+          }}
+          aria-label={webSearchWarmingUp
+            ? "Connecting"
+            : $webSearchForNextMessage
+              ? "Web search on"
+              : "Search web for next message"}
+          aria-pressed={$webSearchForNextMessage}
+          aria-busy={webSearchWarmingUp}
         >
-          {#if $webSearchInProgress}
-            <span class="inline-flex items-center gap-1.5"><ThinkingAtom size={16} />{searchingMessage || 'Searching…'}</span>
-          {:else if $isStreaming}
-            <span class="inline-flex items-center gap-1.5"><ThinkingAtom size={16} />{sendingMessage || 'Sending…'}</span>
-          {:else}
-            Send
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="web-search-icon"
+            class:web-search-icon-spin={webSearchWarmingUp}
+            aria-hidden="true"
+            title="Internet"
+            ><circle cx="12" cy="12" r="10"></circle><line
+              x1="2"
+              y1="12"
+              x2="22"
+              y2="12"
+            ></line><path
+              d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+            ></path></svg
+          >
+          {#if $webSearchForNextMessage}
+            {#if $webSearchConnected}
+              <span
+                class="web-search-dot web-search-dot-green"
+                aria-hidden="true"
+                title="Connected"
+              ></span>
+            {:else}
+              <span
+                class="web-search-dot web-search-dot-red"
+                class:web-search-dot-pulse={webSearchWarmingUp}
+                aria-hidden="true"
+                title="Not connected"
+              ></span>
+            {/if}
           {/if}
         </button>
-      {/if}
-    </div>
-    <div class="context-ring-row" aria-label="Context usage">
-      <ContextRing inline={true} />
+      </div>
+      <div class="chat-input-row flex items-center space-x-3 pr-1">
+        <button
+          type="button"
+          class="mic-button"
+          title={recording
+            ? "Stop recording (click again)"
+            : "Voice input – start Python server first"}
+          disabled={$isStreaming || (voiceProcessing && !recording)}
+          onclick={toggleVoice}
+          aria-label={recording ? "Stop recording" : "Start voice input"}
+        >
+          {#if voiceProcessing && !recording}
+            <span class="mic-spinner" aria-hidden="true">⟳</span>
+          {:else if recording}
+            <span class="mic-dot" aria-hidden="true"></span>
+          {:else}
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="mic-icon"
+              ><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"
+              ></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line
+                x1="12"
+                y1="19"
+                x2="12"
+                y2="22"
+              ></line></svg
+            >
+          {/if}
+        </button>
+        <div class="relative flex items-center justify-center">
+          <div
+            class="absolute -top-[36px]"
+            aria-label="Context usage"
+            title="Context usage"
+          >
+            <ContextRing inline={true} />
+          </div>
+          {#if $isStreaming && onStop}
+            <button
+              type="button"
+              class="chat-send-icon-btn chat-stop-btn"
+              data-state="stop"
+              onclick={() => onStop()}
+              title="Stop"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                ><rect x="6" y="6" width="12" height="12" rx="2" /></svg
+              >
+            </button>
+          {:else}
+            <button
+              class="chat-send-icon-btn"
+              onclick={handleSubmit}
+              disabled={$isStreaming ||
+              $webSearchInProgress ||
+              (!text.trim() && attachments.length === 0)
+                ? true
+                : null}
+              title={$webSearchInProgress
+                ? searchingMessage || "Searching..."
+                : $isStreaming
+                  ? sendingMessage || "Sending..."
+                  : "Send message"}
+            >
+              {#if $webSearchInProgress || $isStreaming}
+                <ThinkingAtom size={18} />
+              {:else}
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  ><line x1="12" y1="19" x2="12" y2="5"></line><polyline
+                    points="5 12 12 5 19 12"
+                  ></polyline></svg
+                >
+              {/if}
+            </button>
+          {/if}
+        </div>
+      </div>
     </div>
   </div>
   {#if voiceError}
@@ -961,129 +1338,14 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    border: 2px solid var(--ui-input-border, var(--ui-border, #e5e7eb));
-    border-radius: 12px;
+    border: none;
+    border-radius: 20px;
     background-color: var(--ui-input-bg, #fff);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-    transition: border-color var(--duration-normal), box-shadow var(--duration-normal);
-    overflow: hidden;
+    transition: all var(--duration-normal);
   }
 
   .chat-input-box:focus-within {
-    border-color: var(--ui-accent, #3b82f6);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent, #3b82f6) 12%, transparent);
-  }
-
-  .chat-input-bar {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 6px;
-    min-height: 48px;
-    padding: 6px 8px 6px 10px;
-    flex-shrink: 0;
-  }
-
-  .chat-input-bar-attach {
-    position: relative;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .chat-input-bar-attach .media-toolbar-dropdown {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    margin-top: 4px;
-    padding: 6px 8px;
-    gap: 4px;
-    background: var(--ui-input-bg, #fff);
-    border: 1px solid color-mix(in srgb, var(--ui-border, #e5e7eb) 50%, transparent);
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    z-index: 20;
-  }
-
-  .chat-input-bar-attach:hover .media-toolbar-dropdown {
-    display: flex;
-  }
-
-  .chat-input-bar .chat-input-main {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-  }
-
-  .chat-input-bar .attach-button-wrap {
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .chat-input-bar .attach-button,
-  .chat-input-bar .mic-button,
-  .chat-input-bar .web-search-button {
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: transparent;
-    border-radius: 6px;
-    color: var(--ui-text-secondary, #6b7280);
-    opacity: 1;
-  }
-
-  .chat-input-bar .attach-button:hover:not(:disabled),
-  .chat-input-bar .mic-button:hover:not(:disabled),
-  .chat-input-bar .web-search-button:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--ui-accent, #3b82f6) 10%, transparent);
-    color: var(--ui-accent, #3b82f6);
-  }
-
-  .chat-input-bar .web-search-button.active {
-    background: color-mix(in srgb, var(--ui-accent, #3b82f6) 12%, transparent);
-    color: var(--ui-accent, #3b82f6);
-  }
-
-  .chat-input-bar .chat-send-button {
-    flex-shrink: 0;
-    margin: 0;
-  }
-
-  .chat-input-content {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .context-ring-row {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding: 2px var(--space-2) 0;
-    min-height: 28px;
-    flex-shrink: 0;
-    border: none;
-    border-top: none;
-    background: transparent;
+    background-color: var(--ui-input-bg-focus, var(--ui-input-bg, #fff));
   }
 
   .at-mention-dropdown {
@@ -1185,30 +1447,24 @@
     flex-shrink: 0;
   }
 
-  .chat-input-row .chat-input-main {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .chat-input-row .chat-send-button {
-    flex-shrink: 0;
-  }
-
   .chat-input-main {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    border: 2px solid var(--ui-input-border, var(--ui-border, #e5e7eb));
-    border-radius: 12px;
+    border: 1.5px solid var(--ui-input-border, var(--ui-border, #e5e7eb));
+    border-radius: 16px;
     background-color: var(--ui-input-bg, #fff);
-    transition: border-color var(--duration-normal), box-shadow var(--duration-normal);
+    transition:
+      border-color var(--duration-normal),
+      box-shadow var(--duration-normal);
     overflow: hidden;
   }
 
   .chat-input-main:focus-within {
     border-color: var(--ui-accent, #3b82f6);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent, #3b82f6) 12%, transparent);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--ui-accent, #3b82f6) 12%, transparent);
   }
 
   textarea {
@@ -1240,33 +1496,42 @@
     cursor: not-allowed;
   }
 
-  .chat-input-footer .chat-send-button {
-    min-height: 36px;
-    padding: var(--space-2) var(--space-4);
-    font-size: 13px;
-  }
-
-  .chat-send-button {
-    padding: var(--space-3) var(--space-6);
-    min-height: 44px;
+  .chat-send-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
     background: var(--ui-accent, #3b82f6);
     color: white;
     border: none;
-    border-radius: 8px;
-    font-weight: 600;
     cursor: pointer;
     transition: all var(--duration-normal);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--ui-accent) 40%, transparent);
   }
 
-  .chat-send-button:hover:not(:disabled) {
-    opacity: 0.9;
-    transform: translateY(-1px);
+  .chat-send-icon-btn:hover:not(:disabled) {
+    transform: translateY(-1px) scale(1.05);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--ui-accent) 50%, transparent);
   }
 
-  .chat-send-button:disabled {
-    opacity: 0.5;
+  .chat-send-icon-btn:disabled {
+    background: color-mix(in srgb, var(--ui-text-secondary) 20%, transparent);
+    color: var(--ui-text-secondary);
     cursor: not-allowed;
+    box-shadow: none;
     transform: none;
+  }
+
+  .chat-stop-btn {
+    background: var(--ui-accent-hot, #dc2626);
+    box-shadow: 0 4px 12px
+      color-mix(in srgb, var(--ui-accent-hot) 40%, transparent);
+  }
+  .chat-stop-btn:hover:not(:disabled) {
+    box-shadow: 0 6px 16px
+      color-mix(in srgb, var(--ui-accent-hot) 50%, transparent);
   }
 
   .media-toolbar {
@@ -1290,7 +1555,9 @@
     background: transparent;
     color: var(--ui-text-secondary, #6b7280);
     cursor: pointer;
-    transition: background var(--duration-normal), color var(--duration-normal);
+    transition:
+      background var(--duration-normal),
+      color var(--duration-normal);
     padding: 0 var(--space-2);
   }
 
@@ -1365,11 +1632,18 @@
     animation: spin var(--duration-slower) linear infinite;
   }
   @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.4;
+    }
   }
   @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+      transform: rotate(360deg);
+    }
   }
   .voice-recording-hint {
     position: absolute;
@@ -1392,8 +1666,15 @@
     animation: recording-pulse var(--duration-long) var(--ease-in-out) infinite;
   }
   @keyframes recording-pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(1.2); }
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.5;
+      transform: scale(1.2);
+    }
   }
   .voice-error,
   .attach-error {
@@ -1443,7 +1724,7 @@
     background: var(--ui-bg-main);
     color: var(--ui-text-primary);
     border: 2px solid var(--ui-border);
-    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
   }
   .clippy-bubble-tail {
     position: absolute;
@@ -1457,7 +1738,7 @@
     border-top: 9px solid var(--ui-border);
   }
   .clippy-bubble-tail::after {
-    content: '';
+    content: "";
     position: absolute;
     left: -5px;
     top: -10px;
@@ -1484,12 +1765,25 @@
     animation: clippy-wiggle var(--duration-slower) var(--ease-in-out);
   }
   @keyframes clippy-wiggle {
-    0%, 100% { transform: rotate(0deg); }
-    15% { transform: rotate(-12deg); }
-    30% { transform: rotate(10deg); }
-    45% { transform: rotate(-8deg); }
-    60% { transform: rotate(4deg); }
-    75% { transform: rotate(-2deg); }
+    0%,
+    100% {
+      transform: rotate(0deg);
+    }
+    15% {
+      transform: rotate(-12deg);
+    }
+    30% {
+      transform: rotate(10deg);
+    }
+    45% {
+      transform: rotate(-8deg);
+    }
+    60% {
+      transform: rotate(4deg);
+    }
+    75% {
+      transform: rotate(-2deg);
+    }
   }
   .attach-button {
     flex-shrink: 0;
@@ -1528,7 +1822,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: border-color var(--duration-fast), background var(--duration-fast);
+    transition:
+      border-color var(--duration-fast),
+      background var(--duration-fast);
   }
   .web-search-button:hover:not(:disabled) {
     border-color: var(--ui-accent, #3b82f6);
@@ -1552,8 +1848,12 @@
     animation: web-search-globe-spin var(--duration-long) linear infinite;
   }
   @keyframes web-search-globe-spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
   }
   .web-search-dot {
     position: absolute;
@@ -1571,11 +1871,17 @@
     background: #dc2626;
   }
   .web-search-dot-pulse {
-    animation: web-search-dot-pulse var(--duration-long) var(--ease-in-out) infinite;
+    animation: web-search-dot-pulse var(--duration-long) var(--ease-in-out)
+      infinite;
   }
   @keyframes web-search-dot-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
   }
   .attachments-row {
     display: flex;
@@ -1617,7 +1923,11 @@
     align-items: center;
     justify-content: center;
     color: var(--ui-accent, #3b82f6);
-    background: color-mix(in srgb, var(--ui-accent, #3b82f6) 10%, var(--ui-input-bg, #fff));
+    background: color-mix(
+      in srgb,
+      var(--ui-accent, #3b82f6) 10%,
+      var(--ui-input-bg, #fff)
+    );
     border-radius: 4px;
   }
   .thumb-label {
@@ -1627,7 +1937,7 @@
     right: 0;
     padding: 2px 4px;
     font-size: 9px;
-    background: rgba(0,0,0,0.6);
+    background: rgba(0, 0, 0, 0.6);
     color: #fff;
     white-space: nowrap;
     overflow: hidden;
@@ -1642,7 +1952,7 @@
     padding: 0;
     border: none;
     border-radius: 4px;
-    background: rgba(0,0,0,0.6);
+    background: rgba(0, 0, 0, 0.6);
     color: #fff;
     font-size: 14px;
     line-height: 1;

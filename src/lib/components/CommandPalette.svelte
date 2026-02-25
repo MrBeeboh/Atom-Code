@@ -1,7 +1,8 @@
 <script>
-  import { onMount } from 'svelte';
-  import { fade, scale } from 'svelte/transition';
-  import { quintOut } from 'svelte/easing';
+  import { onMount } from "svelte";
+  import { get } from "svelte/store";
+  import { fade, scale } from "svelte/transition";
+  import { quintOut } from "svelte/easing";
   import {
     layout,
     uiTheme,
@@ -17,43 +18,63 @@
     confirm,
     terminalOpen,
     fileExplorerOpen,
-  } from '$lib/stores.js';
-  import { createConversation, listConversations, getMessageCount } from '$lib/db.js';
-  import { bulkEraseChats } from '$lib/bulkEraseChats.js';
-  import { UI_THEME_OPTIONS } from '$lib/themeOptions.js';
+    workspaceRoot,
+    fileServerUrl,
+    editorContent,
+    editorFilePath,
+    editorLanguage,
+    editorOpen,
+  } from "$lib/stores.js";
+  import {
+    createConversation,
+    listConversations,
+    getMessageCount,
+  } from "$lib/db.js";
+  import { bulkEraseChats } from "$lib/bulkEraseChats.js";
+  import { UI_THEME_OPTIONS } from "$lib/themeOptions.js";
 
   let modelsList = $state([]);
   let conversationsList = $state([]);
+  let filesList = $state([]);
   $effect(() => {
     const unsubM = models.subscribe((v) => (modelsList = v ?? []));
-    const unsubC = conversations.subscribe((v) => (conversationsList = v ?? []));
+    const unsubC = conversations.subscribe(
+      (v) => (conversationsList = v ?? []),
+    );
     return () => {
       unsubM();
       unsubC();
     };
   });
 
-  const LAYOUT_OPTIONS = [{ value: 'cockpit', label: 'Cockpit' }];
+  const LAYOUT_OPTIONS = [{ value: "cockpit", label: "Cockpit" }];
 
   function loadRecentCommands() {
-    if (typeof localStorage === 'undefined') return [];
-    try { return JSON.parse(localStorage.getItem('recentPaletteCommands') || '[]').slice(0, 5); } catch { return []; }
+    if (typeof localStorage === "undefined") return [];
+    try {
+      return JSON.parse(
+        localStorage.getItem("recentPaletteCommands") || "[]",
+      ).slice(0, 5);
+    } catch {
+      return [];
+    }
   }
   let recentIds = $state(loadRecentCommands());
   function trackRecent(id) {
     recentIds = [id, ...recentIds.filter((r) => r !== id)].slice(0, 5);
-    if (typeof localStorage !== 'undefined') localStorage.setItem('recentPaletteCommands', JSON.stringify(recentIds));
+    if (typeof localStorage !== "undefined")
+      localStorage.setItem("recentPaletteCommands", JSON.stringify(recentIds));
   }
 
   let open = $state(false);
-  let query = $state('');
+  let query = $state("");
   let selectedIndex = $state(0);
   let inputEl = $state(null);
 
   /** Simple fuzzy match: query chars appear in order in str (case-insensitive). */
   function fuzzyMatch(str, q) {
     if (!q) return true;
-    const s = (str ?? '').toLowerCase();
+    const s = (str ?? "").toLowerCase();
     const qn = q.toLowerCase().trim();
     let j = 0;
     for (let i = 0; i < s.length && j < qn.length; i++) {
@@ -69,41 +90,131 @@
 
     // Actions
     const actions = [
-      { id: 'new-chat', label: 'New Chat', shortcut: 'Ctrl+N', category: 'Actions', run: () => runNewChat() },
-      { id: 'search-web', label: 'Include web search for next message', shortcut: '', category: 'Actions', run: () => webSearchForNextMessage.set(true) },
-      { id: 'export-chat', label: 'Export Chat', shortcut: 'Ctrl+Shift+E', category: 'Actions', run: () => chatCommand.set({ type: 'export', ts: Date.now() }) },
-      { id: 'clear-chat', label: 'Clear Chat', shortcut: 'Ctrl+Shift+L', category: 'Actions', run: () => chatCommand.set({ type: 'clear', ts: Date.now() }) },
-      { id: 'bulk-erase', label: 'Bulk erase all chats', shortcut: '', category: 'Actions', run: () => runBulkErase() },
-      { id: 'settings', label: 'Open Settings', shortcut: '', category: 'Actions', run: () => settingsOpen.set(true) },
-      { id: 'toggle-terminal', label: 'Toggle Terminal', shortcut: 'Ctrl+`', category: 'Actions', run: () => terminalOpen.update((v) => !v) },
-      { id: 'toggle-file-explorer', label: 'Toggle File Explorer', shortcut: 'Ctrl+E', category: 'Actions', run: () => fileExplorerOpen.update((v) => !v) },
-      { id: 'set-workspace-root', label: 'Set Workspace Root', shortcut: '', category: 'Actions', run: () => settingsOpen.set(true) },
+      {
+        id: "new-chat",
+        label: "New Chat",
+        shortcut: "Ctrl+N",
+        category: "Actions",
+        run: () => runNewChat(),
+      },
+      {
+        id: "search-web",
+        label: "Include web search for next message",
+        shortcut: "",
+        category: "Actions",
+        run: () => webSearchForNextMessage.set(true),
+      },
+      {
+        id: "export-chat",
+        label: "Export Chat",
+        shortcut: "Ctrl+Shift+E",
+        category: "Actions",
+        run: () => chatCommand.set({ type: "export", ts: Date.now() }),
+      },
+      {
+        id: "clear-chat",
+        label: "Clear Chat",
+        shortcut: "Ctrl+Shift+L",
+        category: "Actions",
+        run: () => chatCommand.set({ type: "clear", ts: Date.now() }),
+      },
+      {
+        id: "bulk-erase",
+        label: "Bulk erase all chats",
+        shortcut: "",
+        category: "Actions",
+        run: () => runBulkErase(),
+      },
+      {
+        id: "settings",
+        label: "Open Settings",
+        shortcut: "",
+        category: "Actions",
+        run: () => settingsOpen.set(true),
+      },
+      {
+        id: "toggle-terminal",
+        label: "Toggle Terminal",
+        shortcut: "Ctrl+`",
+        category: "Actions",
+        run: () => terminalOpen.update((v) => !v),
+      },
+      {
+        id: "toggle-file-explorer",
+        label: "Toggle File Explorer",
+        shortcut: "Ctrl+E",
+        category: "Actions",
+        run: () => fileExplorerOpen.update((v) => !v),
+      },
+      {
+        id: "set-workspace-root",
+        label: "Set Workspace Root",
+        shortcut: "",
+        category: "Actions",
+        run: () => settingsOpen.set(true),
+      },
     ];
     actions.forEach((a) => {
-      if (fuzzyMatch(a.label + ' ' + (a.shortcut || ''), q)) items.push(a);
+      if (fuzzyMatch(a.label + " " + (a.shortcut || ""), q)) items.push(a);
     });
 
     // Models
     ($models || []).forEach((m) => {
       const id = m.id || m;
-      const label = typeof id === 'string' ? id : id.id;
-      if (fuzzyMatch(label, q)) items.push({ id: 'model-' + label, label, category: 'Models', run: () => selectedModelId.set(label) });
+      const label = typeof id === "string" ? id : id.id;
+      if (fuzzyMatch(label, q))
+        items.push({
+          id: "model-" + label,
+          label,
+          category: "Models",
+          run: () => selectedModelId.set(label),
+        });
     });
 
     // Layouts
     LAYOUT_OPTIONS.forEach((opt) => {
-      if (fuzzyMatch(opt.label + ' ' + opt.value, q)) items.push({ id: 'layout-' + opt.value, label: 'Layout: ' + opt.label, category: 'Layouts', run: () => layout.set(opt.value) });
+      if (fuzzyMatch(opt.label + " " + opt.value, q))
+        items.push({
+          id: "layout-" + opt.value,
+          label: "Layout: " + opt.label,
+          category: "Layouts",
+          run: () => layout.set(opt.value),
+        });
     });
 
     // Themes
     UI_THEME_OPTIONS.forEach((opt) => {
-      if (fuzzyMatch(opt.label + ' ' + opt.value, q)) items.push({ id: 'theme-' + opt.value, label: 'Theme: ' + opt.label, category: 'Themes', run: () => uiTheme.set(opt.value) });
+      if (fuzzyMatch(opt.label + " " + opt.value, q))
+        items.push({
+          id: "theme-" + opt.value,
+          label: "Theme: " + opt.label,
+          category: "Themes",
+          run: () => uiTheme.set(opt.value),
+        });
+    });
+
+    // Files
+    (filesList || []).forEach((f) => {
+      if (fuzzyMatch(f.path, q))
+        Object.keys(f).length > 0 &&
+          items.push({
+            id: "file-" + f.path,
+            label: f.path,
+            category: "Files",
+            run: () => openFileInEditor(f.path),
+          });
     });
 
     // Conversations
     ($conversations || []).forEach((c) => {
-      const title = (c.title || 'Untitled').trim() || 'Untitled';
-      if (fuzzyMatch(title, q)) items.push({ id: 'conv-' + c.id, label: title, category: 'Conversations', run: () => activeConversationId.set(c.id) });
+      const title = (c.title || "Untitled").trim() || "Untitled";
+      if (fuzzyMatch(title, q))
+        items.push({
+          id: "conv-" + c.id,
+          label: title,
+          category: "Conversations",
+          run: () => activeConversationId.set(c.id),
+        });
     });
 
     // Prepend recent commands when search is empty
@@ -111,7 +222,7 @@
       const recent = [];
       for (const rid of recentIds) {
         const match = items.find((it) => it.id === rid);
-        if (match) recent.push({ ...match, category: 'Recent' });
+        if (match) recent.push({ ...match, category: "Recent" });
       }
       if (recent.length) items.unshift(...recent);
     }
@@ -122,7 +233,12 @@
   async function runNewChat() {
     const id = await createConversation();
     let list = await listConversations();
-    list = await Promise.all(list.map(async (c) => ({ ...c, messageCount: await getMessageCount(c.id) })));
+    list = await Promise.all(
+      list.map(async (c) => ({
+        ...c,
+        messageCount: await getMessageCount(c.id),
+      })),
+    );
     conversations.set(list);
     activeConversationId.set(id);
   }
@@ -134,22 +250,94 @@
       return;
     }
     closePalette();
-    if (!(await confirm({ title: 'Are you sure?', message: `This will permanently delete all ${n} conversation${n === 1 ? '' : 's'}. This cannot be undone.`, confirmLabel: 'Yes, delete all', cancelLabel: 'Cancel', danger: true }))) return;
+    if (
+      !(await confirm({
+        title: "Are you sure?",
+        message: `This will permanently delete all ${n} conversation${n === 1 ? "" : "s"}. This cannot be undone.`,
+        confirmLabel: "Yes, delete all",
+        cancelLabel: "Cancel",
+        danger: true,
+      }))
+    )
+      return;
     await bulkEraseChats();
   }
 
   let items = $derived(buildItems(modelsList, conversationsList));
 
+  async function fetchFiles() {
+    const root = get(workspaceRoot)?.trim();
+    let base = (get(fileServerUrl) || "http://localhost:8768").replace(
+      /\/$/,
+      "",
+    );
+    if (base.includes(":8766")) base = base.replace(":8766", ":8768");
+    if (!root) return;
+    try {
+      const res = await fetch(
+        `${base}/tree?root=${encodeURIComponent(root)}&depth=5`,
+      );
+      if (res.ok) {
+        const tree = await res.json();
+        const flat = [];
+        function traverse(nodes) {
+          for (const n of nodes) {
+            if (n.type === "file") flat.push(n);
+            if (n.children) traverse(n.children);
+          }
+        }
+        if (Array.isArray(tree)) traverse(tree);
+        filesList = flat;
+      }
+    } catch {}
+  }
+
+  function pathToEditorLang(filePath) {
+    const ext = (filePath || "").split(".").pop()?.toLowerCase() || "";
+    if (ext === "py") return "python";
+    if (["js", "jsx", "mjs", "cjs", "ts", "tsx"].includes(ext))
+      return "javascript";
+    if (["html", "htm", "svelte"].includes(ext)) return "html";
+    if (ext === "css") return "css";
+    if (ext === "json") return "json";
+    return "javascript";
+  }
+
+  async function openFileInEditor(filePath) {
+    const absPath = (filePath || "").trim().replace(/\/+$/, "") || "";
+    if (!absPath) return;
+    let base = (get(fileServerUrl) || "http://localhost:8768").replace(
+      /\/$/,
+      "",
+    );
+    if (base.includes(":8766")) base = base.replace(":8766", ":8768");
+    try {
+      const res = await fetch(
+        `${base}/content?path=${encodeURIComponent(absPath)}`,
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const content = typeof data.content === "string" ? data.content : "";
+        editorContent.set(content);
+        editorFilePath.set(absPath);
+        editorLanguage.set(pathToEditorLang(absPath));
+        editorOpen.set(true);
+        if (!get(terminalOpen)) terminalOpen.set(true);
+      }
+    } catch {}
+  }
+
   function openPalette() {
     open = true;
-    query = '';
+    query = "";
     selectedIndex = 0;
+    fetchFiles();
     setTimeout(() => inputEl?.focus(), 50);
   }
 
   function closePalette() {
     open = false;
-    query = '';
+    query = "";
   }
 
   function runSelected() {
@@ -166,22 +354,24 @@
 
   function onKeydown(e) {
     if (!open) return;
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       e.preventDefault();
       closePalette();
       return;
     }
-    if (e.key === 'ArrowDown') {
+    if (e.key === "ArrowDown") {
       e.preventDefault();
       selectedIndex = items.length ? (selectedIndex + 1) % items.length : 0;
       return;
     }
-    if (e.key === 'ArrowUp') {
+    if (e.key === "ArrowUp") {
       e.preventDefault();
-      selectedIndex = items.length ? (selectedIndex - 1 + items.length) % items.length : 0;
+      selectedIndex = items.length
+        ? (selectedIndex - 1 + items.length) % items.length
+        : 0;
       return;
     }
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       e.preventDefault();
       runSelected();
       return;
@@ -190,41 +380,53 @@
 
   onMount(() => {
     function globalKeydown(e) {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
         if (open) closePalette();
         else openPalette();
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      if ((e.ctrlKey || e.metaKey) && e.key === "n") {
         e.preventDefault();
         runNewChat();
         return;
       }
-      if (e.key === '?' && !open) {
+      if (e.key === "?" && !open) {
         const t = document.activeElement?.tagName?.toLowerCase();
-        if (t !== 'input' && t !== 'textarea' && !(document.activeElement?.getAttribute('contenteditable') === 'true')) {
+        if (
+          t !== "input" &&
+          t !== "textarea" &&
+          !(document.activeElement?.getAttribute("contenteditable") === "true")
+        ) {
           e.preventDefault();
           shortcutsModalOpen.set(true);
         }
         return;
       }
-      if (e.key === '/' && !open) {
+      if (e.key === "/" && !open) {
         const t = document.activeElement?.tagName?.toLowerCase();
-        if (t !== 'input' && t !== 'textarea' && !(document.activeElement?.getAttribute('contenteditable') === 'true')) {
+        if (
+          t !== "input" &&
+          t !== "textarea" &&
+          !(document.activeElement?.getAttribute("contenteditable") === "true")
+        ) {
           e.preventDefault();
           openPalette();
         }
       }
-      if (e.key === ']' && !e.ctrlKey && !e.metaKey && !e.altKey && !open) {
+      if (e.key === "]" && !e.ctrlKey && !e.metaKey && !e.altKey && !open) {
         const t = document.activeElement?.tagName?.toLowerCase();
-        if (t !== 'input' && t !== 'textarea' && !(document.activeElement?.getAttribute('contenteditable') === 'true')) {
+        if (
+          t !== "input" &&
+          t !== "textarea" &&
+          !(document.activeElement?.getAttribute("contenteditable") === "true")
+        ) {
           cockpitIntelOpen.update((v) => !v);
         }
       }
     }
-    document.addEventListener('keydown', globalKeydown);
-    return () => document.removeEventListener('keydown', globalKeydown);
+    document.addEventListener("keydown", globalKeydown);
+    return () => document.removeEventListener("keydown", globalKeydown);
   });
 </script>
 
@@ -237,17 +439,28 @@
     aria-label="Command palette"
     tabindex="-1"
     onclick={(e) => e.target === e.currentTarget && closePalette()}
-    onkeydown={(e) => { onKeydown(e); if (e.key === 'Escape' && e.target === e.currentTarget) closePalette(); }}
-    transition:fade={{ duration: 200 }}>
+    onkeydown={(e) => {
+      onKeydown(e);
+      if (e.key === "Escape" && e.target === e.currentTarget) closePalette();
+    }}
+    transition:fade={{ duration: 200 }}
+  >
     <div
       class="w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden"
       style="background-color: var(--ui-bg-sidebar); border-color: var(--ui-border);"
       role="presentation"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
-      transition:scale={{ start: 0.72, duration: 500, easing: quintOut }}>
-      <div class="flex items-center gap-2 px-4 py-3 border-b" style="border-color: var(--ui-border);">
-        <span class="text-zinc-400 dark:text-zinc-500 shrink-0" aria-hidden="true">&#8250;</span>
+      transition:scale={{ start: 0.72, duration: 500, easing: quintOut }}
+    >
+      <div
+        class="flex items-center gap-2 px-4 py-3 border-b"
+        style="border-color: var(--ui-border);"
+      >
+        <span
+          class="text-zinc-400 dark:text-zinc-500 shrink-0"
+          aria-hidden="true">&#8250;</span
+        >
         <input
           bind:this={inputEl}
           bind:value={query}
@@ -255,26 +468,51 @@
           class="flex-1 min-w-0 bg-transparent text-sm focus:outline-none"
           style="color: var(--ui-text-primary);"
           placeholder="Search commands, models, chats..."
-          aria-label="Search" />
+          aria-label="Search"
+        />
       </div>
       <div class="max-h-[60vh] overflow-y-auto py-2">
         {#if items.length === 0}
-          <div class="px-4 py-6 text-center text-sm" style="color: var(--ui-text-secondary);">No matches</div>
+          <div
+            class="px-4 py-6 text-center text-sm"
+            style="color: var(--ui-text-secondary);"
+          >
+            No matches
+          </div>
         {:else}
           {#each items as item, i}
             {#if i === 0 || item.category !== items[i - 1]?.category}
-              <div class="px-4 pt-3 pb-1 text-[10px] font-medium uppercase tracking-wider" style="color: var(--ui-text-secondary);">{item.category}</div>
+              <div
+                class="px-4 pt-3 pb-1 text-[10px] font-medium uppercase tracking-wider"
+                style="color: var(--ui-text-secondary);"
+              >
+                {item.category}
+              </div>
             {/if}
             {@const isSelected = i === selectedIndex}
             <button
               type="button"
-              class="w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 transition-colors {isSelected ? '' : ''}"
-              style="background-color: {isSelected ? 'var(--ui-sidebar-active)' : 'transparent'}; color: var(--ui-text-primary);"
+              class="w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 transition-colors {isSelected
+                ? ''
+                : ''}"
+              style="background-color: {isSelected
+                ? 'var(--ui-sidebar-active)'
+                : 'transparent'}; color: var(--ui-text-primary);"
               onmouseenter={() => (selectedIndex = i)}
-              onclick={() => { if (item.run) { trackRecent(item.id); item.run(); closePalette(); } }}>
+              onclick={() => {
+                if (item.run) {
+                  trackRecent(item.id);
+                  item.run();
+                  closePalette();
+                }
+              }}
+            >
               <span class="truncate">{item.label}</span>
               {#if item.shortcut}
-                <span class="text-[10px] font-mono shrink-0 opacity-70" style="color: var(--ui-text-secondary);">{item.shortcut}</span>
+                <span
+                  class="text-[10px] font-mono shrink-0 opacity-70"
+                  style="color: var(--ui-text-secondary);">{item.shortcut}</span
+                >
               {/if}
             </button>
           {/each}
