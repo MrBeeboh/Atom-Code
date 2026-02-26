@@ -65,6 +65,12 @@
         else if (c === false) lmStatusMessage = COCKPIT_LM_UNREACHABLE;
         else lmStatusMessage = COCKPIT_LM_CHECKING;
     });
+
+    const workspaceName = $derived(
+        $workspaceRoot
+            ? $workspaceRoot.split(/[/\\]/).filter(Boolean).pop()
+            : null,
+    );
 </script>
 
 <header
@@ -83,6 +89,28 @@
                 />ATOM</span
             >
         </div>
+
+        {#if workspaceName}
+            <div
+                class="flex items-center px-1.5 py-0.5 rounded border text-[10px] font-bold tracking-tight uppercase group relative cursor-help"
+                style="background: color-mix(in srgb, var(--ui-accent) 10%, transparent); border-color: color-mix(in srgb, var(--ui-accent) 20%, transparent); color: var(--ui-accent); opacity: 0.9;"
+                title={$workspaceRoot}
+            >
+                <svg
+                    class="w-3 h-3 mr-1 opacity-70"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><path
+                        d="M4 19.5A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V8.5L14.5 3H6.5A2.5 2.5 0 0 0 4 5.5z"
+                    /><polyline points="14 3 14 9 20 9" /></svg
+                >
+                {workspaceName}
+            </div>
+        {/if}
 
         <div class="h-4 w-[1px] bg-white/10 mx-1 shrink-0"></div>
 
