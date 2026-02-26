@@ -57,7 +57,7 @@ export async function checkLmStudioConnection() {
   };
   try {
     if (await tryFetch(`${base}/api/v1/models`)) return true;
-  } catch (_) {}
+  } catch (_) { }
   try {
     return await tryFetch(`${base}/v1/models`);
   } catch {
@@ -425,7 +425,7 @@ export async function getLoadedInstanceIdsForModel(modelKey) {
 export async function unloadModel(modelId) {
   if (!modelId || typeof modelId !== 'string') return;
   const instanceIds = await getLoadedInstanceIdsForModel(modelId);
-  await Promise.allSettled(instanceIds.map((id) => unloadByInstanceId(id).catch(() => {})));
+  await Promise.allSettled(instanceIds.map((id) => unloadByInstanceId(id).catch(() => { })));
 }
 
 const DEFAULT_UNLOAD_HELPER_URL = 'http://localhost:8766';
@@ -478,7 +478,7 @@ export async function unloadAllModelsNative() {
       }
     }
     if (instanceIds.length === 0) return { ok: true, unloaded: 0 };
-    await Promise.allSettled(instanceIds.map((id) => unloadByInstanceId(id).catch(() => {})));
+    await Promise.allSettled(instanceIds.map((id) => unloadByInstanceId(id).catch(() => { })));
     return { ok: true, unloaded: instanceIds.length };
   } catch (_) {
     return { ok: false, unloaded: 0 };
@@ -1042,7 +1042,7 @@ async function streamGrokResponsesApi({ model, messages, options = {}, onChunk, 
               streamEnded = true;
             }
             if (streamEnded) break;
-          } catch (_) {}
+          } catch (_) { }
         }
         if (streamEnded) break;
       }
@@ -1113,23 +1113,22 @@ export async function streamChatCompletion({ model, messages, options = {}, onCh
     ...(!isCloud && options.ttl != null && Number(options.ttl) > 0 && { ttl: Number(options.ttl) }),
   };
   let effectiveSignal = signal;
-  let timeoutId = null;
-  if (isCloud) {
-    const timeoutCtrl = new AbortController();
-    timeoutId = setTimeout(() => timeoutCtrl.abort(), CLOUD_REQUEST_TIMEOUT_MS);
-    if (signal) {
-      if (signal.aborted) {
+  const timeoutMs = isCloud ? CLOUD_REQUEST_TIMEOUT_MS : 300000;
+  const timeoutCtrl = new AbortController();
+  let timeoutId = setTimeout(() => timeoutCtrl.abort(), timeoutMs);
+
+  if (signal) {
+    if (signal.aborted) {
+      clearTimeout(timeoutId);
+      timeoutCtrl.abort();
+    } else {
+      signal.addEventListener('abort', () => {
         clearTimeout(timeoutId);
         timeoutCtrl.abort();
-      } else {
-        signal.addEventListener('abort', () => {
-          clearTimeout(timeoutId);
-          timeoutCtrl.abort();
-        });
-      }
+      });
     }
-    effectiveSignal = timeoutCtrl.signal;
   }
+  effectiveSignal = timeoutCtrl.signal;
 
   try {
     const res = await fetch(streamUrl, {
@@ -1142,6 +1141,11 @@ export async function streamChatCompletion({ model, messages, options = {}, onCh
     if (!res.ok) {
       const text = await res.text();
       throw new Error(parseChatApiError(res.status, text, model));
+    }
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const text = await res.text();
+      throw new Error(parseChatApiError(res.status || 400, text, model));
     }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -1181,7 +1185,7 @@ export async function streamChatCompletion({ model, messages, options = {}, onCh
                 streamEnded = true;
               }
               if (streamEnded) break;
-            } catch (_) {}
+            } catch (_) { }
           }
         }
         if (streamEnded) break;

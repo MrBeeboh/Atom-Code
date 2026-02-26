@@ -87,23 +87,26 @@ export async function listPinnedConversations() {
 
 /**
  * @param {string} conversationId
- * @param {{ role: string, content: string|Array, stats?: Object, modelId?: string, imageRefs?: Array<{ image_id: string }>, imageUrls?: string[], videoUrls?: string[] }} message
+ * @param {{ role: string, content: string|Array, contextString?: string, autoInjectedFiles?: string[], stats?: Object, modelId?: string, imageRefs?: Array<{ image_id: string }>, imageUrls?: string[], videoUrls?: string[] }} message
  * @param {string} [existingId] - If provided (e.g. streaming placeholder id), use it so the saved message keeps the same id and the UI does not remount.
  */
 export async function addMessage(conversationId, message, existingId) {
   const id = typeof existingId === 'string' && existingId.trim() ? existingId.trim() : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const imageUrls = message.imageUrls;
   const videoUrls = message.videoUrls;
+  const autoInjectedFiles = message.autoInjectedFiles;
   await messagesTable.add({
     id,
     conversationId,
     role: message.role,
     content: message.content,
+    contextString: message.contextString ?? null,
     stats: message.stats ?? null,
     modelId: message.modelId ?? null,
     imageRefs: message.imageRefs ?? null,
     imageUrls: Array.isArray(imageUrls) ? [...imageUrls] : null,
     videoUrls: Array.isArray(videoUrls) ? [...videoUrls] : null,
+    autoInjectedFiles: Array.isArray(autoInjectedFiles) ? [...autoInjectedFiles] : null,
     createdAt: Date.now(),
   });
   return id;

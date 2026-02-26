@@ -1349,14 +1349,17 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    border: none;
+    border: 1px solid var(--glass-border);
     border-radius: 20px;
-    background-color: var(--ui-input-bg, #fff);
+    background-color: var(--glass-bg-hover);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-shadow);
     transition: all var(--duration-normal);
   }
 
   .chat-input-box:focus-within {
-    background-color: var(--ui-input-bg-focus, var(--ui-input-bg, #fff));
+    border-color: var(--glass-border-strong);
   }
 
   .at-mention-dropdown {

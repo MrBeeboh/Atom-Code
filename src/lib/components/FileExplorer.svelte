@@ -387,8 +387,7 @@
       onclick={() => (browseModalOpen = false)}
     >
       <div
-        class="rounded-xl shadow-2xl border p-4 w-full max-w-lg flex flex-col gap-3 min-h-[400px] max-h-[80vh] scale-in"
-        class="glass-modal"
+        class="rounded-xl shadow-2xl border p-4 w-full max-w-lg flex flex-col gap-3 min-h-[400px] max-h-[80vh] scale-in glass-modal"
         onclick={(e) => e.stopPropagation()}
       >
         <div class="flex items-center justify-between">
@@ -502,8 +501,7 @@
       onclick={closeCloneModal}
     >
       <div
-        class="rounded-xl shadow-xl border p-4 w-full max-w-md"
-        class="glass-modal"
+        class="rounded-xl shadow-xl border p-4 w-full max-w-md glass-modal"
         onclick={(e) => e.stopPropagation()}
       >
         <h3

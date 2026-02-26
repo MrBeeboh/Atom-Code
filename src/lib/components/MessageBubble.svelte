@@ -283,7 +283,9 @@
   in:fly={{ y: 20, duration: 380, easing: quintOut }}
 >
   <div
-    class="message-bubble-inner w-full rounded-[10px] px-3 py-2 shadow-sm relative overflow-hidden {isUser ? 'ui-user-bubble' : ' /90 text-zinc-900 dark:text-zinc-100 /80 dark:border-zinc-700/80'} {streaming ? ' streaming-bubble' : ''} glass-modal"
+    class="message-bubble-inner w-full rounded-[10px] px-3 py-2 shadow-sm relative overflow-hidden {isUser
+      ? 'ui-user-bubble'
+      : 'glass'} {streaming ? ' streaming-bubble' : ''}"
   >
     {#if isUser}
       {#if contentArray.length}

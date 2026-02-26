@@ -49,8 +49,7 @@
         role="presentation"
     >
         <div
-            class="w-full max-w-4xl h-[80vh] flex flex-col rounded-xl overflow-hidden shadow-2xl border outline-none"
-            class="glass-modal"
+            class="w-full max-w-4xl h-[80vh] flex flex-col rounded-xl overflow-hidden shadow-2xl border outline-none glass-modal"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
             role="dialog"
@@ -59,7 +58,6 @@
         >
             <div
                 class="flex items-center justify-between p-4 border-b shrink-0"
-                class="glass-modal"
             >
                 <div class="flex flex-col">
                     <h3

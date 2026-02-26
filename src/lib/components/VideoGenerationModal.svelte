@@ -19,8 +19,7 @@
         aria-labelledby="video-modal-title"
     >
         <div
-            class="w-full max-w-md rounded-xl shadow-xl p-5 flex flex-col gap-4"
-            class="glass-modal"
+            class="w-full max-w-md rounded-xl shadow-xl p-5 flex flex-col gap-4 glass-modal"
         >
             <h2
                 id="video-modal-title"

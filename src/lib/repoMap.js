@@ -5,6 +5,7 @@ import { writable } from 'svelte/store';
  */
 
 export const repoMapText = writable('');
+export const repoMapSignatures = writable({});
 
 export async function buildRepoMapText(root, fileServerBase = 'http://localhost:8768') {
   if (!root || typeof root !== 'string' || !root.trim()) {
@@ -29,6 +30,7 @@ export async function buildRepoMapText(root, fileServerBase = 'http://localhost:
   const topPart = `<repo_map>\nPROJECT: ${projectName}\nPATH: ${root}\nGENERATED: ${timestamp}\n\nDIRECTORY STRUCTURE:\n${treeData.tree || ''}\n\nCODE SIGNATURES:\n`;
 
   const signatures = treeData.signatures || {};
+  repoMapSignatures.set(signatures);
   let sigKeys = Object.keys(signatures);
   sigKeys.sort();
 
@@ -76,28 +78,99 @@ export async function buildRepoMapText(root, fileServerBase = 'http://localhost:
   return finalMap;
 }
 
-export function findRelevantFiles(messageText, fileList, maxFiles = 3) {
+const STOP_WORDS = new Set([
+  "what", "where", "which", "this", "that", "with", "from", "have", "does", "work",
+  "function", "defined", "inside", "about", "tell", "show", "explain", "find",
+  "return", "returns", "call", "calls", "used", "using"
+]);
+
+export function findRelevantFiles(messageText, fileList, signatures = {}, maxFiles = 3) {
   if (!messageText?.trim() || !fileList?.length) return [];
+
+  // Extract and clean words from message (keep dot for filename matching)
   const words = messageText
-    .replace(/['"`]/g, ' ')
+    .replace(/[()[\]{},;:'"`]/g, ' ')
+    .toLowerCase()
     .split(/\s+/)
-    .filter((w) => w.length > 1 && /[a-zA-Z0-9_]/.test(w));
+    .filter(w => w.length >= 4 && !STOP_WORDS.has(w) && /[a-z0-9_]/.test(w));
+
   if (words.length === 0) return [];
-  const scored = fileList.map((path) => {
+
+  const fileScores = new Map();
+
+  // Helper to add score
+  const addScore = (path, points, isFileMatch = false) => {
+    const current = fileScores.get(path) || { score: 0, fileMatches: 0, sigMatches: 0 };
+    current.score += points;
+    if (isFileMatch) current.fileMatches++;
+    else current.sigMatches++;
+    fileScores.set(path, current);
+  };
+
+  // Pass 1: Filename matching (Keep existing logic conceptually, update scoring)
+  for (const path of fileList) {
     const lower = path.toLowerCase();
     const segments = path.split(/[/\\]/);
     const filename = segments[segments.length - 1] || '';
-    let score = 0;
+    const basename = filename.split('.')[0] || filename;
+
     for (const w of words) {
-      const wl = w.toLowerCase();
-      if (filename.includes(wl) || filename === wl) score += 10;
-      if (lower.includes(wl)) score += 2;
+      if (filename === w) {
+        addScore(path, 50, true); // High score for exact filename
+      } else if (filename.includes(w) || basename === w || basename.includes(w)) {
+        addScore(path, 10, true);
+      } else if (lower.includes(w)) {
+        addScore(path, 2, true);
+      }
     }
-    return { path, score };
+  }
+
+  // Pass 2: Signature matching
+  for (const [relPath, sigs] of Object.entries(signatures)) {
+    // We need the absolute path from the fileList that matches this relPath
+    // Usually relPath is the tail end of the absolute path.
+    const absPath = fileList.find(p => p.endsWith(relPath.replace(/\\/g, '/')) || p.endsWith(relPath.replace(/\//g, '\\')));
+    if (!absPath) continue;
+
+    for (const sig of sigs) {
+      const cleanSig = sig.replace(/[()[\]{},.;:'"`]/g, ' ').toLowerCase();
+      for (const w of words) {
+        if (cleanSig.includes(w)) {
+          addScore(absPath, 5, false); // 5 points per signature match
+        }
+      }
+    }
+  }
+
+  // Convert map to array and compute final ranking
+  const scored = Array.from(fileScores.entries()).map(([path, data]) => ({
+    path,
+    score: data.score,
+    fileMatches: data.fileMatches,
+    sigMatches: data.sigMatches
+  }));
+
+  // Filter out zero scores
+  const validScored = scored.filter(s => s.score > 0);
+
+  // Sorting logic based on rules:
+  // 1. Files with multiple signature matches rank higher than files with single matches (handled by score weighting inherently, but we can explicitly rank)
+  // 2. Filename matches rank higher than signature-only matches
+  validScored.sort((a, b) => {
+    // If one has file matches and the other doesn't, file match wins
+    if (a.fileMatches > 0 && b.fileMatches === 0) return -1;
+    if (b.fileMatches > 0 && a.fileMatches === 0) return 1;
+
+    // If both are signature-only matches, the one with MORE signature matches wins
+    if (a.fileMatches === 0 && b.fileMatches === 0) {
+      if (a.sigMatches !== b.sigMatches) {
+        return b.sigMatches - a.sigMatches;
+      }
+    }
+
+    // Default to total score
+    return b.score - a.score;
   });
-  scored.sort((a, b) => b.score - a.score);
-  return scored
-    .filter((s) => s.score > 0)
-    .slice(0, maxFiles)
-    .map((s) => s.path);
+
+  return validScored.slice(0, maxFiles).map(s => s.path);
 }

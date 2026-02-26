@@ -1248,10 +1248,7 @@
   </div>
 
   <!-- Sticky footer: Optimize + Save -->
-  <div
-    class="shrink-0 p-3 pt-2 border-t space-y-2"
-    class="glass-modal"
-  >
+  <div class="shrink-0 p-3 pt-2 border-t space-y-2">
     <button
       type="button"
       class="w-full py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-all duration-200 border"

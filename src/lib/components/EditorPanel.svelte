@@ -398,8 +398,7 @@
       aria-label="Save file"
     >
       <div
-        class="rounded-lg border p-4 shadow-xl max-w-sm w-full mx-2"
-        class="glass-modal"
+        class="rounded-lg border p-4 shadow-xl max-w-sm w-full mx-2 glass-modal"
       >
         <p class="text-sm mb-2" style="color: var(--ui-text-primary);">
           Enter absolute path to save (file server):

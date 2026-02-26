@@ -199,10 +199,7 @@
     </div>
 
     {#if status}
-        <div
-            class="flex-1 overflow-y-auto mb-4 border rounded p-1"
-            class="glass-modal"
-        >
+        <div class="flex-1 overflow-y-auto mb-4 border rounded p-1">
             <div class="space-y-0.5">
                 {#each parsedStatus as item}
                     <button

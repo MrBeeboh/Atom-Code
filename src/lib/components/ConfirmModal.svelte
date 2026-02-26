@@ -1,6 +1,6 @@
 <script>
-  import { fade } from 'svelte/transition';
-  import { confirmStore } from '$lib/stores.js';
+  import { fade } from "svelte/transition";
+  import { confirmStore } from "$lib/stores.js";
 
   let pending = $state(null);
 
@@ -27,31 +27,37 @@
     aria-labelledby="confirm-title"
     transition:fade={{ duration: 150 }}
   >
+    <div class="absolute inset-0 bg-black/50" onclick={onCancel}></div>
     <div
-      class="absolute inset-0 bg-black/50"
-      onclick={onCancel}
-    ></div>
-    <div
-      class="relative rounded-xl border shadow-xl max-w-md w-full p-4"
-      class="glass-modal"
+      class="relative rounded-xl border shadow-xl max-w-md w-full p-4 glass-modal"
       onclick={(e) => e.stopPropagation()}
     >
-      <h2 id="confirm-title" class="text-base font-semibold mb-2" style="color: var(--ui-text-primary);">{pending.title}</h2>
-      <p class="text-sm mb-4" style="color: var(--ui-text-secondary);">{pending.message}</p>
+      <h2
+        id="confirm-title"
+        class="text-base font-semibold mb-2"
+        style="color: var(--ui-text-primary);"
+      >
+        {pending.title}
+      </h2>
+      <p class="text-sm mb-4" style="color: var(--ui-text-secondary);">
+        {pending.message}
+      </p>
       <div class="flex justify-end gap-2">
         <button
           type="button"
           class="px-4 py-2 rounded-lg text-sm font-medium min-h-[44px] transition-colors"
           style="color: var(--ui-text-secondary); border: 1px solid var(--ui-border);"
-          onclick={onCancel}
-        >{pending.cancelLabel}</button>
+          onclick={onCancel}>{pending.cancelLabel}</button
+        >
         <button
           type="button"
           class="px-4 py-2 rounded-lg text-sm font-medium min-h-[44px] transition-colors"
-          style:background={pending.danger ? 'var(--ui-accent-hot, #dc2626)' : 'var(--ui-accent)'}
+          style:background={pending.danger
+            ? "var(--ui-accent-hot, #dc2626)"
+            : "var(--ui-accent)"}
           style:color="white"
-          onclick={onConfirm}
-        >{pending.confirmLabel}</button>
+          onclick={onConfirm}>{pending.confirmLabel}</button
+        >
       </div>
     </div>
   </div>

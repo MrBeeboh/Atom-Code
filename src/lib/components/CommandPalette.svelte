@@ -446,8 +446,7 @@
     transition:fade={{ duration: 200 }}
   >
     <div
-      class="w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden"
-      class="glass-modal"
+      class="w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden glass-modal"
       role="presentation"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
