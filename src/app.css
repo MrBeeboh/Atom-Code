@@ -962,104 +962,112 @@ html {
   background-color: #0a0c0a;
 }
 
-/* THEME 6: trek — LCARS Starship Interface (TNG/DS9/VOY) */
-/* Dark mode (default) — the way it's meant to be seen */
+/* ═══════════════════════════════════════════════════════
+   THEME 6: trek — LCARS Starship Console (TNG/DS9/VOY)
+   NO purple. NO violet. NO lavender. EVER.
+   ═══════════════════════════════════════════════════════ */
+
 [data-ui-theme="trek"] {
   --ui-bg-main: #000000;
   --ui-bg-sidebar: #000000;
   --ui-accent: #FF9900;
-  /* LCARS Orange */
-  --ui-accent-hot: #CC6666;
-  /* LCARS Red alert */
+  --ui-accent-hot: #CC2200;
   --ui-text-primary: #FF9900;
-  /* Orange text on black */
-  --ui-text-secondary: #CC99FF;
-  /* LCARS Lavender */
-  --ui-border: #CC99FF;
-  /* Lavender borders */
-  --ui-sidebar-active: #0a0a18;
-  --ui-sidebar-hover: #111128;
+  --ui-text-secondary: #CC6600;
+  --ui-border: #FF9900;
+  --ui-sidebar-active: #0d0800;
+  --ui-sidebar-hover: #1a0f00;
   --ui-input-bg: #000000;
   --ui-input-border: #FF9900;
-  --ui-glow: rgba(255, 153, 0, 0.35);
-  --ui-code-bg: #000000;
+  --ui-glow: rgba(255, 153, 0, 0.3);
+  --ui-code-bg: #0a0a0a;
   --atom-accent: #FF9900;
-  --atom-accent-light: #FFAA00;
-  --atom-teal: #4499FF;
-  /* LCARS Blue */
+  --atom-accent-light: #FFCC00;
+  --atom-teal: #4488FF;
   --atom-amber: #FF9900;
-  --ui-radius: 2px;
-  /* Blocky LCARS panels */
+  --ui-radius: 0px;
 }
 
 [data-ui-theme="trek"] body {
   background-color: #000000;
 }
 
-/* ── LCARS Component Overrides ────────────────────────── */
-
-/* Sidebar: black with LCARS orange left border strip */
+/* Sidebar: black, 4px solid orange left border strip */
 [data-ui-theme="trek"] .sidebar,
 [data-ui-theme="trek"] [class*="sidebar"] {
   border-left: 4px solid #FF9900 !important;
-  border-right: 1px solid #CC99FF !important;
+  border-right: 1px solid #FF9900 !important;
+  background: #000000 !important;
 }
 
-/* Sidebar icons: LCARS orange */
+/* Sidebar icons: orange, active = gold */
 [data-ui-theme="trek"] .sidebar svg,
 [data-ui-theme="trek"] .sidebar button,
 [data-ui-theme="trek"] [class*="sidebar"] svg {
   color: #FF9900 !important;
 }
 
-/* Sidebar labels */
+[data-ui-theme="trek"] .sidebar button:hover svg,
+[data-ui-theme="trek"] .sidebar button.active svg {
+  color: #FFCC00 !important;
+}
+
+/* Sidebar labels: dim orange */
 [data-ui-theme="trek"] .sidebar span,
 [data-ui-theme="trek"] [class*="sidebar"] span {
-  color: #CC99FF !important;
+  color: #CC6600 !important;
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
-/* Top command bar: black with LCARS orange bottom border */
+/* Top command bar: black with orange bottom border */
 [data-ui-theme="trek"] header,
 [data-ui-theme="trek"] .header-bar,
 [data-ui-theme="trek"] [class*="header"] {
   background: #000000 !important;
   border-bottom: 3px solid #FF9900 !important;
+  color: #FF9900 !important;
 }
 
-/* "What can I help with?" title: LCARS orange */
+[data-ui-theme="trek"] header *,
+[data-ui-theme="trek"] .header-bar * {
+  color: #FF9900 !important;
+}
+
+/* "What can I help with?" title */
 [data-ui-theme="trek"] h1,
 [data-ui-theme="trek"] .greeting-title,
 [data-ui-theme="trek"] [class*="greeting"] {
   color: #FF9900 !important;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: 900;
+  letter-spacing: 0.05em;
 }
 
-/* Input box: black bg, LCARS orange border */
+/* Input box: black bg, 2px orange border, 0px radius */
 [data-ui-theme="trek"] .chat-input-bar,
 [data-ui-theme="trek"] textarea,
 [data-ui-theme="trek"] [class*="chat-input"] {
   background: #000000 !important;
-  border-color: #FF9900 !important;
+  border: 2px solid #FF9900 !important;
+  border-radius: 0px !important;
   color: #FF9900 !important;
   caret-color: #FF9900 !important;
 }
 
 [data-ui-theme="trek"] textarea::placeholder {
-  color: #CC99FF !important;
-  opacity: 0.6;
+  color: #CC6600 !important;
+  opacity: 1;
 }
 
-/* Send button: LCARS orange bg, black icon */
+/* Send button: LCARS pill — flat left, round right */
 [data-ui-theme="trek"] .send-button,
 [data-ui-theme="trek"] [aria-label*="Send"],
 [data-ui-theme="trek"] button[type="submit"] {
   background: #FF9900 !important;
   color: #000000 !important;
   border: none !important;
+  border-radius: 0 20px 20px 0 !important;
 }
 
 [data-ui-theme="trek"] .send-button svg,
@@ -1067,48 +1075,58 @@ html {
   color: #000000 !important;
 }
 
-/* Assistant message bubbles: dark navy with LCARS blue left border (okudagram display) */
+/* Assistant message bubbles: near-black with orange left border */
 [data-ui-theme="trek"] .message-bubble.assistant,
 [data-ui-theme="trek"] [class*="message-bubble"][class*="assistant"],
 [data-ui-theme="trek"] .bubble-assistant {
-  background: #050510 !important;
-  border-left: 3px solid #4499FF !important;
-  border-radius: 2px !important;
+  background: #050505 !important;
+  border-left: 3px solid #FF9900 !important;
+  border-radius: 0px !important;
+  color: #FF9900 !important;
 }
 
-/* User message bubbles: dark with orange accent */
+/* User message bubbles: LCARS orange bg, black text */
 [data-ui-theme="trek"] .message-bubble.user,
 [data-ui-theme="trek"] [class*="message-bubble"][class*="user"],
 [data-ui-theme="trek"] .bubble-user {
-  background: #0a0800 !important;
-  border-left: 3px solid #FF9900 !important;
-  border-radius: 2px !important;
+  background: #FF9900 !important;
+  color: #000000 !important;
+  border-radius: 0px !important;
+  border: none !important;
 }
 
-/* Code blocks: pure black with lavender border */
+/* Code blocks: dark bg, blue text, orange left border */
 [data-ui-theme="trek"] .code-block-wrapper pre,
 [data-ui-theme="trek"] pre[class*="language-"],
 [data-ui-theme="trek"] code {
-  background: #000000 !important;
-  border: 1px solid #CC99FF !important;
-  border-radius: 2px !important;
+  background: #0a0a0a !important;
+  color: #4488FF !important;
+  border: none !important;
+  border-left: 2px solid #FF9900 !important;
+  border-radius: 0px !important;
 }
 
-/* Glass overrides: LCARS panels have no blur, just solid blacks */
+/* LCARS = no blur, no frosted glass. Crisp solid panels. */
 [data-ui-theme="trek"] .glass,
 [data-ui-theme="trek"] .glass-modal {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   background: #000000 !important;
-  border: 1px solid #CC99FF !important;
+  border: 1px solid #FF9900 !important;
 }
 
-/* Buttons: LCARS styling */
+/* Disable ALL backdrop-filter on trek */
+[data-ui-theme="trek"] * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Buttons: sharp LCARS corners */
 [data-ui-theme="trek"] button {
-  border-radius: 2px !important;
+  border-radius: 0px !important;
 }
 
-/* Scrollbar: LCARS orange on black */
+/* Scrollbar: orange thumb on black track */
 [data-ui-theme="trek"] ::-webkit-scrollbar {
   width: 6px;
   background: #000000;
@@ -1119,26 +1137,50 @@ html {
   border-radius: 0;
 }
 
-/* Light mode: toned-down LCARS for readability */
+/* Links: gold */
+[data-ui-theme="trek"] a {
+  color: #FFCC00 !important;
+}
+
+[data-ui-theme="trek"] a:hover {
+  color: #FF9900 !important;
+}
+
+/* Dropdowns */
+[data-ui-theme="trek"] select {
+  background: #000000 !important;
+  color: #FF9900 !important;
+  border: 1px solid #FF9900 !important;
+  border-radius: 0 !important;
+}
+
+/* Terminal toolbar */
+[data-ui-theme="trek"] .terminal-toolbar {
+  background: #000000 !important;
+  border-bottom: 1px solid #FF9900 !important;
+  color: #FF9900 !important;
+}
+
+/* Light mode: Still LCARS dark — no beige, no purple */
 [data-ui-theme="trek"]:not(.dark) {
-  --ui-bg-main: #0a0a14;
-  --ui-bg-sidebar: #06060e;
+  --ui-bg-main: #050500;
+  --ui-bg-sidebar: #030300;
   --ui-accent: #FF9900;
-  --ui-accent-hot: #CC3333;
+  --ui-accent-hot: #CC2200;
   --ui-text-primary: #FFCC99;
-  --ui-text-secondary: #CC99FF;
-  --ui-border: #CC99FF;
-  --ui-sidebar-active: #12122a;
-  --ui-sidebar-hover: #1a1a3a;
-  --ui-input-bg: #050510;
+  --ui-text-secondary: #CC6600;
+  --ui-border: #FF9900;
+  --ui-sidebar-active: #0d0800;
+  --ui-sidebar-hover: #1a0f00;
+  --ui-input-bg: #050500;
   --ui-input-border: #FF9900;
-  --ui-glow: rgba(255, 153, 0, 0.25);
-  --ui-code-bg: #000000;
+  --ui-glow: rgba(255, 153, 0, 0.2);
+  --ui-code-bg: #0a0a0a;
   --atom-accent: #FF9900;
-  --atom-accent-light: #FFAA00;
-  --atom-teal: #4499FF;
+  --atom-accent-light: #FFCC00;
+  --atom-teal: #4488FF;
   --atom-amber: #FF9900;
-  --ui-radius: 2px;
+  --ui-radius: 0px;
 }
 
 
