@@ -867,6 +867,154 @@ html {
   background: #000000 !important;
 }
 
+/* THEME 4: ollama – Light mode (default) */
+[data-ui-theme="ollama"] {
+  --ui-bg-main: #fcfcfc;
+  --ui-bg-sidebar: #f7f7f7;
+  --ui-accent: #101010;
+  --ui-accent-hot: #ef4444;
+  --ui-text-primary: #171717;
+  --ui-text-secondary: #6B7280;
+  --ui-border: #e5e7eb;
+  --ui-sidebar-active: #ececec;
+  --ui-sidebar-hover: #f3f4f6;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #d1d5db;
+  --ui-glow: rgba(0, 0, 0, 0.05);
+  --ui-code-bg: #111827;
+  --atom-accent: #111827;
+  --atom-accent-light: #374151;
+  --atom-teal: #10b981;
+  --atom-amber: #f59e0b;
+}
+
+/* THEME 4: ollama – Dark mode */
+.dark[data-ui-theme="ollama"],
+[data-ui-theme="ollama"].dark {
+  --ui-bg-main: #1a1a1a;
+  --ui-bg-sidebar: #141414;
+  --ui-accent: #e0e0e0;
+  --ui-accent-hot: #ef4444;
+  --ui-text-primary: #e8e8e8;
+  --ui-text-secondary: #9ca3af;
+  --ui-border: #2a2a2a;
+  --ui-sidebar-active: #252525;
+  --ui-sidebar-hover: #2a2a2a;
+  --ui-input-bg: #1e1e1e;
+  --ui-input-border: #3a3a3a;
+  --ui-glow: rgba(255, 255, 255, 0.05);
+  --ui-code-bg: #111111;
+  --atom-accent: #e0e0e0;
+  --atom-accent-light: #b0b0b0;
+  --atom-teal: #10b981;
+  --atom-amber: #f59e0b;
+}
+
+[data-ui-theme="ollama"].dark body {
+  background-color: #1a1a1a;
+}
+
+/* THEME 5: perplexity – Light mode (Emerald Green) */
+[data-ui-theme="perplexity"] {
+  --ui-accent: #0ca678;
+  /* Darker emerald for light bg */
+  --ui-accent-hot: #e03131;
+  --ui-bg-main: #f5faf7;
+  --ui-bg-sidebar: #eaf5ee;
+  --ui-text-primary: #1a2e1a;
+  --ui-text-secondary: #4a6a4a;
+  --ui-border: #c8dcc8;
+  --ui-sidebar-active: #d4ecd4;
+  --ui-sidebar-hover: #e0f0e0;
+  --ui-input-bg: #ffffff;
+  --ui-input-border: #b8d4b8;
+  --ui-glow: rgba(12, 166, 120, 0.15);
+  --ui-code-bg: #eef6f0;
+  --atom-accent: #0ca678;
+  --atom-accent-light: #20c997;
+  --atom-teal: #0ca678;
+  --atom-amber: #e8a800;
+}
+
+/* THEME 5: perplexity – Dark mode (Emerald Green) */
+.dark[data-ui-theme="perplexity"],
+[data-ui-theme="perplexity"].dark {
+  --ui-bg-main: #0a0c0a;
+  --ui-bg-sidebar: #050705;
+  --ui-accent: #20c997;
+  --ui-accent-hot: #ff6b6b;
+  --ui-text-primary: #e8f0e8;
+  --ui-text-secondary: #8a9a8a;
+  --ui-border: #162016;
+  --ui-sidebar-active: #0f160f;
+  --ui-sidebar-hover: #162016;
+  --ui-input-bg: #0b0f0b;
+  --ui-input-border: #1e2e1e;
+  --ui-glow: rgba(32, 201, 151, 0.2);
+  --ui-code-bg: #0a0c0a;
+  --atom-accent: #20c997;
+  --atom-accent-light: #38d9a9;
+  --atom-teal: #20c997;
+  --atom-amber: #ffd43b;
+}
+
+[data-ui-theme="perplexity"].dark body {
+  background-color: #0a0c0a;
+}
+
+/* THEME 6: trek – Dark mode (default, LCARS) */
+[data-ui-theme="trek"] {
+  --ui-bg-main: #000000;
+  --ui-bg-sidebar: #000000;
+  --ui-accent: #ff9900;
+  --ui-accent-hot: #cc6666;
+  --ui-text-primary: #ffcc99;
+  --ui-text-secondary: #cc99cc;
+  --ui-border: #9966cc;
+  --ui-sidebar-active: #222244;
+  --ui-sidebar-hover: #333366;
+  --ui-input-bg: #050505;
+  --ui-input-border: #9966cc;
+  --ui-glow: rgba(255, 153, 0, 0.4);
+  --ui-code-bg: #000000;
+  --atom-accent: #ffcc00;
+  --atom-accent-light: #ffaa00;
+  --atom-teal: #9999ff;
+  --atom-amber: #ff9900;
+  --ui-radius: 2px;
+}
+
+[data-ui-theme="trek"] body {
+  background-color: #000000;
+}
+
+[data-ui-theme="trek"] .code-block-wrapper pre {
+  background: #000000 !important;
+  border: 1px solid #996699;
+}
+
+/* THEME 6: trek – Light mode (LCARS Beige) */
+[data-ui-theme="trek"]:not(.dark) {
+  --ui-bg-main: #f5f0e8;
+  --ui-bg-sidebar: #ebe4d8;
+  --ui-accent: #cc7700;
+  --ui-accent-hot: #cc3333;
+  --ui-text-primary: #2a1a00;
+  --ui-text-secondary: #7a5a30;
+  --ui-border: #d4c4a8;
+  --ui-sidebar-active: #e0d6c4;
+  --ui-sidebar-hover: #e8dece;
+  --ui-input-bg: #faf6ee;
+  --ui-input-border: #c8b898;
+  --ui-glow: rgba(204, 119, 0, 0.15);
+  --ui-code-bg: #2a1a00;
+  --atom-accent: #cc7700;
+  --atom-accent-light: #ee9900;
+  --atom-teal: #6666cc;
+  --atom-amber: #cc7700;
+  --ui-radius: 2px;
+}
+
 /* Theme-aware utilities (glow, etc.) */
 .ui-input-glow:focus-within {
   border-color: var(--ui-accent-cool, var(--ui-accent));
@@ -1120,7 +1268,8 @@ body {
 
 .dark,
 [data-ui-theme="dark"],
-[data-ui-theme="coder"] {
+[data-ui-theme="coder"],
+[data-ui-theme="trek"] {
   --glass-bg: rgba(255, 255, 255, 0.04);
   --glass-bg-hover: rgba(255, 255, 255, 0.07);
   --glass-bg-active: rgba(255, 255, 255, 0.10);

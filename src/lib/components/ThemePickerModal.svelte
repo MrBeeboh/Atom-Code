@@ -1,33 +1,36 @@
 <script>
-  import { uiTheme, theme } from "$lib/stores.js";
+  import { uiTheme, theme, themePickerOpen } from "$lib/stores.js";
   import { UI_THEME_OPTIONS } from "$lib/themeOptions.js";
   import { fade, scale } from "svelte/transition";
 
-  let { open = $bindable(false) } = $props();
+  const PREVIEW = {
+    light: { bg: "#ffffff", accent: "#2563eb", text: "#1a1a1a" },
+    dark: { bg: "#111111", accent: "#3b82f6", text: "#e5e5e5" },
+    coder: { bg: "#000000", accent: "#39d353", text: "#c9d1d9" },
+    ollama: { bg: "#fcfcfc", accent: "#101010", text: "#171717" },
+    perplexity: { bg: "#0a0c0a", accent: "#20c997", text: "#e8f0e8" },
+    trek: { bg: "#000000", accent: "#ff9900", text: "#ffffcc" },
+  };
 
   function selectTheme(value) {
     uiTheme.set(value);
+    // Only the built-in light/dark options force the mode.
+    // All custom themes (ollama, perplexity, trek, coder) respect the Auto/Light/Dark toggle.
     if (value === "light") theme.set("light");
-    else if (value === "dark" || value === "coder") theme.set("dark");
-    open = false;
+    else if (value === "dark") theme.set("dark");
+    themePickerOpen.set(false);
   }
-
-  const PREVIEW = {
-    light: { bg: "#ffffff", accent: "#2563eb", text: "#1a1a1a" },
-    dark: { bg: "#1a1a1a", accent: "#3b82f6", text: "#e5e5e5" },
-    coder: { bg: "#0d1117", accent: "#39d353", text: "#c9d1d9" },
-  };
 </script>
 
-{#if open}
+{#if $themePickerOpen}
   <div
     class="fixed inset-0 z-[110] flex items-center justify-center p-4"
     role="dialog"
     aria-label="Choose theme"
     tabindex="-1"
     transition:fade={{ duration: 150 }}
-    onkeydown={(e) => e.key === "Escape" && (open = false)}
-    onclick={() => (open = false)}
+    onkeydown={(e) => e.key === "Escape" && themePickerOpen.set(false)}
+    onclick={() => themePickerOpen.set(false)}
   >
     <div
       class="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -54,7 +57,7 @@
           type="button"
           class="p-1 rounded text-xs"
           style="color: var(--ui-text-secondary);"
-          onclick={() => (open = false)}
+          onclick={() => themePickerOpen.set(false)}
           aria-label="Close">✕</button
         >
       </div>

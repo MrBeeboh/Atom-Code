@@ -13,6 +13,7 @@
     conversations,
     selectedModelId,
     uiTheme,
+    themePickerOpen,
     cockpitIntelOpen,
     models,
     lmStudioConnected,
@@ -56,6 +57,7 @@
   import ConfirmModal from "$lib/components/ConfirmModal.svelte";
   import ShortcutsModal from "$lib/components/ShortcutsModal.svelte";
   import DiffViewer from "$lib/components/DiffViewer.svelte";
+  import ThemePickerModal from "$lib/components/ThemePickerModal.svelte";
 
   import AtomLogo from "$lib/components/AtomLogo.svelte";
   import CommandCenter from "$lib/components/CommandCenter.svelte";
@@ -190,7 +192,12 @@
   function getResolvedUiTheme() {
     const u = get(uiTheme);
     const t = get(theme);
-    if (u === "coder") return "coder";
+
+    // Custom themes (ollama, perplexity, trek) are returned as-is.
+    // Standard themes (light, dark, coder) may need system resolution.
+    const isStandard = ["light", "dark", "coder"].includes(u);
+    if (!isStandard) return u;
+
     if (t === "system" && typeof window !== "undefined") {
       return window.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
@@ -199,10 +206,40 @@
     return t === "dark" ? "dark" : "light";
   }
   function applyResolvedTheme() {
-    const resolved = getResolvedUiTheme();
+    const u = get(uiTheme); // e.g. "light", "dark", "coder", "ollama", "perplexity", "trek"
+    const t = get(theme); // "light", "dark", or "system"
+
+    // Determine which UI theme palette to apply
+    const isStandard = ["light", "dark", "coder"].includes(u);
+    let uiThemeName = u;
+    if (isStandard) {
+      if (u === "coder") {
+        uiThemeName = "coder";
+      } else if (t === "system" && typeof window !== "undefined") {
+        uiThemeName = window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+      } else {
+        uiThemeName = t === "dark" ? "dark" : "light";
+      }
+    }
+
+    // Determine dark/light mode separately (for .dark class and glassmorphism)
+    let isDark;
+    if (t === "system" && typeof window !== "undefined") {
+      isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    } else if (t === "dark") {
+      isDark = true;
+    } else if (t === "light") {
+      isDark = false;
+    } else {
+      // Fallback: standard themes use their own value
+      isDark = uiThemeName !== "light";
+    }
+
     if (typeof document !== "undefined") {
-      document.documentElement.dataset.uiTheme = resolved;
-      document.documentElement.classList.toggle("dark", resolved !== "light");
+      document.documentElement.dataset.uiTheme = uiThemeName;
+      document.documentElement.classList.toggle("dark", isDark);
     }
   }
   onMount(() => {
@@ -345,6 +382,7 @@
   <CommandPalette />
   <ConfirmModal />
   <ShortcutsModal />
+  <ThemePickerModal />
   {#if $diffViewerState}
     <DiffViewer
       originalCode={$diffViewerState.originalCode}

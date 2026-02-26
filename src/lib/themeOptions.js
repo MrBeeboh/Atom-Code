@@ -6,4 +6,7 @@ export const UI_THEME_OPTIONS = [
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
   { value: 'coder', label: 'Coder' },
+  { value: 'ollama', label: 'Open Web UI' },
+  { value: 'perplexity', label: 'Perplexity' },
+  { value: 'trek', label: 'Star Trek' },
 ];

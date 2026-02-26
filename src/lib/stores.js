@@ -94,6 +94,7 @@ function getInitialUiTheme() {
   return 'light';
 }
 export const uiTheme = writable(getInitialUiTheme());
+export const themePickerOpen = writable(false);
 
 /** LM Studio server base URL (e.g. http://localhost:1234 or http://10.0.0.51:1234). Empty = use default. */
 const getStoredLmStudioUrl = () => (typeof localStorage !== 'undefined' ? localStorage.getItem('lmStudioBaseUrl') : null) || '';
@@ -421,7 +422,7 @@ export const terminalCommand = writable(null);
 
 /** Phase 11: Code editor panel. */
 export const editorOpen = writable(
-  typeof localStorage !== 'undefined' ? localStorage.getItem('editorOpen') === 'true' : false
+  typeof localStorage !== 'undefined' ? localStorage.getItem('editorOpen') !== 'false' : true
 );
 if (typeof localStorage !== 'undefined') {
   editorOpen.subscribe((v) => localStorage.setItem('editorOpen', v ? 'true' : 'false'));
