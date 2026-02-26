@@ -32,7 +32,6 @@
     repoMapLoading,
     repoMapError,
   } from "$lib/stores.js";
-  import { getRepoMap } from "$lib/repoMap.js";
   import { startTemporalController } from "$lib/temporalController.js";
   import {
     createConversation,
@@ -145,7 +144,7 @@
 
   let lmStatusMessage = $state("");
 
-  // Phase 9A: Index workspace when root or file server changes
+  // Phase 9A/Phase 2: Index workspace when root or file server changes
   $effect(() => {
     const root = $workspaceRoot?.trim();
     const base = $fileServerUrl;
@@ -158,28 +157,21 @@
     let cancelled = false;
     repoMapLoading.set(true);
     repoMapError.set(null);
-    getRepoMap(root, base)
-      .then((result) => {
-        if (cancelled) return;
-        if (result) {
-          repoMapText.set(result.text);
-          repoMapFileList.set(result.fileList);
-        } else {
+    import("$lib/repoMap.js").then(({ buildRepoMapText }) => {
+      buildRepoMapText(root, base)
+        .then((text) => {
+          if (cancelled) return;
+          repoMapText.set(text || "");
+          repoMapError.set(null);
+          repoMapLoading.set(false);
+        })
+        .catch((e) => {
+          if (cancelled) return;
           repoMapText.set("");
-          repoMapFileList.set([]);
-        }
-        repoMapError.set(null);
-      })
-      .catch((e) => {
-        if (!cancelled) {
           repoMapError.set(e?.message || "Failed to index project");
-          repoMapText.set("");
-          repoMapFileList.set([]);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) repoMapLoading.set(false);
-      });
+          repoMapLoading.set(false);
+        });
+    });
     return () => {
       cancelled = true;
     };
