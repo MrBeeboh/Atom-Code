@@ -1,6 +1,10 @@
 # ATOM Code
 
+> ⚠️ **LINUX PROTOTYPE ONLY** — Developed and tested on Linux Mint. Windows and macOS are currently unsupported. Expect breakage on non-Linux systems.
+
 A local-first AI coding assistant built with Svelte 5 and LM Studio. No cloud required, no subscriptions, no data leaving your machine.
+
+![ATOM Code Interface](docs/media/screenshot-hero.png)
 
 ## What It Does
 
@@ -14,13 +18,16 @@ A local-first AI coding assistant built with Svelte 5 and LM Studio. No cloud re
 - Web search integration via Brave Search
 - Multiple themes including LCARS Star Trek, Ollama Forge, Perplexity, and default light/dark
 
+![LCARS Star Trek Theme](docs/media/screenshot-lcars.png)
+
 ## Requirements
 
-- Linux (developed and tested on Linux Mint)
+- **Linux** (developed and tested on Linux Mint)
 - Node.js 18+
 - Python 3.10+ (for voice server)
 - LM Studio with at least one model loaded
 - NVIDIA GPU recommended (RTX 4070 or equivalent for best performance)
+- `build-essential` package (for node-pty compilation)
 
 ## Quick Start
 
@@ -62,6 +69,8 @@ Or press `Ctrl+C` in the terminal running `start-atom-code.sh`.
 | Search Proxy | 5174 | Brave web search integration |
 | Voice Server | 8765 | Whisper speech-to-text |
 
+> 🔒 **Security:** All services bind to `127.0.0.1` (localhost) only. Never expose these ports publicly — the terminal server provides full shell access with no authentication. If you use a reverse proxy, only expose port 5173 and ensure the backend ports remain firewalled.
+
 ## How Codebase Indexing Works
 
 When you open a workspace, ATOM Code automatically:
@@ -73,6 +82,10 @@ When you open a workspace, ATOM Code automatically:
 ## Watchdog
 
 A background watchdog process monitors all six services every 30 seconds and automatically restarts any that stop responding. Restart events are logged to `watchdog.log`.
+
+## Demo
+
+A recorded demo of ATOM Code in action is available at [`docs/media/demo.webp`](docs/media/demo.webp) — shows theme switching, chat interaction, file explorer, and integrated terminal.
 
 ## Project Structure
 
@@ -87,10 +100,10 @@ atom-code/
 │   └── terminal-server/    # Terminal backend (WebSocket + HTTP)
 ├── voice-server/           # Whisper voice input server
 ├── scripts/                # Start, stop, watchdog, and search proxy
-├── docs/                   # Documentation
+├── docs/                   # Documentation and media
 └── public/                 # Static assets
 ```
 
 ## License
 
-MIT
+[MIT](LICENSE)
