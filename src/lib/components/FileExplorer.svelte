@@ -22,7 +22,7 @@
   let tree = $state([]);
   let loading = $state(false);
   let error = $state("");
-  let expandedDirs = $state(new Set());
+  let expandedDirs = $state({});
   let contextMenu = $state(null);
   let workspaceInput = $state("");
   let cloneModalOpen = $state(false);
@@ -115,9 +115,11 @@
   });
 
   function toggleDir(path) {
-    expandedDirs = new Set(expandedDirs);
-    if (expandedDirs.has(path)) expandedDirs.delete(path);
-    else expandedDirs.add(path);
+    if (expandedDirs[path]) {
+      delete expandedDirs[path];
+    } else {
+      expandedDirs[path] = true;
+    }
   }
 
   function setWorkspace() {
@@ -202,6 +204,12 @@
   async function openFileInEditor(filePath) {
     const absPath = (filePath || "").trim().replace(/\/+$/, "") || "";
     if (!absPath) return;
+    // Toggle: if already open, deselect it
+    if (get(editorFilePath) === absPath) {
+      editorFilePath.set("");
+      editorContent.set("");
+      return;
+    }
     let base = (get(fileServerUrl) || "http://localhost:8768").replace(
       /\/$/,
       "",

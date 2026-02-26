@@ -254,7 +254,6 @@
                   ],
                 },
               },
-              { description: "All files", accept: { "*/*": ["*"] } },
             ],
           });
           saveFileHandle = handle;

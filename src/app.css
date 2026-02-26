@@ -815,8 +815,8 @@ html {
 
 /* THEME 2: dark */
 [data-ui-theme="dark"] {
-  --ui-bg-main: #1a1a1a;
-  --ui-bg-sidebar: #242424;
+  --ui-bg-main: #111111;
+  --ui-bg-sidebar: #111111;
   --ui-accent: #3b82f6;
   --ui-accent-hot: #f87171;
   --ui-text-primary: #e5e5e5;
@@ -824,10 +824,10 @@ html {
   --ui-border: #333333;
   --ui-sidebar-active: #2d2d2d;
   --ui-sidebar-hover: #333333;
-  --ui-input-bg: #242424;
+  --ui-input-bg: #111111;
   --ui-input-border: #404040;
   --ui-glow: rgba(59, 130, 246, 0.25);
-  --ui-code-bg: #1e1e2e;
+  --ui-code-bg: #111111;
   --atom-accent: #3b82f6;
   --atom-accent-light: #60a5fa;
   --atom-teal: #22d3ee;
@@ -835,24 +835,24 @@ html {
 }
 
 [data-ui-theme="dark"] body {
-  background-color: #1a1a1a;
+  background-color: #111111;
 }
 
 /* THEME 3: coder (GitHub dark / terminal) */
 [data-ui-theme="coder"] {
-  --ui-bg-main: #0d1117;
-  --ui-bg-sidebar: #161b22;
+  --ui-bg-main: #000000;
+  --ui-bg-sidebar: #000000;
   --ui-accent: #39d353;
   --ui-accent-hot: #f85149;
   --ui-text-primary: #c9d1d9;
   --ui-text-secondary: #8b949e;
   --ui-border: #30363d;
-  --ui-sidebar-active: #21262d;
+  --ui-sidebar-active: #161b22;
   --ui-sidebar-hover: #30363d;
-  --ui-input-bg: #0d1117;
+  --ui-input-bg: #000000;
   --ui-input-border: #30363d;
   --ui-glow: rgba(57, 211, 83, 0.2);
-  --ui-code-bg: #0d1117;
+  --ui-code-bg: #000000;
   --atom-accent: #39d353;
   --atom-accent-light: #56d364;
   --atom-teal: #39d353;
@@ -860,11 +860,11 @@ html {
 }
 
 [data-ui-theme="coder"] body {
-  background-color: #0d1117;
+  background-color: #000000;
 }
 
 [data-ui-theme="coder"] .code-block-wrapper pre {
-  background: #0d1117 !important;
+  background: #000000 !important;
 }
 
 /* Theme-aware utilities (glow, etc.) */

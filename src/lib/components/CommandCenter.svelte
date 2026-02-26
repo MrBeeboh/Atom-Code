@@ -88,11 +88,11 @@
             role="group"
             aria-label="Model and preset"
         >
-            <div class="min-w-0 max-w-[20rem]">
-                <ModelSelector />
-            </div>
             <div class="shrink-0">
                 <PresetSelect compact={true} />
+            </div>
+            <div class="min-w-0 max-w-[20rem]">
+                <ModelSelector />
             </div>
         </div>
     </div>

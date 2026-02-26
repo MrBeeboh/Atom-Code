@@ -564,7 +564,7 @@
   }
 
   /** Perplexity-style: stable height when empty, grow only with content up to max. */
-  const INPUT_HEIGHT_EMPTY = 72;
+  const INPUT_HEIGHT_EMPTY = 80;
   const INPUT_HEIGHT_MAX = 200;
 
   function autoResize() {
@@ -998,242 +998,193 @@
           {/each}
         </div>
       {/if}
-    </div>
-    <div
-      class="chat-input-footer flex items-center justify-between px-3 pb-3 pt-1"
-    >
-      <div class="chat-input-footer-icons flex items-center space-x-1">
-        <div class="attach-button-wrap relative flex items-center">
-          {#if clippyBubble}
-            <div class="clippy-bubble" role="status" aria-live="polite">
-              <span class="clippy-bubble-text">{clippyBubble}</span>
-              <span class="clippy-bubble-tail" aria-hidden="true"></span>
-            </div>
-          {/if}
-          <button
-            type="button"
-            class="attach-button"
-            class:clippy-active={clippyBubble}
-            title="Attach image or PDF (or drag & drop, paste)"
-            disabled={$isStreaming || attachProcessing}
-            onclick={() => fileInputEl?.click()}
-            onmouseenter={onAttachHover}
-            onmouseleave={onAttachLeave}
-            aria-label="Attach files"
-          >
-            {#if attachProcessing}
-              <span class="mic-spinner" aria-hidden="true">⟳</span>
-            {:else}
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                class="attach-icon"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><path
-                  d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"
-                ></path></svg
-              >
+      <div
+        class="chat-input-footer flex items-center justify-between px-3 pb-3 pt-1"
+      >
+        <div class="chat-input-footer-icons flex items-center space-x-1">
+          <div class="attach-button-wrap relative flex items-center">
+            {#if clippyBubble}
+              <div class="clippy-bubble" role="status" aria-live="polite">
+                <span class="clippy-bubble-text">{clippyBubble}</span>
+                <span class="clippy-bubble-tail" aria-hidden="true"></span>
+              </div>
             {/if}
-          </button>
-        </div>
-        <div class="media-toolbar inline-flex items-center space-x-1">
-          <button
-            type="button"
-            class="media-icon-btn {imageGenerating
-              ? 'media-icon-btn-active'
-              : ''}"
-            disabled={$isStreaming || imageGenerating || !text.trim()}
-            onclick={handleImageClick}
-            title={imageGenerating
-              ? "Generating image…"
-              : onGenerateImageGrok
-                ? "Generate image (Grok)"
-                : "Generate image (DeepInfra)"}
-            aria-label={imageGenerating ? "Generating image" : "Generate image"}
-          >
-            {#if imageGenerating}
-              <ThinkingAtom size={16} />
-            {:else}
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-              >
-                <rect
-                  x="2.5"
-                  y="2.5"
-                  width="19"
-                  height="19"
-                  rx="3"
+            <button
+              type="button"
+              class="attach-button"
+              class:clippy-active={clippyBubble}
+              title="Attach image or PDF (or drag & drop, paste)"
+              disabled={$isStreaming || attachProcessing}
+              onclick={() => fileInputEl?.click()}
+              onmouseenter={onAttachHover}
+              onmouseleave={onAttachLeave}
+              aria-label="Attach files"
+            >
+              {#if attachProcessing}
+                <span class="mic-spinner" aria-hidden="true">⟳</span>
+              {:else}
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  class="attach-icon"
                   stroke="currentColor"
-                  stroke-width="1.5"
-                />
-                <circle cx="8" cy="8" r="2" fill="currentColor" opacity="0.5" />
-                <path
-                  d="M2.5 16l5-5.5 3.5 3.5 3-3L21.5 16v3.5a3 3 0 0 1-3 3h-13a3 3 0 0 1-3-3V16z"
-                  fill="currentColor"
-                  opacity="0.2"
-                />
-                <path
-                  d="M2.5 16l5-5.5 3.5 3.5 3-3L21.5 16"
-                  stroke="currentColor"
-                  stroke-width="1.5"
+                  stroke-width="2"
                   stroke-linecap="round"
                   stroke-linejoin="round"
-                />
-              </svg>
-            {/if}
-            <span class="media-icon-label">IMAGE</span>
-          </button>
+                  ><path
+                    d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"
+                  ></path></svg
+                >
+              {/if}
+            </button>
+          </div>
+          <div class="media-toolbar inline-flex items-center space-x-1">
+            <button
+              type="button"
+              class="media-icon-btn {imageGenerating
+                ? 'media-icon-btn-active'
+                : ''}"
+              disabled={$isStreaming || imageGenerating || !text.trim()}
+              onclick={handleImageClick}
+              title={imageGenerating
+                ? "Generating image…"
+                : onGenerateImageGrok
+                  ? "Generate image (Grok)"
+                  : "Generate image (DeepInfra)"}
+              aria-label={imageGenerating
+                ? "Generating image"
+                : "Generate image"}
+            >
+              {#if imageGenerating}
+                <ThinkingAtom size={16} />
+              {:else}
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <rect
+                    x="2.5"
+                    y="2.5"
+                    width="19"
+                    height="19"
+                    rx="3"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                  />
+                  <circle
+                    cx="8"
+                    cy="8"
+                    r="2"
+                    fill="currentColor"
+                    opacity="0.5"
+                  />
+                  <path
+                    d="M2.5 16l5-5.5 3.5 3.5 3-3L21.5 16v3.5a3 3 0 0 1-3 3h-13a3 3 0 0 1-3-3V16z"
+                    fill="currentColor"
+                    opacity="0.2"
+                  />
+                  <path
+                    d="M2.5 16l5-5.5 3.5 3.5 3-3L21.5 16"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              {/if}
+            </button>
+            <button
+              type="button"
+              class="media-icon-btn {videoGenerating
+                ? 'media-icon-btn-active'
+                : ''}"
+              disabled={$isStreaming || videoGenerating || !text.trim()}
+              onclick={handleVideoClick}
+              title={videoGenerating
+                ? `Generating video… ${videoGenElapsed}`
+                : "Generate video (DeepInfra)"}
+              aria-label={videoGenerating
+                ? "Generating video"
+                : "Generate video"}
+            >
+              {#if videoGenerating}
+                <span class="media-icon-generating"
+                  ><ThinkingAtom size={16} /></span
+                >
+              {:else}
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <rect
+                    x="2.5"
+                    y="3.5"
+                    width="19"
+                    height="17"
+                    rx="3"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                  />
+                  <path
+                    d="M10 8.5v7l5.5-3.5L10 8.5z"
+                    fill="currentColor"
+                    opacity="0.35"
+                  />
+                  <path
+                    d="M10 8.5v7l5.5-3.5L10 8.5z"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              {/if}
+            </button>
+          </div>
           <button
             type="button"
-            class="media-icon-btn {videoGenerating
-              ? 'media-icon-btn-active'
-              : ''}"
-            disabled={$isStreaming || videoGenerating || !text.trim()}
-            onclick={handleVideoClick}
-            title={videoGenerating
-              ? `Generating video… ${videoGenElapsed}`
-              : "Generate video (DeepInfra)"}
-            aria-label={videoGenerating ? "Generating video" : "Generate video"}
-          >
-            {#if videoGenerating}
-              <span class="media-icon-generating"
-                ><ThinkingAtom size={16} /></span
-              >
-            {:else}
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-              >
-                <rect
-                  x="2.5"
-                  y="3.5"
-                  width="19"
-                  height="17"
-                  rx="3"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                />
-                <path
-                  d="M10 8.5v7l5.5-3.5L10 8.5z"
-                  fill="currentColor"
-                  opacity="0.35"
-                />
-                <path
-                  d="M10 8.5v7l5.5-3.5L10 8.5z"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-            {/if}
-            <span class="media-icon-label">VIDEO</span>
-          </button>
-        </div>
-        <button
-          type="button"
-          class="web-search-button"
-          class:active={$webSearchForNextMessage}
-          title={webSearchWarmingUp
-            ? "Connecting…"
-            : $webSearchForNextMessage
-              ? $webSearchConnected
-                ? "Web search on – connected (click to turn off)"
-                : "Web search on – not connected yet (click globe again to retry)"
-              : "Search the web for next message"}
-          disabled={$isStreaming}
-          onclick={() => {
-            const on = $webSearchForNextMessage;
-            const connected = $webSearchConnected;
-            if (on && !connected && !webSearchWarmingUp) {
-              webSearchWarmUpAttempted = false;
+            class="web-search-button"
+            class:active={$webSearchForNextMessage}
+            title={webSearchWarmingUp
+              ? "Connecting…"
+              : $webSearchForNextMessage
+                ? $webSearchConnected
+                  ? "Web search on – connected (click to turn off)"
+                  : "Web search on – not connected yet (click globe again to retry)"
+                : "Search the web for next message"}
+            disabled={$isStreaming}
+            onclick={() => {
+              const on = $webSearchForNextMessage;
+              const connected = $webSearchConnected;
+              if (on && !connected && !webSearchWarmingUp) {
+                webSearchWarmUpAttempted = false;
+                runWarmUp();
+                return;
+              }
+              if (on) {
+                webSearchForNextMessage.set(false);
+                webSearchConnected.set(false);
+                return;
+              }
+              webSearchForNextMessage.set(true);
               runWarmUp();
-              return;
-            }
-            if (on) {
-              webSearchForNextMessage.set(false);
-              webSearchConnected.set(false);
-              return;
-            }
-            webSearchForNextMessage.set(true);
-            runWarmUp();
-          }}
-          aria-label={webSearchWarmingUp
-            ? "Connecting"
-            : $webSearchForNextMessage
-              ? "Web search on"
-              : "Search web for next message"}
-          aria-pressed={$webSearchForNextMessage}
-          aria-busy={webSearchWarmingUp}
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="web-search-icon"
-            class:web-search-icon-spin={webSearchWarmingUp}
-            aria-hidden="true"
-            title="Internet"
-            ><circle cx="12" cy="12" r="10"></circle><line
-              x1="2"
-              y1="12"
-              x2="22"
-              y2="12"
-            ></line><path
-              d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
-            ></path></svg
+            }}
+            aria-label={webSearchWarmingUp
+              ? "Connecting"
+              : $webSearchForNextMessage
+                ? "Web search on"
+                : "Search web for next message"}
+            aria-pressed={$webSearchForNextMessage}
+            aria-busy={webSearchWarmingUp}
           >
-          {#if $webSearchForNextMessage}
-            {#if $webSearchConnected}
-              <span
-                class="web-search-dot web-search-dot-green"
-                aria-hidden="true"
-                title="Connected"
-              ></span>
-            {:else}
-              <span
-                class="web-search-dot web-search-dot-red"
-                class:web-search-dot-pulse={webSearchWarmingUp}
-                aria-hidden="true"
-                title="Not connected"
-              ></span>
-            {/if}
-          {/if}
-        </button>
-      </div>
-      <div class="chat-input-row flex items-center space-x-3 pr-1">
-        <button
-          type="button"
-          class="mic-button"
-          title={recording
-            ? "Stop recording (click again)"
-            : "Voice input – start Python server first"}
-          disabled={$isStreaming || (voiceProcessing && !recording)}
-          onclick={toggleVoice}
-          aria-label={recording ? "Stop recording" : "Start voice input"}
-        >
-          {#if voiceProcessing && !recording}
-            <span class="mic-spinner" aria-hidden="true">⟳</span>
-          {:else if recording}
-            <span class="mic-dot" aria-hidden="true"></span>
-          {:else}
             <svg
               width="18"
               height="18"
@@ -1243,75 +1194,135 @@
               stroke-width="2"
               stroke-linecap="round"
               stroke-linejoin="round"
-              class="mic-icon"
-              ><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"
-              ></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line
-                x1="12"
-                y1="19"
-                x2="12"
-                y2="22"
-              ></line></svg
+              class="web-search-icon"
+              class:web-search-icon-spin={webSearchWarmingUp}
+              aria-hidden="true"
+              title="Internet"
+              ><circle cx="12" cy="12" r="10"></circle><line
+                x1="2"
+                y1="12"
+                x2="22"
+                y2="12"
+              ></line><path
+                d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+              ></path></svg
             >
-          {/if}
-        </button>
-        <div class="relative flex items-center justify-center">
-          <div
-            class="absolute -top-[36px]"
-            aria-label="Context usage"
-            title="Context usage"
-          >
-            <ContextRing inline={true} />
-          </div>
-          {#if $isStreaming && onStop}
-            <button
-              type="button"
-              class="chat-send-icon-btn chat-stop-btn"
-              data-state="stop"
-              onclick={() => onStop()}
-              title="Stop"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                ><rect x="6" y="6" width="12" height="12" rx="2" /></svg
-              >
-            </button>
-          {:else}
-            <button
-              class="chat-send-icon-btn"
-              onclick={handleSubmit}
-              disabled={$isStreaming ||
-              $webSearchInProgress ||
-              (!text.trim() && attachments.length === 0)
-                ? true
-                : null}
-              title={$webSearchInProgress
-                ? searchingMessage || "Searching..."
-                : $isStreaming
-                  ? sendingMessage || "Sending..."
-                  : "Send message"}
-            >
-              {#if $webSearchInProgress || $isStreaming}
-                <ThinkingAtom size={18} />
+            {#if $webSearchForNextMessage}
+              {#if $webSearchConnected}
+                <span
+                  class="web-search-dot web-search-dot-green"
+                  aria-hidden="true"
+                  title="Connected"
+                ></span>
               {:else}
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  ><line x1="12" y1="19" x2="12" y2="5"></line><polyline
-                    points="5 12 12 5 19 12"
-                  ></polyline></svg
-                >
+                <span
+                  class="web-search-dot web-search-dot-red"
+                  class:web-search-dot-pulse={webSearchWarmingUp}
+                  aria-hidden="true"
+                  title="Not connected"
+                ></span>
               {/if}
-            </button>
-          {/if}
+            {/if}
+          </button>
+        </div>
+        <div class="chat-input-row flex items-center space-x-3 pr-1">
+          <button
+            type="button"
+            class="mic-button"
+            title={recording
+              ? "Stop recording (click again)"
+              : "Voice input – start Python server first"}
+            disabled={$isStreaming || (voiceProcessing && !recording)}
+            onclick={toggleVoice}
+            aria-label={recording ? "Stop recording" : "Start voice input"}
+          >
+            {#if voiceProcessing && !recording}
+              <span class="mic-spinner" aria-hidden="true">⟳</span>
+            {:else if recording}
+              <span class="mic-dot" aria-hidden="true"></span>
+            {:else}
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="mic-icon"
+                ><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"
+                ></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line
+                  x1="12"
+                  y1="19"
+                  x2="12"
+                  y2="22"
+                ></line></svg
+              >
+            {/if}
+          </button>
+          <div
+            class="relative flex items-center justify-center w-[44px] h-[44px]"
+          >
+            <div
+              class="absolute inset-0 flex items-center justify-center"
+              aria-label="Context usage"
+              title="Context usage"
+            >
+              <!-- Use inline=true for contrasting teal color, and a larger size to ring the 36px button -->
+              <ContextRing inline={true} size={44} strokeWidth={2.5} />
+            </div>
+            {#if $isStreaming && onStop}
+              <button
+                type="button"
+                class="chat-send-icon-btn chat-stop-btn relative z-10"
+                data-state="stop"
+                onclick={() => onStop()}
+                title="Stop"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  ><rect x="6" y="6" width="12" height="12" rx="2" /></svg
+                >
+              </button>
+            {:else}
+              <button
+                class="chat-send-icon-btn relative z-10"
+                onclick={handleSubmit}
+                disabled={$isStreaming ||
+                $webSearchInProgress ||
+                (!text.trim() && attachments.length === 0)
+                  ? true
+                  : null}
+                title={$webSearchInProgress
+                  ? searchingMessage || "Searching..."
+                  : $isStreaming
+                    ? sendingMessage || "Sending..."
+                    : "Send message"}
+              >
+                {#if $webSearchInProgress || $isStreaming}
+                  <ThinkingAtom size={18} />
+                {:else}
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><line x1="12" y1="19" x2="12" y2="5"></line><polyline
+                      points="5 12 12 5 19 12"
+                    ></polyline></svg
+                  >
+                {/if}
+              </button>
+            {/if}
+          </div>
         </div>
       </div>
     </div>

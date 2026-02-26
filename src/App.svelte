@@ -57,7 +57,7 @@
   import ConfirmModal from "$lib/components/ConfirmModal.svelte";
   import ShortcutsModal from "$lib/components/ShortcutsModal.svelte";
   import DiffViewer from "$lib/components/DiffViewer.svelte";
-  import LabDiagnosticsOverlay from "$lib/components/LabDiagnosticsOverlay.svelte";
+
   import AtomLogo from "$lib/components/AtomLogo.svelte";
   import CommandCenter from "$lib/components/CommandCenter.svelte";
   import { checkLmStudioConnection } from "$lib/api.js";
@@ -541,7 +541,6 @@
   {#if $settingsOpen}
     <SettingsPanel onclose={() => settingsOpen.set(false)} />
   {/if}
-  <LabDiagnosticsOverlay />
 </div>
 
 <style>

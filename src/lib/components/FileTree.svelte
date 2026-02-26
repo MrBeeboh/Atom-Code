@@ -1,7 +1,8 @@
 <script>
+  import FileTree from "./FileTree.svelte";
   let {
     nodes = [],
-    expandedDirs = new Set(),
+    expandedDirs = {},
     pinnedSet = new Set(),
     openFilePath = null,
     level = 0,
@@ -30,25 +31,33 @@
         onclick={() => onToggleDir?.(node.path)}
         oncontextmenu={(e) => onContextMenu?.(e, node)}
       >
-        <span class="shrink-0 w-3"
-          >{expandedDirs.has(node.path) ? "▼" : "▶"}</span
-        >
+        <span class="shrink-0 w-3">{expandedDirs[node.path] ? "▼" : "▶"}</span>
         <span class="truncate">{node.name}/</span>
       </button>
-      {#if expandedDirs.has(node.path) && node.children?.length}
-        <FileTree
-          nodes={node.children}
-          {expandedDirs}
-          {pinnedSet}
-          {openFilePath}
-          level={level + 1}
-          {onToggleDir}
-          {onPin}
-          {onUnpin}
-          {onOpenFile}
-          {onCopyPath}
-          {onContextMenu}
-        />
+      {#if expandedDirs[node.path]}
+        {#if node.children?.length}
+          <FileTree
+            nodes={node.children}
+            {expandedDirs}
+            {pinnedSet}
+            {openFilePath}
+            level={level + 1}
+            {onToggleDir}
+            {onPin}
+            {onUnpin}
+            {onOpenFile}
+            {onCopyPath}
+            {onContextMenu}
+          />
+        {:else}
+          <div
+            class="text-[10px] italic opacity-40 py-0.5"
+            style="margin-left: {(level + 1) * 8 +
+              12}px; color: var(--ui-text-secondary);"
+          >
+            (empty)
+          </div>
+        {/if}
       {/if}
     </div>
   {:else}

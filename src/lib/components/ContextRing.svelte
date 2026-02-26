@@ -5,15 +5,14 @@
     settings,
   } from "$lib/stores.js";
 
-  let { inline = false } = $props();
+  let { inline = false, size = 24, strokeWidth = 2.5 } = $props();
 
   function triggerSummarize() {
     summarizeAndContinueTrigger.update((n) => n + 1);
   }
 
-  const radius = 10;
-  const stroke = 2.5;
-  const circumference = 2 * Math.PI * radius;
+  const radius = $derived((size - strokeWidth * 2) / 2);
+  const circumference = $derived(2 * Math.PI * radius);
 
   const used = $derived($contextUsage.promptTokens);
   const storeMax = $derived($contextUsage.contextMax || 128000);
@@ -35,7 +34,7 @@
   type="button"
   class="context-ring-button rounded-full flex items-center justify-center shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
   class:context-ring-inline={inline}
-  style="width: 24px; height: 24px;"
+  style="width: {size}px; height: {size}px;"
   title="{used} / {maxLabel} tokens{isHigh
     ? ' — Click to summarize and continue'
     : ''}"
@@ -45,29 +44,29 @@
   onclick={() => isHigh && triggerSummarize()}
 >
   <svg
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    viewBox="0 0 {size} {size}"
     class="rotate-[-90deg]"
     aria-hidden="true"
   >
     <circle
-      cx="12"
-      cy="12"
+      cx={size / 2}
+      cy={size / 2}
       r={radius}
       fill="none"
       stroke="currentColor"
-      stroke-width={stroke}
+      stroke-width={strokeWidth}
       opacity="0.2"
     />
     {#if used > 0}
       <circle
-        cx="12"
-        cy="12"
+        cx={size / 2}
+        cy={size / 2}
         r={radius}
         fill="none"
         stroke="currentColor"
-        stroke-width={stroke}
+        stroke-width={strokeWidth}
         stroke-dasharray={circumference}
         stroke-dashoffset={dashOffset}
         stroke-linecap="round"
