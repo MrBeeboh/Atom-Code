@@ -1076,25 +1076,50 @@ body {
     animation: none;
   }
 }
-/* Glassmorphism utility */
+
+/* Glassmorphism performance safeguard */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+.no-blur * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Glassmorphism utility & theme variables */
 .glass {
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   background-color: var(--glass-bg);
   border: 1px solid var(--glass-border);
 }
 
 :root {
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(0, 0, 0, 0.05);
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-bg-hover: rgba(255, 255, 255, 0.75);
+  --glass-bg-active: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-border-strong: rgba(0, 0, 0, 0.14);
+  --glass-blur: blur(12px);
+  --glass-blur-strong: blur(20px);
+  --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+  --glass-shadow-strong: 0 8px 40px rgba(0, 0, 0, 0.2);
 }
 
-.dark, [data-ui-theme="dark"] {
-  --glass-bg: rgba(10, 10, 10, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.08);
-}
-
+.dark,
+[data-ui-theme="dark"],
 [data-ui-theme="coder"] {
-  --glass-bg: rgba(0, 0, 0, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-bg-hover: rgba(255, 255, 255, 0.07);
+  --glass-bg-active: rgba(255, 255, 255, 0.10);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-strong: rgba(255, 255, 255, 0.14);
+  --glass-blur: blur(12px);
+  --glass-blur-strong: blur(20px);
+  --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  --glass-shadow-strong: 0 8px 40px rgba(0, 0, 0, 0.5);
 }
