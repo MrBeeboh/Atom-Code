@@ -30,8 +30,8 @@
     clearMessages,
     deleteMessage,
     getMessageCount,
-    createConversation,
   } from "$lib/db.js";
+  import { repoMapText } from "$lib/repoMap.js";
   import { streamChatCompletionWithMetrics } from "$lib/streamReporter.js";
   import {
     requestGrokImageGeneration,
@@ -548,7 +548,17 @@
     }
     const msgsForApi = [...history, { role: "user", content: lastUserContent }];
     const currentSettings = get(settings);
-    const systemPrompt = (currentSettings?.system_prompt || "").trim();
+    let systemPrompt = (currentSettings?.system_prompt || "").trim();
+
+    // Phase 2: Inject Repo Map
+    const mapText = get(repoMapText) || "";
+    if (mapText) {
+      systemPrompt = systemPrompt
+        .replace(/<repo_map>[\s\S]*?<\/repo_map>\n*/g, "")
+        .trim();
+      systemPrompt = `${mapText}\n\n${systemPrompt}`.trim();
+    }
+
     let apiMessages = buildApiMessages(msgsForApi, systemPrompt);
     const userContextLen = Number(currentSettings?.context_length) || 0;
     const storeContextMax = get(contextUsage)?.contextMax || 0;
