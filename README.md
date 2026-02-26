@@ -1,78 +1,95 @@
 # ATOM Code
 
-A voice-first local coding assistant. No cloud APIs, no subscriptions, no sending your code to anyone. Runs entirely on your machine with LM Studio.
+A local-first AI coding assistant built with Svelte 5 and LM Studio. No cloud required, no subscriptions, no data leaving your machine.
 
 ## What It Does
 
-- **Voice-first chat** — Talk to your AI model using local Whisper speech-to-text. No audio leaves your machine.
-- **Integrated terminal** — Real bash shell in the browser via xterm.js and node-pty. Run code directly from chat.
-- **File explorer** — Browse your project, pin files as context for the AI model. **Pinned files** are set in the file tree (right-click a file → “Pin as context”); they show a pin icon and “Unpin all” in the explorer. The sidebar **Pinned** list is for **pinned conversations** (chats), not files. Pinned files are never auto-removed when a fetch fails; they stay in the list until you unpin.
-- **Code block actions** — Every code block has Copy, Run (sends to terminal), Save (downloads file), and Apply (diff viewer with before/after comparison and one-click write to disk).
-- **Diff viewer** — See exactly what changes the AI wants to make to your files. Green for added, red for removed. Apply or reject.
-- **Quick actions** — One-click Explain, Fix, Refactor, Test, Document buttons that pre-fill coding prompts.
-- **Coding presets** — Switch between Code, Debug, Review, Refactor, Explain, and General system prompts.
-- **Model switching** — Use any model loaded in LM Studio. Switch models mid-conversation.
-- **Performance stats** — Live tokens/sec, token count, and latency on every response.
-- **Context usage indicator** — Visual ring showing how much of the model's context window you're using. Long conversations and pinned context are automatically trimmed to stay within the model's limit.
-- **100% local** — Everything runs on your hardware. Voice processing, AI inference, file access, terminal — all local.
+- AI chat interface powered by local LLM models via LM Studio
+- Automatic codebase indexing — the AI understands your entire project structure from the first message
+- Signature-aware file injection — relevant files are automatically pulled into context based on your query
+- Integrated file explorer with pinning and context management
+- Integrated terminal
+- Git panel with diff viewer and commit workflow
+- Voice input via local Whisper model
+- Web search integration via Brave Search
+- Multiple themes including LCARS Star Trek, Ollama Forge, Perplexity, and default light/dark
 
-## Who It's For
+## Requirements
 
-People who want to build software by talking to an AI, not by typing code. ATOM Code is designed for voice-first "vibe coding" — describe what you want, the AI writes it, you review the diff and approve it.
-
-## Architecture
-
-- **Frontend:** Svelte 5, Vite, Tailwind CSS 4, xterm.js
-- **Storage:** Dexie.js (IndexedDB, browser-local)
-- **AI Backend:** LM Studio (OpenAI-compatible API, runs locally)
-- **Terminal Server:** Node.js + node-pty (WebSocket on port 8767)
-- **File Server:** Express.js (read/write project files, port 8768)
-- **Voice Server:** Python + FastAPI + faster-whisper (local STT, port 8765)
+- Linux (developed and tested on Linux Mint)
+- Node.js 18+
+- Python 3.10+ (for voice server)
+- LM Studio with at least one model loaded
+- NVIDIA GPU recommended (RTX 4070 or equivalent for best performance)
 
 ## Quick Start
 
-### Basic (chat only, no terminal/files/voice):
 ```bash
-npm install
-npm run dev
-```
-Open http://localhost:5173. Requires LM Studio running with a model loaded.
+# Clone the repository
+git clone https://github.com/MrBeeboh/Atom-Code.git
+cd atom-code
 
-### Full Stack (all features):
-```bash
-# Install dependencies (one time)
+# Install dependencies
 npm install
-cd services/terminal-server && npm install && cd ../..
 cd services/file-server && npm install && cd ../..
-cd voice-server && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt && cd ..
+cd services/terminal-server && npm install && cd ../..
 
-# Start everything (script starts voice server and installs voice deps if needed)
-chmod +x start-atom-code.sh
+# Voice server (optional)
+cd voice-server && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt && cd ..
+
+# Start everything
 ./start-atom-code.sh
 ```
-Open http://localhost:5173. Voice uses port 8765; see `voice-server/README.md` and `VOICE-SETUP.md`.
 
-### Requirements
-- Node.js 18+
-- Python 3.10+ (for voice only)
-- build-essential (for node-pty compilation)
-- LM Studio running locally
-- Linux (tested on Linux Mint)
+Open http://localhost:5173 in your browser.
 
-## Roadmap
+## Stopping
 
-- [x] Chat with local AI models
-- [x] Voice input (local Whisper)
-- [x] Integrated terminal
-- [x] File explorer with pinning
-- [x] Code block actions (copy, run, save, apply)
-- [x] Diff viewer with apply-to-file
-- [x] Quick actions and coding presets
-- [ ] Error feedback loop (auto-detect terminal errors, one-click fix)
-- [ ] Codebase-aware context (auto-index project files)
-- [x] Code editor panel (bottom panel, open from chat or file explorer)
-- [ ] Voice commands ("fix it", "run it", "apply it")
-- [ ] Vision integration (screenshot-to-fix)
+```bash
+./scripts/stop-atom-code.sh
+```
+
+Or press `Ctrl+C` in the terminal running `start-atom-code.sh`.
+
+## Architecture
+
+| Service | Port | Purpose |
+|---|---|---|
+| Vite Dev Server | 5173 | Main UI |
+| LM Studio API | 1234 | Local LLM inference |
+| File Server | 8768 | File tree and repo map indexing |
+| Terminal Server | 8767 | Integrated terminal via WebSocket |
+| Search Proxy | 5174 | Brave web search integration |
+| Voice Server | 8765 | Whisper speech-to-text |
+
+## How Codebase Indexing Works
+
+When you open a workspace, ATOM Code automatically:
+1. Indexes the directory structure and extracts function/class signatures from all source files
+2. Injects a compressed repo map into the AI system prompt
+3. Detects which files are relevant to your query using signature-aware matching
+4. Auto-injects those files into context — no manual file attachment needed
+
+## Watchdog
+
+A background watchdog process monitors all six services every 30 seconds and automatically restarts any that stop responding. Restart events are logged to `watchdog.log`.
+
+## Project Structure
+
+```
+atom-code/
+├── src/                    # Svelte 5 frontend
+│   └── lib/
+│       ├── components/     # UI components
+│       └── stores.js       # Svelte stores
+├── services/
+│   ├── file-server/        # File tree and repo map API
+│   └── terminal-server/    # Terminal backend (WebSocket + HTTP)
+├── voice-server/           # Whisper voice input server
+├── scripts/                # Start, stop, watchdog, and search proxy
+├── docs/                   # Documentation
+└── public/                 # Static assets
+```
 
 ## License
 
