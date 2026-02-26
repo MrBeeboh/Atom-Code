@@ -45,3 +45,20 @@ handoff*.json
 *-manifest.json
 ATOM-*-FIX.md
 config/brave_key.txt
+
+# Runtime / PID files
+watchdog.pid
+*.pid
+
+# SvelteKit build cache
+.svelte-kit/
+
+# Python (global)
+__pycache__/
+*.pyc
+
+# OS
+Thumbs.db
+
+# Archives (historical docs)
+docs/archive/
