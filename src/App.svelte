@@ -28,6 +28,7 @@
     diffViewerState,
     workspaceRoot,
     fileServerUrl,
+    terminalServerUrl,
     repoMapText,
     repoMapFileList,
     repoMapLoading,
@@ -250,10 +251,30 @@
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-color-scheme: dark)");
     mq?.addEventListener?.("change", () => applyResolvedTheme());
+
+    // ── Clean shutdown on tab/window close ──────────────
+    function handleBeforeUnload() {
+      // Signal both backend servers to shut down
+      // sendBeacon is fire-and-forget, works reliably on tab close
+      const fsUrl = get(fileServerUrl) || "http://localhost:8768";
+      const tsUrl = (get(terminalServerUrl) || "ws://localhost:8767").replace(
+        /^ws/,
+        "http",
+      ); // convert ws:// to http://
+      try {
+        navigator.sendBeacon(`${fsUrl}/shutdown`, "");
+      } catch (_) {}
+      try {
+        navigator.sendBeacon(`${tsUrl}/shutdown`, "");
+      } catch (_) {}
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
     return () => {
       unsubTheme();
       unsubUi();
       mq?.removeEventListener?.("change", () => applyResolvedTheme());
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   });
   theme.subscribe((v) => {

@@ -333,4 +333,25 @@ app.get('/git/diff', async (req, res) => {
   }
 });
 
-app.listen(PORT, '127.0.0.1', () => console.log(`File server on http://127.0.0.1:${PORT}`));
+// POST /shutdown — clean exit
+app.post('/shutdown', (_req, res) => {
+  res.json({ ok: true });
+  console.log('File server: shutdown requested, exiting...');
+  if (httpServer) httpServer.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 1000);
+});
+
+const httpServer = app.listen(PORT, '127.0.0.1', () => console.log(`File server on http://127.0.0.1:${PORT}`));
+
+// ── Graceful shutdown ──────────────────────────────────
+function shutdown(signal) {
+  console.log(`\nFile server received ${signal}, shutting down...`);
+  httpServer.close(() => {
+    console.log('File server closed.');
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 3000);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

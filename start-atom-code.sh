@@ -61,7 +61,26 @@ echo "  File:       http://localhost:8768"
 echo "  Voice:      http://localhost:8765"
 echo "  Search:     http://localhost:5174"
 echo ""
+
+# Launch watchdog
+echo "Starting watchdog monitor..."
+nohup "$HOME/atom-code/scripts/watchdog.sh" >> "$HOME/atom-code/watchdog.log" 2>&1 &
+WATCHDOG_PID=$!
+disown $WATCHDOG_PID
+echo $WATCHDOG_PID > "$HOME/atom-code/watchdog.pid"
+echo "  Watchdog:   started (PID: $WATCHDOG_PID)"
+echo ""
 echo "Press Ctrl+C to stop all services"
 
-trap "kill $TERM_PID $FILE_PID $SEARCH_PID $VOICE_PID $DEV_PID $LMS_PID 2>/dev/null; exit" INT TERM
+cleanup() {
+  echo ""
+  echo "Stopping ATOM Code..."
+  # Kill watchdog first so it cannot restart services as we stop them
+  [ -f "$HOME/atom-code/watchdog.pid" ] && kill $(cat "$HOME/atom-code/watchdog.pid") 2>/dev/null && rm "$HOME/atom-code/watchdog.pid"
+  kill $TERM_PID $FILE_PID $SEARCH_PID $VOICE_PID $DEV_PID $LMS_PID 2>/dev/null
+  echo "All services stopped."
+  exit
+}
+
+trap cleanup INT TERM
 wait
