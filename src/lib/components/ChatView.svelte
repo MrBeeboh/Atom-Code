@@ -30,6 +30,7 @@
     clearMessages,
     deleteMessage,
     getMessageCount,
+    createConversation,
   } from "$lib/db.js";
   import { repoMapText } from "$lib/repoMap.js";
   import { streamChatCompletionWithMetrics } from "$lib/streamReporter.js";
@@ -412,7 +413,14 @@
       typeof out[0].content === "string"
     ) {
       const maxSystemChars = Math.max(1000, (maxPromptTokens - 500) * 3);
-      out[0] = { ...out[0], content: out[0].content.slice(-maxSystemChars) };
+      if (out[0].content.includes("<repo_map>")) {
+        let truncated = out[0].content.slice(0, maxSystemChars);
+        if (!truncated.endsWith("</repo_map>"))
+          truncated += "\n\n<!-- Truncated -->\n</repo_map>";
+        out[0] = { ...out[0], content: truncated };
+      } else {
+        out[0] = { ...out[0], content: out[0].content.slice(-maxSystemChars) };
+      }
     }
     return out;
   }
@@ -556,7 +564,7 @@
       systemPrompt = systemPrompt
         .replace(/<repo_map>[\s\S]*?<\/repo_map>\n*/g, "")
         .trim();
-      systemPrompt = `${mapText}\n\n${systemPrompt}`.trim();
+      systemPrompt = `${systemPrompt}\n\n${mapText}`.trim();
     }
 
     let apiMessages = buildApiMessages(msgsForApi, systemPrompt);
