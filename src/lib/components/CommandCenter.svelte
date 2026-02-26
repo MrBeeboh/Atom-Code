@@ -9,7 +9,9 @@
         isStreaming,
         lmStudioConnected,
         cloudApisAvailable,
+        fileServerUrl,
     } from "$lib/stores.js";
+    import { buildRepoMapText, repoMapText } from "$lib/repoMap.js";
     import AtomLogo from "./AtomLogo.svelte";
     import ModelSelector from "./ModelSelector.svelte";
     import PresetSelect from "./PresetSelect.svelte";
@@ -33,6 +35,26 @@
     });
 
     let lmStatusMessage = $state("");
+    let isRefreshing = $state(false);
+    let showCheckmark = $state(false);
+
+    async function refreshContext() {
+        if (!$workspaceRoot?.trim() || isRefreshing) return;
+        isRefreshing = true;
+        try {
+            const text = await buildRepoMapText(
+                $workspaceRoot.trim(),
+                $fileServerUrl,
+            );
+            repoMapText.set(text || "");
+            showCheckmark = true;
+            setTimeout(() => (showCheckmark = false), 1500);
+        } catch (e) {
+            console.error("Refresh context failed:", e);
+        } finally {
+            isRefreshing = false;
+        }
+    }
 
     $effect(() => {
         const c = $lmStudioConnected;
@@ -79,6 +101,57 @@
                 <span class="opacity-20 italic">No file selected</span>
             {/if}
         </div>
+
+        <button
+            class="flex items-center justify-center w-7 h-7 rounded hover:bg-white/5 opacity-50 hover:opacity-100 transition-all shrink-0 ml-1"
+            title="Refresh Context"
+            onclick={refreshContext}
+            disabled={isRefreshing}
+        >
+            {#if showCheckmark}
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#22c55e"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><polyline points="20 6 9 17 4 12"></polyline></svg
+                >
+            {:else if isRefreshing}
+                <svg
+                    class="animate-spin"
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"
+                    ></path><path d="M21 3v5h-5"></path></svg
+                >
+            {:else}
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"
+                    ></path><path d="M21 3v5h-5"></path></svg
+                >
+            {/if}
+        </button>
     </div>
 
     <!-- Center: Model & Preset -->
