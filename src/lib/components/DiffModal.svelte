@@ -50,7 +50,7 @@
     >
         <div
             class="w-full max-w-4xl h-[80vh] flex flex-col rounded-xl overflow-hidden shadow-2xl border outline-none"
-            style="background-color: var(--ui-bg-main); border-color: var(--ui-border);"
+            class="glass-modal"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.stopPropagation()}
             role="dialog"
@@ -59,7 +59,7 @@
         >
             <div
                 class="flex items-center justify-between p-4 border-b shrink-0"
-                style="border-color: var(--ui-border); background-color: var(--ui-bg-sidebar);"
+                class="glass-modal"
             >
                 <div class="flex flex-col">
                     <h3

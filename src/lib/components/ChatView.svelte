@@ -32,7 +32,11 @@
     getMessageCount,
     createConversation,
   } from "$lib/db.js";
-  import { repoMapText } from "$lib/repoMap.js";
+  import {
+    repoMapText,
+    repoMapSignatures,
+    findRelevantFiles,
+  } from "$lib/repoMap.js";
   import { streamChatCompletionWithMetrics } from "$lib/streamReporter.js";
   import {
     requestGrokImageGeneration,
@@ -160,6 +164,7 @@
 
   let chatAbortController = $state(null);
   let imageGenerating = $state(false);
+  let autoInjectedFiles = $state([]);
 
   /** Image options modal. Verified config from docs/image-models-and-settings-for-verification.json (Together AI, 2026-02-15). Grok unchanged. */
   const ENGINE_OPTIONS = [
@@ -347,11 +352,27 @@
   }
 
   function buildApiMessages(msgs, systemPrompt) {
-    const sanitized = msgs.map((m, i) => ({
-      role: m.role,
-      content:
-        i === msgs.length - 1 ? m.content : sanitizeContentForApi(m.content),
-    }));
+    const sanitized = msgs.map((m, i) => {
+      let contentObj =
+        i === msgs.length - 1 ? m.content : sanitizeContentForApi(m.content);
+      if (m.contextString) {
+        if (typeof contentObj === "string") {
+          contentObj = m.contextString + "\n\n" + contentObj;
+        } else if (Array.isArray(contentObj)) {
+          const textPart = contentObj.find((p) => p.type === "text");
+          const rest = contentObj.filter((p) => p.type !== "text");
+          const text =
+            (textPart?.text ?? "")
+              ? m.contextString + "\n\n" + textPart.text
+              : m.contextString;
+          contentObj = [{ type: "text", text }, ...rest];
+        }
+      }
+      return {
+        role: m.role,
+        content: contentObj,
+      };
+    });
     const out = sanitized.filter((m) => {
       if (m.role === "system") return true;
       if (typeof m.content === "string") return m.content.trim().length > 0;
@@ -530,31 +551,113 @@
       }
     }
 
+    // --- NEW: Auto-Context Injection ---
+    autoInjectedFiles = [];
+    let autoContext = "";
+    if (get(workspaceRoot) && hasText) {
+      try {
+        const url = get(fileServerUrl) || "http://localhost:8768";
+        const signatures = get(repoMapSignatures) || {};
+
+        // Build flatList from signatures to avoid file server walk
+        const flatList = Object.keys(signatures).map((rel) => {
+          const root = get(workspaceRoot);
+          return (
+            root + (root.endsWith("/") || root.endsWith("\\") ? "" : "/") + rel
+          );
+        });
+
+        let candidates = findRelevantFiles(
+          effectiveText,
+          flatList,
+          signatures,
+          3,
+        );
+        candidates = candidates.filter((p) => {
+          if (allPaths.includes(p)) return false;
+          if (
+            p.includes("/node_modules/") ||
+            p.includes("\\node_modules\\") ||
+            p.includes("/.git/") ||
+            p.includes("\\.git\\") ||
+            p.includes("/dist/") ||
+            p.includes("\\dist\\")
+          )
+            return false;
+          return true;
+        });
+
+        if (candidates.length > 0) {
+          const contents = await Promise.all(
+            candidates.map(async (p) => {
+              try {
+                const res = await fetch(
+                  `${url}/content?path=${encodeURIComponent(p)}`,
+                );
+                if (!res.ok) return null;
+                const data = await res.json();
+                const rel = p
+                  .replace(get(workspaceRoot) || "", "")
+                  .replace(/^[/\\]+/, "");
+                return { path: p, rel, content: data.content };
+              } catch {
+                return null;
+              }
+            }),
+          );
+
+          const validContents = contents.filter(Boolean);
+          const injectedBlocks = [];
+          const injectedPaths = [];
+
+          for (const file of validContents) {
+            const wrapLen = `<file path="${file.rel}">\n\n</file>`.length;
+            const blockLen = wrapLen + file.content.length;
+
+            if (file.content.length > 20000) {
+              const allowedLen = 20000 - 15; // 15 for "\n...[Truncated]"
+              const truncated =
+                file.content.slice(0, allowedLen) + "\n...[Truncated]";
+              injectedBlocks.push(
+                `<file path="${file.rel}">\n${truncated}\n</file>`,
+              );
+              injectedPaths.push(file.rel);
+            } else {
+              injectedBlocks.push(
+                `<file path="${file.rel}">\n${file.content}\n</file>`,
+              );
+              injectedPaths.push(file.rel);
+            }
+          }
+
+          if (injectedBlocks.length > 0) {
+            autoContext = injectedBlocks.join("\n\n");
+            autoInjectedFiles = injectedPaths;
+          }
+        }
+      } catch (e) {
+        console.warn("[ChatView] Auto-context fetch failed:", e?.message);
+      }
+    }
+
+    const contextPrefix =
+      (githubContext ? githubContext + "\n\n" : "") +
+      (fileContext ? "Code Context:\n\n" + fileContext + "\n\n" : "") +
+      (autoContext ? "Auto Context:\n\n" + autoContext + "\n\n" : "");
+
     const history = await getMessages(convId);
     await addMessage(convId, {
       role: "user",
       content: userContent,
+      contextString: contextPrefix ? contextPrefix : undefined,
+      autoInjectedFiles: autoInjectedFiles?.length
+        ? [...autoInjectedFiles]
+        : undefined,
       videoUrls: hasVideos ? [...videoDataUrls] : undefined,
     });
     await loadMessages();
-    let lastUserContent = userContent;
-    const contextPrefix =
-      (githubContext ? githubContext + "\n\n" : "") +
-      (fileContext ? "Code Context:\n\n" + fileContext + "\n\n" : "");
-    if (contextPrefix) {
-      if (typeof userContent === "string") {
-        lastUserContent = contextPrefix + "\n\n" + userContent;
-      } else if (Array.isArray(userContent)) {
-        const textPart = userContent.find((p) => p.type === "text");
-        const rest = userContent.filter((p) => p.type !== "text");
-        const text =
-          (textPart?.text ?? "")
-            ? contextPrefix + "\n\n" + textPart.text
-            : contextPrefix;
-        lastUserContent = [{ type: "text", text }, ...rest];
-      }
-    }
-    const msgsForApi = [...history, { role: "user", content: lastUserContent }];
+
+    const msgsForApi = await getMessages(convId);
     const currentSettings = get(settings);
     let systemPrompt = (currentSettings?.system_prompt || "").trim();
 
@@ -669,9 +772,15 @@
       streamingContent.set("");
       messagePreparing.set(false);
       isStreaming.set(false);
+      autoInjectedFiles = [];
     }
 
-    if (streamResult?.aborted) return;
+    if (streamResult?.aborted) {
+      activeMessages.update((arr) =>
+        arr.filter((m) => m.id !== assistantMsgId),
+      );
+      return;
+    }
 
     activeMessages.update((arr) => {
       const out = [...arr];
@@ -1019,6 +1128,61 @@
             {/if}
           </div>
           <div class="shrink-0 w-full max-w-[56rem] mx-auto px-4 pb-6">
+            {#if autoInjectedFiles.length > 0}
+              <div
+                class="flex items-center gap-2 mb-2 px-3 py-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg w-max text-xs text-zinc-500 dark:text-zinc-400"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  ><path
+                    d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                  ></path><polyline points="14 2 14 8 20 8"></polyline><line
+                    x1="16"
+                    y1="13"
+                    x2="8"
+                    y2="13"
+                  ></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline
+                    points="10 9 9 9 8 9"
+                  ></polyline></svg
+                >
+                <span
+                  >Auto-context: {autoInjectedFiles
+                    .map((f) => f.split(/[/\\]/).pop())
+                    .join(", ")}</span
+                >
+                <button
+                  class="ml-1 hover:text-zinc-800 dark:hover:text-zinc-200"
+                  onclick={() => (autoInjectedFiles = [])}
+                  aria-label="Dismiss"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><line x1="18" y1="6" x2="6" y2="18"></line><line
+                      x1="6"
+                      y1="6"
+                      x2="18"
+                      y2="18"
+                    ></line></svg
+                  >
+                </button>
+              </div>
+            {/if}
             <ChatInput
               onSend={sendUserMessage}
               onStop={() => chatAbortController?.abort?.()}
@@ -1064,6 +1228,60 @@
             {/if}
             <QuickActions />
             <div class="w-full min-w-0">
+              {#if autoInjectedFiles.length > 0}
+                <div
+                  class="flex items-center gap-2 mb-2 px-3 py-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg w-max text-xs text-zinc-500 dark:text-zinc-400"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><path
+                      d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                    ></path><polyline points="14 2 14 8 20 8"></polyline><line
+                      x1="16"
+                      y1="13"
+                      x2="8"
+                      y2="13"
+                    ></line><line x1="16" y1="17" x2="8" y2="17"
+                    ></line><polyline points="10 9 9 9 8 9"></polyline></svg
+                  >
+                  <span
+                    >Auto-context: {autoInjectedFiles
+                      .map((f) => f.split(/[/\\]/).pop())
+                      .join(", ")}</span
+                  >
+                  <button
+                    class="ml-1 hover:text-zinc-800 dark:hover:text-zinc-200"
+                    onclick={() => (autoInjectedFiles = [])}
+                    aria-label="Dismiss"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      ><line x1="18" y1="6" x2="6" y2="18"></line><line
+                        x1="6"
+                        y1="6"
+                        x2="18"
+                        y2="18"
+                      ></line></svg
+                    >
+                  </button>
+                </div>
+              {/if}
               <ChatInput
                 onSend={sendUserMessage}
                 onStop={() => chatAbortController?.abort?.()}

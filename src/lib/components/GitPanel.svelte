@@ -201,7 +201,7 @@
     {#if status}
         <div
             class="flex-1 overflow-y-auto mb-4 border rounded p-1"
-            style="background-color: var(--ui-bg-main); border-color: var(--ui-border);"
+            class="glass-modal"
         >
             <div class="space-y-0.5">
                 {#each parsedStatus as item}

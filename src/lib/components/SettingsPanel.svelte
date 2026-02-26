@@ -63,7 +63,7 @@
   aria-modal="true"
   aria-label="Settings">
   <div
-    class="bg-white dark:bg-zinc-800 rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-hidden border border-zinc-200 dark:border-zinc-700 flex flex-col"
+    class="rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-hidden dark:border-zinc-700 flex flex-col glass-modal"
     in:fly={{ x: 300, duration: 400, easing: backOut }}
     out:fly={{ x: 300, duration: 300, easing: quintOut }}>
     <div class="shrink-0 px-6 pt-5 pb-2 border-b border-zinc-200 dark:border-zinc-700 flex items-start justify-between gap-2">
@@ -79,32 +79,32 @@
         <div class="px-4 py-3 space-y-3">
           <div>
             <label for="settings-lmstudio-url" class="block text-sm font-medium text-zinc-600 dark:text-zinc-400">LM Studio URL</label>
-            <input id="settings-lmstudio-url" type="url" bind:value={$lmStudioBaseUrl} placeholder="http://localhost:1234" class="w-full rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400" />
+            <input id="settings-lmstudio-url" type="url" bind:value={$lmStudioBaseUrl} placeholder="http://localhost:1234" class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal" />
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Empty = localhost:1234. Enable CORS in LM Studio → Developer.</p>
           </div>
           <div>
             <label for="settings-unload-helper-url" class="block text-sm font-medium text-zinc-600 dark:text-zinc-400">Unload helper URL</label>
-            <input id="settings-unload-helper-url" type="url" bind:value={$lmStudioUnloadHelperUrl} placeholder="http://localhost:8766" class="w-full rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400" />
+            <input id="settings-unload-helper-url" type="url" bind:value={$lmStudioUnloadHelperUrl} placeholder="http://localhost:8766" class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal" />
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Optional. <code class="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">python scripts/unload_helper_server.py</code>. Leave empty to disable.</p>
           </div>
           <div>
             <label for="settings-voice-url" class="block text-sm font-medium text-zinc-600 dark:text-zinc-400">Voice server URL</label>
-            <input id="settings-voice-url" type="url" bind:value={$voiceServerUrl} placeholder="http://localhost:8765" class="w-full rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400" />
+            <input id="settings-voice-url" type="url" bind:value={$voiceServerUrl} placeholder="http://localhost:8765" class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal" />
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Mic/voice. Default port 8765; see voice-server/README.</p>
           </div>
           <div>
             <label for="settings-terminal-url" class="block text-sm font-medium text-zinc-600 dark:text-zinc-400">Terminal server URL</label>
-            <input id="settings-terminal-url" type="url" bind:value={$terminalServerUrl} placeholder="ws://localhost:8767" class="w-full rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400" />
+            <input id="settings-terminal-url" type="url" bind:value={$terminalServerUrl} placeholder="ws://localhost:8767" class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal" />
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">WebSocket for integrated terminal. Run <code class="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">services/terminal-server</code>. Toggle panel: Ctrl+`</p>
           </div>
           <div>
             <label for="settings-file-server-url" class="block text-sm font-medium text-zinc-600 dark:text-zinc-400">File server URL</label>
-            <input id="settings-file-server-url" type="url" bind:value={$fileServerUrl} placeholder="http://localhost:8768" class="w-full rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400" />
+            <input id="settings-file-server-url" type="url" bind:value={$fileServerUrl} placeholder="http://localhost:8768" class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal" />
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">For file explorer and pinned context. Run <code class="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">services/file-server</code>. Toggle: Ctrl+E</p>
           </div>
           <div>
             <label for="settings-workspace-root" class="block text-sm font-medium text-zinc-600 dark:text-zinc-400">Workspace root</label>
-            <input id="settings-workspace-root" type="text" bind:value={$workspaceRoot} placeholder="/path/to/project" class="w-full rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400" />
+            <input id="settings-workspace-root" type="text" bind:value={$workspaceRoot} placeholder="/path/to/project" class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal" />
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Default path for file explorer tree. Also set in the File Explorer panel.</p>
           </div>
         </div>
@@ -122,7 +122,7 @@
               autocomplete="off"
               bind:value={$deepSeekApiKey}
               placeholder="API key (paste without extra spaces)"
-              class="w-full rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400" />
+              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal" />
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1"><a href="https://platform.deepseek.com" target="_blank" rel="noopener noreferrer" class="underline">platform.deepseek.com</a></p>
           </div>
           <div>
@@ -133,7 +133,7 @@
               autocomplete="off"
               bind:value={$grokApiKey}
               placeholder="xai-…"
-              class="w-full rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400" />
+              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal" />
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1"><a href="https://console.x.ai" target="_blank" rel="noopener noreferrer" class="underline">console.x.ai</a></p>
           </div>
           <div>
@@ -145,7 +145,7 @@
               bind:value={$braveApiKey}
               onblur={() => syncBraveKeyToProxy($braveApiKey)}
               placeholder="Paste your Brave Search API key"
-              class="w-full rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400" />
+              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal" />
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Web search (globe). <a href="https://search.brave.com/help/api" target="_blank" rel="noopener noreferrer" class="underline">search.brave.com/help/api</a></p>
           </div>
           <div>
@@ -156,7 +156,7 @@
               autocomplete="off"
               bind:value={$githubToken}
               placeholder="ghp_… (only for private repo fetch)"
-              class="w-full rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400" />
+              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal" />
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Paste a GitHub URL in chat to fetch repo context. Token only needed for private repos. Never sent to the model.</p>
           </div>
           <div>
@@ -167,7 +167,7 @@
               autocomplete="off"
               bind:value={$deepinfraApiKey}
               placeholder="…"
-              class="w-full rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400" />
+              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal" />
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Image/video when DeepSeek. <a href="https://deepinfra.com" target="_blank" rel="noopener noreferrer" class="underline">deepinfra.com</a></p>
           </div>
           <div>
@@ -178,7 +178,7 @@
               autocomplete="off"
               bind:value={$togetherApiKey}
               placeholder="…"
-              class="w-full rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400" />
+              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal" />
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Legacy image when DeepSeek. <a href="https://api.together.xyz" target="_blank" rel="noopener noreferrer" class="underline">api.together.xyz</a></p>
           </div>
         </div>
@@ -210,7 +210,7 @@
             {#each PRESETS as p}
               <div class="flex flex-wrap items-center gap-2">
                 <span class="text-xs text-zinc-600 dark:text-zinc-400 min-w-[4rem]">{p.name}:</span>
-                <select class="text-xs rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-2 py-1 min-w-[140px]" value={$presetDefaultModels[p.name] ?? ''} onchange={(e) => setPresetDefaultModel(p.name, e.currentTarget.value || null)} aria-label="Default model for {p.name}">
+                <select class="text-xs rounded-lg border-zinc-300 text-zinc-900 dark:text-zinc-100 px-2 py-1 min-w-[140px] glass-modal" value={$presetDefaultModels[p.name] ?? ''} onchange={(e) => setPresetDefaultModel(p.name, e.currentTarget.value || null)} aria-label="Default model for {p.name}">
                   <option value="">None</option>
                   {#each $models as m}
                     <option value={m.id}>{m.id}</option>

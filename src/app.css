@@ -1098,6 +1098,14 @@ body {
   border: 1px solid var(--glass-border);
 }
 
+.glass-modal {
+  background: var(--glass-bg-active) !important;
+  border: 1px solid var(--glass-border-strong) !important;
+  backdrop-filter: var(--glass-blur-strong) !important;
+  -webkit-backdrop-filter: var(--glass-blur-strong) !important;
+  box-shadow: var(--glass-shadow-strong) !important;
+}
+
 :root {
   --glass-bg: rgba(255, 255, 255, 0.6);
   --glass-bg-hover: rgba(255, 255, 255, 0.75);

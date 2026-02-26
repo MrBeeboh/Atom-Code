@@ -278,7 +278,9 @@
   class:border-r={standalone}
   style="{standalone
     ? 'width: 280px; max-width: 280px;'
-    : 'width: 100%; height: 100%;'} background-color: var(--ui-bg-sidebar); border-color: var(--ui-border);"
+    : 'width: 100%; height: 100%;'} background: var(--glass-bg); border-right: {standalone
+    ? '1px solid var(--glass-border)'
+    : 'none'}; backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);"
 >
   <div
     class="flex flex-col gap-2 p-2 border-b shrink-0"
@@ -386,7 +388,7 @@
     >
       <div
         class="rounded-xl shadow-2xl border p-4 w-full max-w-lg flex flex-col gap-3 min-h-[400px] max-h-[80vh] scale-in"
-        style="background: var(--ui-bg-main); border-color: var(--ui-border);"
+        class="glass-modal"
         onclick={(e) => e.stopPropagation()}
       >
         <div class="flex items-center justify-between">
@@ -501,7 +503,7 @@
     >
       <div
         class="rounded-xl shadow-xl border p-4 w-full max-w-md"
-        style="background: var(--ui-bg-main); border-color: var(--ui-border);"
+        class="glass-modal"
         onclick={(e) => e.stopPropagation()}
       >
         <h3

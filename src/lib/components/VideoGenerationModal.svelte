@@ -20,7 +20,7 @@
     >
         <div
             class="w-full max-w-md rounded-xl shadow-xl p-5 flex flex-col gap-4"
-            style="background: var(--ui-bg-main); border: 1px solid var(--ui-border);"
+            class="glass-modal"
         >
             <h2
                 id="video-modal-title"

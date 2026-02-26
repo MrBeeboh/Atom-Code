@@ -1250,7 +1250,7 @@
   <!-- Sticky footer: Optimize + Save -->
   <div
     class="shrink-0 p-3 pt-2 border-t space-y-2"
-    style="border-color: var(--ui-border); background-color: var(--ui-bg-sidebar);"
+    class="glass-modal"
   >
     <button
       type="button"

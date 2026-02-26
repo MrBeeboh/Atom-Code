@@ -1,19 +1,19 @@
 <script>
-  import { fly } from 'svelte/transition';
-  import { backOut, quintOut } from 'svelte/easing';
+  import { fly } from "svelte/transition";
+  import { backOut, quintOut } from "svelte/easing";
 
   let {
-    title = 'Panel',
-    icon = '☰',
-    position = 'right',
+    title = "Panel",
+    icon = "☰",
+    position = "right",
     openStore,
-    width = '320px',
-    triggerTitle = '',
+    width = "320px",
+    triggerTitle = "",
     children,
   } = $props();
 
-  const slideDistance = typeof width === 'number' ? width : 320;
-  const x = position === 'right' ? slideDistance : -slideDistance;
+  const slideDistance = typeof width === "number" ? width : 320;
+  const x = position === "right" ? slideDistance : -slideDistance;
 </script>
 
 {#if !$openStore}
@@ -35,8 +35,8 @@
 {#if $openStore}
   <aside
     class="side-panel"
-    class:left={position === 'left'}
-    class:right={position === 'right'}
+    class:left={position === "left"}
+    class:right={position === "right"}
     style="width: {typeof width === 'number' ? width + 'px' : width};"
     role="dialog"
     aria-label={title}
@@ -73,7 +73,9 @@
     background-color: var(--ui-bg-sidebar);
     color: var(--ui-text-secondary);
     cursor: pointer;
-    transition: color 0.15s, background-color 0.15s;
+    transition:
+      color 0.15s,
+      background-color 0.15s;
   }
   .side-panel-trigger:hover {
     color: var(--ui-text-primary);
@@ -87,8 +89,10 @@
     z-index: 50;
     display: flex;
     flex-direction: column;
-    background-color: var(--ui-bg-primary);
-    border: 2px solid var(--ui-border);
+    background-color: var(--glass-bg);
+    border-left: 1px solid var(--glass-border);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
     box-shadow: -4px 0 12px rgba(0, 0, 0, 0.15);
   }
   .side-panel.right {
@@ -123,7 +127,9 @@
     color: var(--ui-text-secondary);
     cursor: pointer;
     border-radius: 4px;
-    transition: color 0.15s, background-color 0.15s;
+    transition:
+      color 0.15s,
+      background-color 0.15s;
   }
   .side-panel-close:hover {
     color: var(--ui-text-primary);

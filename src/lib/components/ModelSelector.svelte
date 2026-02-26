@@ -133,7 +133,7 @@
   {#if open}
     <div
       id="model-listbox"
-      class="fixed z-[100] rounded-[12px] border border-zinc-200 dark:border-zinc-600 bg-white dark:bg-zinc-800 shadow-lg py-1 overflow-y-auto overflow-x-visible min-w-[280px]"
+      class="fixed z-[100] rounded-[12px] py-1 overflow-y-auto overflow-x-visible min-w-[280px] glass-modal"
       style="left: {dropdownPlace.left}px; width: {dropdownPlace.width}px; max-height: {dropdownPlace.maxHeight}px; {dropdownPlace.openUp ? 'bottom: ' + dropdownPlace.bottom + 'px; top: auto;' : 'top: ' + dropdownPlace.top + 'px;'}"
       role="listbox">
       {#if loading}

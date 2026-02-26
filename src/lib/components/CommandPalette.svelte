@@ -447,7 +447,7 @@
   >
     <div
       class="w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden"
-      style="background-color: var(--ui-bg-sidebar); border-color: var(--ui-border);"
+      class="glass-modal"
       role="presentation"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}

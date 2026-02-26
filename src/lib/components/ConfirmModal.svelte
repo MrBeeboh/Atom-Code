@@ -33,7 +33,7 @@
     ></div>
     <div
       class="relative rounded-xl border shadow-xl max-w-md w-full p-4"
-      style="background-color: var(--ui-bg-sidebar); border-color: var(--ui-border);"
+      class="glass-modal"
       onclick={(e) => e.stopPropagation()}
     >
       <h2 id="confirm-title" class="text-base font-semibold mb-2" style="color: var(--ui-text-primary);">{pending.title}</h2>

@@ -399,7 +399,7 @@
     >
       <div
         class="rounded-lg border p-4 shadow-xl max-w-sm w-full mx-2"
-        style="background: var(--ui-bg-main); border-color: var(--ui-border);"
+        class="glass-modal"
       >
         <p class="text-sm mb-2" style="color: var(--ui-text-primary);">
           Enter absolute path to save (file server):

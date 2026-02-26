@@ -283,11 +283,7 @@
   in:fly={{ y: 20, duration: 380, easing: quintOut }}
 >
   <div
-    class="message-bubble-inner w-full rounded-[10px] px-3 py-2 shadow-sm relative overflow-hidden
-      {isUser
-      ? 'ui-user-bubble'
-      : 'bg-white dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100 border border-zinc-200/80 dark:border-zinc-700/80'}
-      {streaming ? ' streaming-bubble' : ''}"
+    class="message-bubble-inner w-full rounded-[10px] px-3 py-2 shadow-sm relative overflow-hidden {isUser ? 'ui-user-bubble' : ' /90 text-zinc-900 dark:text-zinc-100 /80 dark:border-zinc-700/80'} {streaming ? ' streaming-bubble' : ''} glass-modal"
   >
     {#if isUser}
       {#if contentArray.length}
@@ -325,6 +321,30 @@
           {/each}
         </div>
       {/if}
+      {#if Array.isArray(message.autoInjectedFiles) && message.autoInjectedFiles.length > 0}
+        <div class="mt-2 flex flex-wrap gap-2">
+          {#each message.autoInjectedFiles as file}
+            <div
+              class="flex items-center gap-1.5 px-2 py-1 bg-black/10 dark:bg-white/10 rounded-full text-[10px] font-medium opacity-80"
+              title="Auto-injected file context"
+            >
+              <svg
+                class="w-3 h-3"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                ><path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                ></path></svg
+              >
+              {file}
+            </div>
+          {/each}
+        </div>
+      {/if}
     {:else if isAssistant}
       <div
         class="message-assistant-body"
@@ -342,37 +362,45 @@
           </div>
         {/if}
         {#if !displayContent}
-          <div class="flex items-center py-1" aria-label="Thinking">
-            <svg
-              class="thinking-atom-icon w-8 h-8"
-              viewBox="0 0 32 32"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
+          {#if streaming}
+            <div class="flex items-center py-1" aria-label="Thinking">
+              <svg
+                class="thinking-atom-icon w-8 h-8"
+                viewBox="0 0 32 32"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle cx="16" cy="16" r="3" class="thinking-atom-nucleus" />
+                <ellipse
+                  cx="16"
+                  cy="16"
+                  rx="10"
+                  ry="4"
+                  class="thinking-atom-orbit"
+                />
+                <ellipse
+                  cx="16"
+                  cy="16"
+                  rx="12"
+                  ry="5"
+                  class="thinking-atom-orbit-2"
+                />
+                <ellipse
+                  cx="16"
+                  cy="16"
+                  rx="11"
+                  ry="4.5"
+                  class="thinking-atom-orbit-3"
+                />
+              </svg>
+            </div>
+          {:else}
+            <div
+              class="prose-chat prose dark:prose-invert max-w-none text-zinc-500 dark:text-zinc-400 italic font-medium"
             >
-              <circle cx="16" cy="16" r="3" class="thinking-atom-nucleus" />
-              <ellipse
-                cx="16"
-                cy="16"
-                rx="10"
-                ry="4"
-                class="thinking-atom-orbit"
-              />
-              <ellipse
-                cx="16"
-                cy="16"
-                rx="12"
-                ry="5"
-                class="thinking-atom-orbit-2"
-              />
-              <ellipse
-                cx="16"
-                cy="16"
-                rx="11"
-                ry="4.5"
-                class="thinking-atom-orbit-3"
-              />
-            </svg>
-          </div>
+              (Empty response)
+            </div>
+          {/if}
         {:else if hasThinkingOrAnswer}
           <div class="prose-chat prose dark:prose-invert max-w-none space-y-3">
             {#each parts as part}

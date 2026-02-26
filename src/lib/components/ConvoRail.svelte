@@ -162,10 +162,10 @@
 </script>
 
 <div
-  class="convo-rail flex flex-col shrink-0 border-r overflow-visible transition-[width] duration-200 relative min-w-0 glass"
+  class="convo-rail flex flex-col shrink-0 border-r overflow-visible transition-[width] duration-200 relative min-w-0"
   style="width: {expanded ? expandedWidth : '44px'}; max-width: {expanded
     ? expandedWidth
-    : '44px'}; border-color: var(--ui-border);"
+    : '44px'}; background: var(--glass-bg); border-right: 1px solid var(--glass-border); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);"
 >
   <!-- Protruded arrow tab midway on right edge: out = expand, in = retract -->
   <button

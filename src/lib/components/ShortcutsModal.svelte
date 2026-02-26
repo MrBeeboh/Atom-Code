@@ -31,7 +31,7 @@
     <div class="absolute inset-0 bg-black/50" onclick={close}></div>
     <div
       class="relative rounded-xl border shadow-xl max-w-sm w-full p-4"
-      style="background-color: var(--ui-bg-sidebar); border-color: var(--ui-border);"
+      class="glass-modal"
       onclick={(e) => e.stopPropagation()}
     >
       <div class="flex items-center justify-between mb-4">

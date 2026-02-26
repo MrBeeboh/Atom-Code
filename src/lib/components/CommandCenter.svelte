@@ -68,8 +68,8 @@
 </script>
 
 <header
-    class="h-11 shrink-0 flex items-center justify-between px-4 border-b z-30 glass"
-    style="border-color: var(--ui-border);"
+    class="h-11 shrink-0 flex items-center justify-between px-4 border-b z-30"
+    style="background: var(--glass-bg); border-bottom: 1px solid var(--glass-border); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);"
 >
     <!-- Left: Brand & Breadcrumbs -->
     <div class="flex items-center gap-3 overflow-hidden pr-4">

@@ -31,7 +31,7 @@
     <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true"></div>
     <div
       class="relative z-10 w-full max-w-2xl max-h-[80vh] rounded-2xl border shadow-2xl overflow-hidden flex flex-col"
-      style="background-color: var(--ui-bg-sidebar); border-color: var(--ui-border);"
+      class="glass-modal"
       role="presentation"
       transition:scale={{ start: 0.96, duration: 200 }}
       onclick={(e) => e.stopPropagation()}
