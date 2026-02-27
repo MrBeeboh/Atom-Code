@@ -12,7 +12,14 @@
     editorFilePath,
     editorLanguage,
     editorOpen,
+    repoMapText,
+    repoMapFileList,
+    repoMapLoading,
+    repoMapError,
   } from "$lib/stores.js";
+  import { repoMapSignatures } from "$lib/repoMap.js";
+  import { addMessage } from "$lib/db.js";
+  import { activeConversationId } from "$lib/stores.js";
   import FileTree from "$lib/components/FileTree.svelte";
   import { parseGitHubUrl } from "$lib/github.js";
 
@@ -35,6 +42,83 @@
   let browseLoading = $state(false);
   let browsePath = $state("");
   let browseError = $state(null);
+  let workspaceHistory = $state([]);
+  let searchQuery = $state("");
+
+  const filteredTree = $derived.by(() => {
+    if (!searchQuery.trim()) return tree;
+    const query = searchQuery.toLowerCase();
+
+    function filterNodes(nodes) {
+      return nodes
+        .map((node) => {
+          if (node.type === "file") {
+            return node.name.toLowerCase().includes(query) ? node : null;
+          }
+          const children = filterNodes(node.children || []);
+          if (children.length > 0 || node.name.toLowerCase().includes(query)) {
+            return { ...node, children };
+          }
+          return null;
+        })
+        .filter(Boolean);
+    }
+    return filterNodes(tree);
+  });
+
+  const forceExpandedOnSearch = $derived(searchQuery.trim().length > 0);
+
+  onMount(() => {
+    const stored = localStorage.getItem("workspaceHistory");
+    if (stored) {
+      try {
+        workspaceHistory = JSON.parse(stored);
+      } catch (e) {
+        workspaceHistory = [];
+      }
+    }
+    // Add default shortcuts if not present
+    const home = "/home/mike";
+    const root = "/";
+    if (!workspaceHistory.includes(home)) workspaceHistory.push(home);
+    if (!workspaceHistory.includes(root)) workspaceHistory.push(root);
+  });
+
+  function addToHistory(path) {
+    if (!path) return;
+    const next = [path, ...workspaceHistory.filter((p) => p !== path)].slice(
+      0,
+      5,
+    );
+    workspaceHistory = next;
+    localStorage.setItem("workspaceHistory", JSON.stringify(next));
+  }
+
+  async function openBrowse() {
+    browseLoading = true;
+    browseError = null;
+    try {
+      const url = get(fileServerUrl) || "http://localhost:8768";
+      const res = await fetch(`${url}/pick-directory`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to open folder picker");
+      }
+      const data = await res.json();
+      if (data.path) {
+        workspaceInput = data.path;
+        setWorkspace(data.path);
+      }
+    } catch (err) {
+      console.error("[FileExplorer] pick directory failed", err);
+      // Fallback to old modal if zenity is missing or fails
+      browsePath = workspaceInput.trim() || "/home/mike";
+      browseModalOpen = true;
+      fetchBrowseTree();
+    } finally {
+      browseLoading = false;
+    }
+  }
 
   async function fetchBrowseTree(path = browsePath) {
     browseLoading = true;
@@ -53,12 +137,6 @@
     } finally {
       browseLoading = false;
     }
-  }
-
-  function openBrowse() {
-    browsePath = workspaceInput.trim() || "/home/mike";
-    browseModalOpen = true;
-    fetchBrowseTree();
   }
 
   function selectBrowse(path) {
@@ -122,8 +200,28 @@
     }
   }
 
-  function setWorkspace() {
-    workspaceRoot.set(workspaceInput?.trim() || "");
+  function setWorkspace(path = workspaceInput) {
+    const trimmed = path?.trim() || "";
+    workspaceRoot.set(trimmed);
+    if (trimmed) {
+      addToHistory(trimmed);
+    }
+  }
+
+  async function ejectWorkspace() {
+    workspaceRoot.set("");
+    repoMapText.set("");
+    repoMapFileList.set([]);
+    repoMapSignatures.set({});
+    repoMapError.set(null);
+
+    const convId = get(activeConversationId);
+    if (convId) {
+      await addMessage(convId, {
+        role: "assistant",
+        content: "Workspace cleared — context injection stopped.",
+      });
+    }
   }
 
   function openCloneModal() {
@@ -286,59 +384,218 @@
     class="flex flex-col gap-2 p-2 border-b shrink-0"
     style="border-color: var(--ui-border);"
   >
-    <div class="w-full flex-col flex gap-1.5">
-      <span
-        class="text-[10px] font-semibold uppercase tracking-wider pl-1 block"
-        style="color: var(--ui-text-secondary);">Local Workspace</span
-      >
-      <div class="flex items-center gap-1.5 w-full">
-        {#if standalone}
+    <div class="w-full flex-col flex gap-2">
+      <div class="flex items-center justify-between pl-1">
+        <span
+          class="text-[10px] font-semibold uppercase tracking-wider block"
+          style="color: var(--ui-text-secondary);">Local Workspace</span
+        >
+        {#if $workspaceRoot}
+          <div class="flex items-center gap-2">
+            {#if $repoMapLoading}
+              <div
+                class="flex items-center gap-1.5 no-drag scale-in"
+                title="Indexing codebase context..."
+              >
+                <div class="relative w-2.5 h-2.5">
+                  <div
+                    class="absolute inset-0 border-2 border-[var(--ui-accent)] opacity-20 rounded-full"
+                  ></div>
+                  <div
+                    class="absolute inset-0 border-2 border-[var(--ui-accent)] border-t-transparent rounded-full animate-spin"
+                  ></div>
+                </div>
+              </div>
+            {/if}
+
+            <button
+              type="button"
+              class="p-0.5 rounded-full hover:bg-white/10 transition-colors"
+              title="Eject workspace"
+              onclick={ejectWorkspace}
+            >
+              <svg
+                class="w-3 h-3"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg
+              >
+            </button>
+          </div>
+        {/if}
+      </div>
+
+      {#if $workspaceRoot}
+        <div
+          class="group relative flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-all duration-200"
+          style="background: var(--ui-input-bg); border-color: var(--ui-border);"
+          title={$workspaceRoot}
+        >
+          <div
+            class="w-2 h-2 rounded-full shrink-0 animate-pulse bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+          ></div>
+          <span
+            class="text-xs font-bold truncate flex-1 uppercase tracking-tight"
+            >{$workspaceRoot.split(/[/\\]/).pop() || "/"}</span
+          >
           <button
             type="button"
-            class="shrink-0 p-1 rounded hover:bg-[color-mix(in_srgb,var(--ui-accent)_15%,transparent)] transition-colors"
-            title="Close file explorer (Ctrl+E)"
-            aria-label="Close file explorer"
-            onclick={() => fileExplorerOpen.set(false)}
+            class="shrink-0 p-1 rounded-md border transition-all hover:bg-white/5 active:scale-95"
+            style="color: var(--ui-text-secondary); border-color: var(--ui-border);"
+            onclick={openBrowse}
+            disabled={browseLoading}
+            title="Switch workspace"
           >
-            <svg
-              class="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              style="color: var(--ui-text-secondary);"
-              ><path d="M15 19l-7-7 7-7" /></svg
-            >
+            {#if browseLoading}
+              <div
+                class="w-3 h-3 border-2 border-white/20 border-t-white/80 rounded-full animate-spin"
+              ></div>
+            {:else}
+              <svg
+                class="w-3 h-3"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                ><path
+                  d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"
+                /></svg
+              >
+            {/if}
           </button>
-        {/if}
-        <input
-          type="text"
-          class="flex-1 min-w-0 rounded border px-2 py-1 text-xs font-mono"
-          style="background: var(--ui-input-bg); border-color: var(--ui-border); color: var(--ui-text-primary);"
-          placeholder="/home/user/project"
-          bind:value={workspaceInput}
-          onkeydown={(e) => e.key === "Enter" && setWorkspace()}
-        />
-        <button
-          type="button"
-          class="shrink-0 px-2 py-1 rounded text-xs font-medium"
-          style="background: var(--ui-accent); color: var(--ui-bg-main);"
-          onclick={setWorkspace}
-          title="Set workspace root">Set</button
-        >
-        <button
-          type="button"
-          class="shrink-0 px-2 py-1 rounded text-xs transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-          style="color: var(--ui-text-secondary); border: 1px solid var(--ui-border);"
-          onclick={openBrowse}
-          title="Browse local folders">Browse</button
-        >
-      </div>
+        </div>
+      {:else}
+        <div class="flex items-center gap-1.5 w-full">
+          {#if standalone}
+            <button
+              type="button"
+              class="shrink-0 p-1 rounded hover:bg-[color-mix(in_srgb,var(--ui-accent)_15%,transparent)] transition-colors"
+              title="Close file explorer (Ctrl+E)"
+              aria-label="Close file explorer"
+              onclick={() => fileExplorerOpen.set(false)}
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                style="color: var(--ui-text-secondary);"
+                ><path d="M15 19l-7-7 7-7" /></svg
+              >
+            </button>
+          {/if}
+          <div class="flex-1 relative flex items-center min-w-0">
+            <input
+              type="text"
+              class="w-full rounded border px-2 py-1 text-xs font-mono pr-7"
+              style="background: var(--ui-input-bg); border-color: var(--ui-border); color: var(--ui-text-primary);"
+              placeholder="Path or pick folder..."
+              bind:value={workspaceInput}
+              onkeydown={(e) => e.key === "Enter" && setWorkspace()}
+            />
+            {#if workspaceHistory.length > 0}
+              <div class="absolute right-1 top-1/2 -translate-y-1/2 group">
+                <button
+                  type="button"
+                  class="p-0.5 rounded hover:bg-white/10 opacity-40 hover:opacity-100 transition-all"
+                  title="Workspace history"
+                >
+                  <svg
+                    class="w-3 h-3"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"><path d="M19 9l-7 7-7-7" /></svg
+                  >
+                </button>
+                <div
+                  class="hidden group-hover:block absolute top-full right-0 mt-1 w-64 bg-black/90 backdrop-blur-xl border border-white/10 rounded-lg shadow-2xl z-50 py-1 overflow-hidden scale-in"
+                >
+                  <div
+                    class="px-2 py-1 text-[9px] uppercase tracking-widest font-bold opacity-30 border-b border-white/5 mb-1 flex justify-between items-center"
+                  >
+                    <span>Pinned & Recent</span>
+                    <button
+                      class="hover:text-white transition-colors p-0.5"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        workspaceHistory = ["/home/mike", "/"];
+                        localStorage.setItem(
+                          "workspaceHistory",
+                          JSON.stringify(workspaceHistory),
+                        );
+                      }}
+                      title="Reset to defaults"
+                    >
+                      <svg
+                        class="w-2.5 h-2.5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        ><path
+                          d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
+                        /><path d="M3 3v5h5" /></svg
+                      >
+                    </button>
+                  </div>
+                  {#each workspaceHistory as hist}
+                    <button
+                      type="button"
+                      class="w-full px-3 py-2 text-[11px] text-left hover:bg-white/5 truncate transition-colors"
+                      onclick={() => {
+                        workspaceInput = hist;
+                        setWorkspace(hist);
+                      }}
+                    >
+                      <div class="font-bold mb-0.5 uppercase tracking-tighter">
+                        {hist.split(/[/\\]/).pop()}
+                      </div>
+                      <div
+                        class="opacity-40 text-[9px] truncate font-mono italic"
+                      >
+                        {hist}
+                      </div>
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+          </div>
+          <button
+            type="button"
+            class="shrink-0 p-1.5 rounded-lg border transition-all hover:bg-white/5 active:scale-95"
+            style="color: var(--ui-text-secondary); border-color: var(--ui-border);"
+            onclick={openBrowse}
+            disabled={browseLoading}
+            title="Browse local folders"
+          >
+            {#if browseLoading}
+              <div
+                class="w-3.5 h-3.5 border-2 border-white/20 border-t-white/80 rounded-full animate-spin"
+              ></div>
+            {:else}
+              <svg
+                class="w-3.5 h-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                ><path
+                  d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"
+                /></svg
+              >
+            {/if}
+          </button>
+        </div>
+      {/if}
     </div>
 
-    <div class="w-full flex-col flex gap-1.5 mt-1">
+    <div class="w-full flex-col flex gap-1.5 mt-2">
       <span
         class="text-[10px] font-semibold uppercase tracking-wider pl-1 block"
         style="color: var(--ui-text-secondary);">GitHub</span
@@ -346,7 +603,7 @@
       <div class="flex items-center gap-1.5 w-full">
         <button
           type="button"
-          class="flex-1 px-2 py-1 rounded text-xs flex items-center justify-center gap-1.5 transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+          class="flex-1 px-2 py-1.5 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors hover:bg-black/5 dark:hover:bg-white/5"
           style="color: var(--ui-text-secondary); border: 1px solid var(--ui-border);"
           onclick={openCloneModal}
           title="Clone GitHub repo into workspace"
@@ -369,7 +626,7 @@
         {#if ($pinnedFiles || []).length > 0}
           <button
             type="button"
-            class="flex-1 px-2 py-1 rounded text-xs transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+            class="flex-1 px-2 py-1.5 rounded-lg text-xs transition-colors hover:bg-black/5 dark:hover:bg-white/5"
             style="color: var(--ui-text-secondary); border: 1px solid var(--ui-border);"
             onclick={unpinAll}
             title="Unpin all files">Unpin all</button
@@ -551,7 +808,95 @@
     </div>
   {/if}
 
-  <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-1.5">
+  <div
+    class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-1.5 custom-scrollbar"
+  >
+    {#if (get(workspaceRoot) || "").trim()}
+      <!-- Search Bar -->
+      <div class="px-1.5 mb-2">
+        <div class="relative flex items-center group">
+          <svg
+            class="absolute left-2 w-3 h-3 opacity-30 group-focus-within:opacity-70 transition-opacity"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            ><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg
+          >
+          <input
+            type="text"
+            placeholder="Search files..."
+            class="w-full bg-black/10 dark:bg-white/5 border border-white/5 rounded-md pl-7 pr-2 py-1 text-[11px] outline-none focus:border-white/20 transition-all font-medium"
+            bind:value={searchQuery}
+          />
+          {#if searchQuery}
+            <button
+              class="absolute right-1.5 p-0.5 rounded-full hover:bg-white/10 opacity-40 hover:opacity-100"
+              onclick={() => (searchQuery = "")}
+            >
+              <svg
+                class="w-2.5 h-2.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3"><path d="M18 6L6 18M6 6l12 12" /></svg
+              >
+            </button>
+          {/if}
+        </div>
+      </div>
+
+      <!-- Pinned Context -->
+      {#if ($pinnedFiles || []).length > 0}
+        <div class="mb-3 px-1.5">
+          <div class="flex items-center justify-between mb-1 px-1">
+            <span
+              class="text-[9px] font-bold uppercase tracking-wider opacity-40"
+              >Pinned Context</span
+            >
+            <button
+              class="text-[9px] opacity-40 hover:opacity-100 transition-opacity hover:underline"
+              onclick={unpinAll}>Clear all</button
+            >
+          </div>
+          <div class="flex flex-col gap-0.5">
+            {#each $pinnedFiles as path}
+              <div
+                class="flex items-center justify-between group px-2 py-1 rounded bg-[color-mix(in_srgb,var(--ui-accent)_5%,transparent)] border border-[color-mix(in_srgb,var(--ui-accent)_10%,transparent)]"
+              >
+                <button
+                  class="flex-1 text-[11px] truncate text-left hover:text-[var(--ui-accent)] transition-colors font-medium mr-2"
+                  onclick={() => openFileInEditor(path)}
+                  title={path}
+                >
+                  {path.split(/[/\\]/).pop()}
+                </button>
+                <button
+                  class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-all"
+                  onclick={() => unpin(path)}
+                  title="Unpin"
+                >
+                  <svg
+                    class="w-2.5 h-2.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg
+                  >
+                </button>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
+
+      <div
+        class="px-1 mb-1 text-[9px] font-bold uppercase tracking-wider opacity-40"
+      >
+        Files
+      </div>
+    {/if}
+
     {#if !(get(workspaceRoot) || "").trim()}
       <div
         class="flex flex-col items-center justify-center pt-8 px-4 text-center text-[11px] gap-2"
@@ -583,8 +928,8 @@
       </div>
     {:else}
       <FileTree
-        nodes={tree}
-        {expandedDirs}
+        nodes={filteredTree}
+        expandedDirs={forceExpandedOnSearch ? {} : expandedDirs}
         {pinnedSet}
         openFilePath={$editorFilePath}
         level={0}
@@ -594,6 +939,7 @@
         onOpenFile={openFileInEditor}
         onCopyPath={copyPath}
         {onContextMenu}
+        forceExpanded={forceExpandedOnSearch}
       />
     {/if}
   </div>
@@ -634,6 +980,18 @@
           closeContextMenu();
         }}>Copy path</button
       >
+      {#if !contextMenu.isFile}
+        <button
+          type="button"
+          class="w-full text-left px-3 py-1.5 text-xs hover:bg-[color-mix(in_srgb,var(--ui-accent)_15%,transparent)] border-t border-white/5"
+          style="color: var(--ui-accent);"
+          onclick={() => {
+            workspaceInput = contextMenu.path;
+            setWorkspace(contextMenu.path);
+            closeContextMenu();
+          }}>Set as Workspace Root</button
+        >
+      {/if}
     </div>
   {/if}
 </div>

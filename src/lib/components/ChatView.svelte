@@ -549,6 +549,13 @@
       } catch (e) {
         console.warn("[ChatView] Multi-file context fetch failed:", e?.message);
       }
+      if (allPaths.length > 0 && !fileContext.trim()) {
+        messagePreparing.set(false);
+        chatError.set(
+          "File server (port 8768) not reachable. File contents could not be loaded. Start the file server (e.g. from the app) or paste the content into the message instead.",
+        );
+        return;
+      }
     }
 
     // --- NEW: Auto-Context Injection ---

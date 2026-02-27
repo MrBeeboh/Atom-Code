@@ -40,6 +40,25 @@ function checkPathAccess(normalized, res) {
   return true;
 }
 
+// GET /pick-directory - Opens a native folder picker (Linux: zenity)
+app.get('/pick-directory', async (req, res) => {
+  try {
+    // Attempt to use zenity to select a directory
+    const { stdout } = await execAsync('zenity --file-selection --directory --title="Choose Workspace Folder"');
+    const pickedPath = stdout.trim();
+    if (!pickedPath) {
+      return res.status(400).json({ error: 'No directory selected' });
+    }
+    // We don't strictly enforce checkPathAccess here because the user
+    // manually picked it via OS dialog, but we'll return it so the UI can set it.
+    res.json({ path: pickedPath });
+  } catch (err) {
+    // If zenity is cancelled or fails
+    res.status(500).json({ error: 'Folder picker closed or zenity not found' });
+  }
+});
+
+
 // GET /tree?root=/path/to/project&depth=3
 app.get('/tree', async (req, res) => {
   const rawRoot = req.query.root || process.env.HOME || WORKSPACE_ROOT;
