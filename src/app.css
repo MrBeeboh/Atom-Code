@@ -962,6 +962,48 @@ html {
   background-color: #0a0c0a;
 }
 
+/* THEME 6: vanguard – Techno-Military (Matte Black / Gunmetal / Safety Orange) */
+[data-ui-theme="vanguard"] {
+  --ui-radius: 0;
+  --ui-bg-main: #0a0a0a;
+  --ui-bg-sidebar: #050505;
+  --ui-accent: #ff5f00;
+  /* Safety Orange */
+  --ui-accent-hot: #ff3e00;
+  --ui-text-primary: #e4e4e7;
+  --ui-text-secondary: #71717a;
+  --ui-border: #18181b;
+  --ui-sidebar-active: #18181b;
+  --ui-sidebar-hover: #27272a;
+  --ui-input-bg: #000000;
+  --ui-input-border: #3f3f46;
+  --ui-glow: rgba(255, 95, 0, 0.15);
+  --ui-code-bg: #000000;
+  --atom-accent: #ff5f00;
+  --atom-accent-light: #ff7f30;
+  --atom-teal: #06b6d4;
+  --atom-amber: #f59e0b;
+}
+
+[data-ui-theme="vanguard"] body {
+  background-color: #0a0a0a;
+  /* HUD effect: subtle horizontal scanlines */
+  background-image: linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px);
+  background-size: 100% 3px;
+}
+
+[data-ui-theme="vanguard"] .glass-modal,
+[data-ui-theme="vanguard"] .glass {
+  border-radius: 0 !important;
+}
+
+[data-ui-theme="vanguard"] button,
+[data-ui-theme="vanguard"] input,
+[data-ui-theme="vanguard"] div {
+  /* Enforce sharp edges for industrial feel */
+  --ui-radius: 0 !important;
+}
+
 
 /* Theme-aware utilities (glow, etc.) */
 .ui-input-glow:focus-within {
@@ -1217,7 +1259,7 @@ body {
 .dark,
 [data-ui-theme="dark"],
 [data-ui-theme="coder"],
-[data-ui-theme="trek"] {
+[data-ui-theme="vanguard"] {
   --glass-bg: rgba(255, 255, 255, 0.04);
   --glass-bg-hover: rgba(255, 255, 255, 0.07);
   --glass-bg-active: rgba(255, 255, 255, 0.10);

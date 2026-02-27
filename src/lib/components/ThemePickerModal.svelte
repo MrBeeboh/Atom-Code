@@ -9,7 +9,7 @@
     coder: { bg: "#000000", accent: "#39d353", text: "#c9d1d9" },
     ollama: { bg: "#fcfcfc", accent: "#101010", text: "#171717" },
     perplexity: { bg: "#0a0c0a", accent: "#20c997", text: "#e8f0e8" },
-    trek: { bg: "#000000", accent: "#ff9900", text: "#ffffcc" },
+    vanguard: { bg: "#0d0d0d", accent: "#ff5f00", text: "#a1a1aa" },
   };
 
   function selectTheme(value) {

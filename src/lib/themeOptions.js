@@ -8,5 +8,5 @@ export const UI_THEME_OPTIONS = [
   { value: 'coder', label: 'Coder' },
   { value: 'ollama', label: 'Open Web UI' },
   { value: 'perplexity', label: 'Perplexity' },
-  { value: 'trek', label: 'Star Trek' },
+  { value: 'vanguard', label: 'Vanguard' },
 ];
