@@ -2,12 +2,38 @@
  * @file api.js
  * @description LM Studio API client: list models, load/unload, chat (streaming and non-streaming).
  *
- * Endpoints: GET /api/v1/models, POST /api/v1/models/load, POST /api/v1/models/unload (per-instance),
- * POST /v1/chat/completions. Bulk eject: unload helper at http://localhost:8766 (POST /unload-all, runs lms unload --all).
  * Base URL: localStorage lmStudioBaseUrl or dev proxy /api/lmstudio or http://localhost:1234.
  */
+import { LMStudioClient } from '@lmstudio/sdk';
 
 const DEFAULT_BASE = typeof import.meta !== 'undefined' && import.meta.env?.DEV ? '/api/lmstudio' : 'http://localhost:1234';
+
+let _lmStudioClient = null;
+let _lmStudioClientBaseUrl = null;
+
+export function getLMStudioClient() {
+  const currentBase = getLmStudioBase();
+  let wsBase = currentBase;
+
+  // SDK uses WebSockets for most commands, so convert http:// to ws://
+  if (wsBase.startsWith('http')) {
+    wsBase = wsBase.replace(/^http/, 'ws');
+  } else if (wsBase.startsWith('/')) {
+    // Relative path, resolve it against window location if in browser
+    if (typeof window !== 'undefined') {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsBase = `${protocol}//${window.location.host}${wsBase}`;
+    } else {
+      wsBase = `ws://127.0.0.1:1234`;
+    }
+  }
+
+  if (!_lmStudioClient || _lmStudioClientBaseUrl !== wsBase) {
+    _lmStudioClient = new LMStudioClient({ baseUrl: wsBase });
+    _lmStudioClientBaseUrl = wsBase;
+  }
+  return _lmStudioClient;
+}
 
 /** Current LM Studio base URL (no trailing slash). Reads from localStorage so UI settings apply immediately. */
 function getLmStudioBase() {
@@ -245,39 +271,29 @@ const LOCAL_MODELS_TIMEOUT_MS = 10000;
 const CLOUD_REQUEST_TIMEOUT_MS = 120000;
 
 /**
- * Fetch list of models from LM Studio (local). Throws if unreachable or timeout.
+ * Fetch list of models from LM Studio using the SDK. Throws if unreachable.
  * @returns {Promise<{ id: string }[]>}
  */
 async function getLocalModels() {
-  const base = getLmStudioBase();
-  const rest = `${base}/api/v1`;
-  const openai = `${base}/v1`;
-  const ctrl = new AbortController();
-  const to = setTimeout(() => ctrl.abort(), LOCAL_MODELS_TIMEOUT_MS);
+  const client = getLMStudioClient();
   try {
-    const res = await fetch(`${rest}/models`, { signal: ctrl.signal });
-    if (res.ok) {
-      const data = await res.json();
-      const raw = data.models ?? (Array.isArray(data) ? data : []);
-      if (Array.isArray(raw) && raw.length > 0) {
-        const llms = raw
-          .filter((m) => m && m.type !== 'embedding')
-          .map(toModelItem)
-          .filter(Boolean);
-        if (llms.length > 0) {
-          clearTimeout(to);
-          return llms;
-        }
-      }
-    }
-    const fallback = await fetch(`${openai}/models`, { signal: ctrl.signal });
-    if (!fallback.ok) throw new Error(`LM Studio models: ${fallback.status}`);
-    const data = await fallback.json();
-    const list = data.data ?? data;
-    const arr = Array.isArray(list) ? list : [];
-    return arr.map(toModelItem).filter(Boolean);
-  } finally {
-    clearTimeout(to);
+    const downloaded = await client.system.listDownloadedModels();
+    return downloaded
+      .filter(m => m.type !== 'embedding')
+      .map(m => {
+        const id = m.path || m.modelKey;
+        if (!id) return null;
+        return {
+          id,
+          name: m.displayName || m.modelKey || id,
+          size: m.sizeBytes || 0,
+          architecture: m.architecture || '',
+          format: m.format || ''
+        };
+      })
+      .filter(Boolean);
+  } catch (err) {
+    throw new Error(`LM Studio SDK error: ${err.message}`);
   }
 }
 
@@ -299,43 +315,27 @@ export async function getModels() {
 
 /**
  * Get model keys that are currently loaded (have at least one instance in memory).
- * Uses GET /api/v1/models and checks loaded_instances. Use to wait until unload is complete.
  * @returns {Promise<string[]>} Model keys (ids) that are loaded
  */
 export async function getLoadedModelKeys() {
-  const base = getLmStudioBase();
-  const res = await fetch(`${base}/api/v1/models`);
-  if (!res.ok) return [];
-  const data = await res.json();
-  const raw = data.models ?? data.data?.models ?? (Array.isArray(data) ? data : []);
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .filter((m) => {
-      const instances = m?.loaded_instances ?? m?.instances ?? m?.loaded;
-      return m && Array.isArray(instances) && instances.length > 0;
-    })
-    .map((m) => m.key ?? m.id ?? '')
-    .filter(Boolean);
+  const client = getLMStudioClient();
+  try {
+    const loaded = await client.llm.listLoaded();
+    return loaded.map(m => m.path || m.modelKey || m.identifier).filter(Boolean);
+  } catch (err) {
+    console.warn("Failed to get loaded model keys from SDK", err);
+    return [];
+  }
 }
 
 /**
- * Unload one model instance by instance_id (LM Studio REST: POST body is { instance_id }).
- * @param {string} instanceId - From loaded_instances[].id in list response
+ * Unload one model instance by instance_id - NOT USED BY SDK; kept for compat but throws deprecation warning.
+ * @param {string} instanceId
  * @returns {Promise<{ instance_id?: string }>}
  */
 export async function unloadByInstanceId(instanceId) {
-  if (!instanceId || typeof instanceId !== 'string') return {};
-  const base = getLmStudioBase();
-  const res = await fetch(`${base}/api/v1/models/unload`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ instance_id: instanceId }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`LM Studio unload: ${res.status} ${text}`);
-  }
-  return res.json();
+  console.warn("unloadByInstanceId is deprecated with @lmstudio/sdk, use unloadModel(modelId)");
+  return {};
 }
 
 /**
@@ -361,81 +361,73 @@ export async function waitUntilUnloaded(modelIds, opts = {}) {
 }
 
 /**
- * Load a model with the given load config (LM Studio REST API v1).
- * Sends only params LM Studio accepts: context_length, eval_batch_size, flash_attention, offload_kv_cache_to_gpu.
- * GPU, CPU threads, Parallel are stored in our UI but not sent (LM Studio manages them).
- * @param {string} modelId - Model identifier (as in GET /v1/models)
+ * Eagerly load a model using the SDK.
+ * @param {string} modelId - Model identifier
  * @param {Object} loadConfig
  * @param {number} [loadConfig.context_length]
  * @param {number} [loadConfig.eval_batch_size]
  * @param {boolean} [loadConfig.flash_attention]
  * @param {boolean} [loadConfig.offload_kv_cache_to_gpu]
- * @returns {Promise<{ type: string, instance_id: string, load_time_seconds: number, status: string, load_config?: object }>}
+ * @returns {Promise<{ type: string, instance_id: string, load_time_seconds: number, status: string }>}
  */
 export async function loadModel(modelId, loadConfig = {}) {
-  const body = { model: modelId };
-  if (loadConfig.context_length != null) body.context_length = loadConfig.context_length;
-  if (loadConfig.eval_batch_size != null) body.eval_batch_size = loadConfig.eval_batch_size;
-  if (loadConfig.flash_attention != null) body.flash_attention = loadConfig.flash_attention;
-  if (loadConfig.offload_kv_cache_to_gpu != null) body.offload_kv_cache_to_gpu = loadConfig.offload_kv_cache_to_gpu;
-  body.echo_load_config = true;
+  const client = getLMStudioClient();
+  const sdkConfig = {};
+  if (loadConfig.context_length != null) sdkConfig.contextLength = loadConfig.context_length;
+  if (loadConfig.eval_batch_size != null) sdkConfig.evalBatchSize = loadConfig.eval_batch_size;
+  // flash_attention doesn't map directly in the new SDK often, dropping for now unless explicitly needed
+  // kvcache is similar, assuming reasonable defaults managed by LM Studio.
 
-  const base = getLmStudioBase();
-  const res = await fetch(`${base}/api/v1/models/load`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`LM Studio load: ${res.status} ${text}`);
+  try {
+    const start = Date.now();
+    await client.llm.load(modelId, { config: sdkConfig });
+    return { type: "", instance_id: "sdk-managed", load_time_seconds: (Date.now() - start) / 1000, status: "loaded" };
+  } catch (err) {
+    throw new Error(`LM Studio SDK Load Error: ${err.message}`);
   }
-  return res.json();
+}
+
+async function resolveLMSModelId(client, modelId) {
+  try {
+    const loaded = await client.llm.listLoaded();
+    const target = loaded.find(m => m.path === modelId || m.modelKey === modelId || m.identifier === modelId);
+    return target ? target.identifier : modelId;
+  } catch (err) {
+    return modelId;
+  }
 }
 
 /**
- * Get loaded instance IDs for a single model key (from GET /api/v1/models: model.key + loaded_instances[].id).
- * @param {string} modelKey - Model key to match (m.key ?? m.id)
+ * Get loaded instance IDs for a single model key - unused with SDK.
+ * @param {string} modelKey
  * @returns {Promise<string[]>}
  */
 export async function getLoadedInstanceIdsForModel(modelKey) {
-  if (!modelKey || typeof modelKey !== 'string') return [];
-  const base = getLmStudioBase();
-  const res = await fetch(`${base}/api/v1/models`);
-  if (!res.ok) return [];
-  const data = await res.json();
-  const raw = data.models ?? data.data?.models ?? (Array.isArray(data) ? data : []);
-  const key = String(modelKey).trim().toLowerCase();
-  const ids = [];
-  for (const m of raw) {
-    const modelKeyCur = (m?.key ?? m?.id ?? '').toString().trim().toLowerCase();
-    if (!modelKeyCur || modelKeyCur !== key && !modelKeyCur.endsWith('/' + key) && !key.endsWith('/' + modelKeyCur))
-      continue;
-    const instances = m?.loaded_instances ?? m?.instances;
-    if (Array.isArray(instances)) for (const inst of instances) if (inst?.id != null) ids.push(String(inst.id));
-  }
-  return ids;
+  return [];
 }
 
 /**
- * Unload a model from memory by model key. Resolves to instance IDs via list API and unloads each.
+ * Unload a model from memory using SDK.
  * @param {string} modelId - Model key (e.g. from load or list)
  * @returns {Promise<void>}
  */
 export async function unloadModel(modelId) {
   if (!modelId || typeof modelId !== 'string') return;
-  const instanceIds = await getLoadedInstanceIdsForModel(modelId);
-  await Promise.allSettled(instanceIds.map((id) => unloadByInstanceId(id).catch(() => { })));
+  const client = getLMStudioClient();
+  try {
+    const identifier = await resolveLMSModelId(client, modelId);
+    await client.llm.unload(identifier);
+  } catch (err) {
+    console.warn("SDK Unload errored", err);
+  }
 }
 
 const DEFAULT_UNLOAD_HELPER_URL = 'http://localhost:8766';
 
 /**
- * Unload every currently loaded model instance (e.g. to free VRAM).
- * Calls the helper at helperUrlOrOverride, or from localStorage, or default http://localhost:8766.
- * If the helper is not running, returns { ok: false } and does not throw.
- * @param {string} [helperUrlOrOverride] - Optional; if set, use this; else localStorage; else default.
- * @returns {Promise<{ ok: boolean }>} - ok true if eject succeeded, false if helper unreachable or error.
+ * Unload every currently loaded model instance. Still calls out to any local unload scripts if provided via override.
+ * @param {string} [helperUrlOrOverride]
+ * @returns {Promise<{ ok: boolean }>}
  */
 export async function unloadAllLoadedModels(helperUrlOrOverride) {
   const fromOverride =
@@ -455,32 +447,18 @@ export async function unloadAllLoadedModels(helperUrlOrOverride) {
 }
 
 /**
- * Unload ALL currently loaded model instances using the native LM Studio API.
- * Does NOT require any helper server. Finds every loaded instance via
- * GET /api/v1/models and calls POST /api/v1/models/unload for each.
+ * Unload ALL currently loaded model instances using the SDK.
  * @returns {Promise<{ ok: boolean, unloaded: number }>}
  */
 export async function unloadAllModelsNative() {
+  const client = getLMStudioClient();
   try {
-    const base = getLmStudioBase();
-    const res = await fetch(`${base}/api/v1/models`);
-    if (!res.ok) return { ok: false, unloaded: 0 };
-    const data = await res.json();
-    const raw = data.models ?? data.data?.models ?? (Array.isArray(data) ? data : []);
-    if (!Array.isArray(raw)) return { ok: false, unloaded: 0 };
-    const instanceIds = [];
-    for (const m of raw) {
-      const instances = m?.loaded_instances ?? m?.instances;
-      if (Array.isArray(instances)) {
-        for (const inst of instances) {
-          if (inst?.id != null) instanceIds.push(String(inst.id));
-        }
-      }
-    }
-    if (instanceIds.length === 0) return { ok: true, unloaded: 0 };
-    await Promise.allSettled(instanceIds.map((id) => unloadByInstanceId(id).catch(() => { })));
-    return { ok: true, unloaded: instanceIds.length };
-  } catch (_) {
+    const loaded = await client.llm.listLoaded();
+    if (loaded.length === 0) return { ok: true, unloaded: 0 };
+    await Promise.allSettled(loaded.map((m) => client.llm.unload(m.identifier)));
+    return { ok: true, unloaded: loaded.length };
+  } catch (err) {
+    console.warn("Failed to native-unload all via SDK", err);
     return { ok: false, unloaded: 0 };
   }
 }
@@ -839,13 +817,50 @@ export async function requestChatCompletion({ model, messages, options = {} }) {
       throw err;
     }
   }
-  const { base, headers: authHeaders } = getBaseAndAuth(model);
-  const resolvedModel = resolveModelId(model);
+
+  const isCloud = model && String(model).includes(':');
+
+  // NOTE: The @lmstudio/sdk respond() method does NOT support OpenAI-style image_url content parts.
+  // When messages contain images (vision/PDF pages), we must use the local HTTP API instead.
+  const hasImageContent = Array.isArray(messages) && messages.some(
+    m => Array.isArray(m.content) && m.content.some(c => c?.type === 'image_url')
+  );
+
+  if (!isCloud && !hasImageContent) {
+    const client = getLMStudioClient();
+    const identifier = await resolveLMSModelId(client, model);
+    const lmsModel = await client.llm.model(identifier);
+    try {
+      const response = await lmsModel.respond(messages, {
+        temperature: options.temperature,
+        contextLength: options.max_tokens,
+      });
+      return {
+        content: response.content,
+        usage: { prompt_tokens: response.stats?.promptTokensCount, completion_tokens: response.stats?.predictedTokensCount },
+      };
+    } catch (err) {
+      const msg = (err instanceof Error ? err.message : String(err)) || 'Unknown LM Studio error';
+      throw new Error(`LM Studio Chat Error: ${msg}`);
+    }
+  }
+
+  // HTTP path: cloud models OR local models with image/vision content
+  let base, resolvedModel, authHeaders;
+  if (isCloud) {
+    const r = getBaseAndAuth(model);
+    base = r.base;
+    authHeaders = r.headers;
+    resolvedModel = resolveModelId(model);
+  } else {
+    base = `${getLmStudioBase()}/v1`;
+    authHeaders = {};
+    resolvedModel = model;
+  }
   const url = base.endsWith('/v1') ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
   const headers = { 'Content-Type': 'application/json', ...authHeaders };
-  const isCloud = model && String(model).includes(':');
   const rawMax = options.max_tokens ?? 1024;
-  const maxTokens = isCloud ? Math.max(1, Math.min(8192, Number(rawMax) || 1024)) : rawMax;
+  const maxTokens = Math.max(1, Math.min(8192, Number(rawMax) || 1024));
   const body = {
     model: resolvedModel,
     messages,
@@ -854,38 +869,26 @@ export async function requestChatCompletion({ model, messages, options = {} }) {
     max_tokens: maxTokens,
     ...(options.top_p != null && { top_p: options.top_p }),
     ...(options.top_k != null && { top_k: options.top_k }),
-    ...(!isCloud && options.repeat_penalty != null && { repeat_penalty: options.repeat_penalty }),
-    ...(!isCloud && options.presence_penalty != null && { presence_penalty: options.presence_penalty }),
-    ...(!isCloud && options.frequency_penalty != null && { frequency_penalty: options.frequency_penalty }),
   };
   const fetchOpts = { method: 'POST', headers, body: JSON.stringify(body) };
-  if (isCloud) {
-    const ctrl = new AbortController();
-    const to = setTimeout(() => ctrl.abort(), CLOUD_REQUEST_TIMEOUT_MS);
-    fetchOpts.signal = ctrl.signal;
-    try {
-      const res = await fetch(url, fetchOpts);
-      clearTimeout(to);
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(parseChatApiError(res.status, text, model));
-      }
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content ?? '';
-      return { content: String(content).trim(), usage: data.usage };
-    } catch (err) {
-      clearTimeout(to);
-      throw err;
+
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), CLOUD_REQUEST_TIMEOUT_MS);
+  fetchOpts.signal = ctrl.signal;
+  try {
+    const res = await fetch(url, fetchOpts);
+    clearTimeout(to);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(parseChatApiError(res.status, text, model));
     }
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content ?? '';
+    return { content: String(content).trim(), usage: data.usage };
+  } catch (err) {
+    clearTimeout(to);
+    throw err;
   }
-  const res = await fetch(url, fetchOpts);
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(parseChatApiError(res.status, text, model));
-  }
-  const data = await res.json();
-  const content = data.choices?.[0]?.message?.content ?? '';
-  return { content: String(content).trim(), usage: data.usage };
 }
 
 /** Regex to extract <render_searched_image image_id="..." size="..."> from stream deltas (Grok image search). */
@@ -1081,8 +1084,8 @@ export async function streamChatCompletion({ model, messages, options = {}, onCh
   if (isGrokModel(model)) {
     return streamGrokResponsesApi({ model, messages, options, onChunk, onUsage, onDone, onImageRef, signal });
   }
+
   const startTime = Date.now();
-  let usage = null;
   let doneCalled = false;
   const callOnDone = () => {
     if (!doneCalled) {
@@ -1090,30 +1093,78 @@ export async function streamChatCompletion({ model, messages, options = {}, onCh
       onDone?.();
     }
   };
-  const { base, headers: authHeaders } = getBaseAndAuth(model);
-  const resolvedModel = resolveModelId(model);
-  const streamUrl = base.endsWith('/v1') ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
-  const headers = { 'Content-Type': 'application/json', ...authHeaders };
+
   const isCloud = model && String(model).includes(':');
+
+  // The @lmstudio/sdk does NOT support OpenAI image_url content parts in respond().
+  // Route vision/PDF messages through the HTTP SSE streaming path instead.
+  const hasImageContent = Array.isArray(messages) && messages.some(
+    m => Array.isArray(m.content) && m.content.some(c => c?.type === 'image_url')
+  );
+
+  if (!isCloud && !hasImageContent) {
+    const client = getLMStudioClient();
+    try {
+      const identifier = await resolveLMSModelId(client, model);
+      const lmsModel = await client.llm.model(identifier);
+      const stream = lmsModel.respond(messages, {
+        temperature: options.temperature,
+        contextLength: options.max_tokens,
+        stopStrings: options.stop,
+      });
+
+      if (signal) {
+        if (signal.aborted) stream.cancel();
+        else signal.addEventListener('abort', () => stream.cancel());
+      }
+
+      for await (const chunk of stream) {
+        if (chunk.content) onChunk(chunk.content);
+      }
+
+      const result = await stream;
+      const usageParams = { prompt_tokens: result.stats?.promptTokensCount, completion_tokens: result.stats?.predictedTokensCount };
+      onUsage?.(usageParams);
+      callOnDone();
+      return { usage: usageParams, elapsedMs: Date.now() - startTime };
+    } catch (err) {
+      if (err?.name === 'AbortError' || signal?.aborted) {
+        callOnDone();
+        return { elapsedMs: Date.now() - startTime, aborted: true };
+      }
+      callOnDone();
+      const msg = (err instanceof Error ? err.message : String(err)) || 'Unknown LM Studio error';
+      throw new Error(`LM Studio Stream Error: ${msg}`);
+    }
+  }
+
+  // HTTP SSE streaming: cloud models OR local models with image/vision content
+  let streamBase, resolvedModel, authHeaders;
+  if (isCloud) {
+    const r = getBaseAndAuth(model);
+    streamBase = r.base;
+    authHeaders = r.headers;
+    resolvedModel = resolveModelId(model);
+  } else {
+    streamBase = `${getLmStudioBase()}/v1`;
+    authHeaders = {};
+    resolvedModel = model;
+  }
+  const streamUrl = streamBase.endsWith('/v1') ? `${streamBase}/chat/completions` : `${streamBase}/v1/chat/completions`;
+  const headers = { 'Content-Type': 'application/json', ...authHeaders };
   const rawMax = options.max_tokens ?? 4096;
-  const maxTokens = isCloud ? Math.max(1, Math.min(8192, Number(rawMax) || 4096)) : rawMax;
+  const maxTokens = Math.max(1, Math.min(8192, Number(rawMax) || 4096));
   const streamBody = {
     model: resolvedModel,
     messages,
     stream: true,
-    ...(!isCloud && { stream_options: { include_usage: true } }),
     temperature: options.temperature ?? 0.7,
     max_tokens: maxTokens,
     ...(options.top_p != null && { top_p: options.top_p }),
     ...(options.top_k != null && { top_k: options.top_k }),
-    ...(!isCloud && options.repeat_penalty != null && { repeat_penalty: options.repeat_penalty }),
-    ...(!isCloud && options.presence_penalty != null && { presence_penalty: options.presence_penalty }),
-    ...(!isCloud && options.frequency_penalty != null && { frequency_penalty: options.frequency_penalty }),
-    ...(options.stop?.length && { stop: options.stop }),
-    ...(!isCloud && options.ttl != null && Number(options.ttl) > 0 && { ttl: Number(options.ttl) }),
   };
   let effectiveSignal = signal;
-  const timeoutMs = isCloud ? CLOUD_REQUEST_TIMEOUT_MS : 300000;
+  const timeoutMs = CLOUD_REQUEST_TIMEOUT_MS;
   const timeoutCtrl = new AbortController();
   let timeoutId = setTimeout(() => timeoutCtrl.abort(), timeoutMs);
 
@@ -1129,6 +1180,8 @@ export async function streamChatCompletion({ model, messages, options = {}, onCh
     }
   }
   effectiveSignal = timeoutCtrl.signal;
+
+  let usage = null;
 
   try {
     const res = await fetch(streamUrl, {
@@ -1192,6 +1245,7 @@ export async function streamChatCompletion({ model, messages, options = {}, onCh
       }
     } catch (readErr) {
       if (readErr?.name === 'AbortError') {
+        callOnDone();
         return { usage, elapsedMs: Date.now() - startTime, aborted: true };
       }
       throw readErr;
@@ -1199,6 +1253,7 @@ export async function streamChatCompletion({ model, messages, options = {}, onCh
     return { usage, elapsedMs: Date.now() - startTime };
   } catch (err) {
     if (err?.name === 'AbortError') {
+      callOnDone();
       return { usage, elapsedMs: Date.now() - startTime, aborted: true };
     }
     throw err;

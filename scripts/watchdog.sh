@@ -23,9 +23,9 @@ restart_lm_studio() {
   log "LM Studio not responding — restarting"
   LMSPATH="${LMSTUDIO_CLI_PATH:-$HOME/.lmstudio/bin/lms}"
   if command -v lms &>/dev/null; then
-    lms server start >> "$LOG_FILE" 2>&1
+    lms server start --cors >> "$LOG_FILE" 2>&1 &
   elif [ -x "$LMSPATH" ]; then
-    "$LMSPATH" server start >> "$LOG_FILE" 2>&1
+    "$LMSPATH" server start --cors >> "$LOG_FILE" 2>&1 &
   else
     log "WARNING: LM Studio CLI not found — cannot restart"
     return
