@@ -6,6 +6,9 @@
     presetDefaultModels,
     lmStudioBaseUrl,
     modelSelectionNotification,
+    ttsEnabled,
+    ttsVoice,
+    ttsSpeed,
   } from "$lib/stores.js";
   import { getModels, modelDisplayName, getModelTypeTag } from "$lib/api.js";
   import {
@@ -252,6 +255,69 @@
                 </span>
               </button>
             {/each}
+
+            <!-- TTS Settings Section -->
+            <div
+              class="border-t border-white/10 mt-1 pt-1 bg-black/5 dark:bg-white/5"
+            >
+              <div
+                class="px-4 py-2 text-[9px] font-bold uppercase tracking-wider opacity-40 flex items-center gap-2"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+                Voice Reader (Kokoro)
+              </div>
+              <div class="grid grid-cols-2 gap-1 px-2 pb-2">
+                {#each [{ id: "af_heart", name: "Heart" }, { id: "af_bella", name: "Bella" }, { id: "am_adam", name: "Adam" }, { id: "am_michael", name: "Michael" }] as v}
+                  <button
+                    type="button"
+                    class="flex items-center gap-2 px-2 py-1.5 text-left text-[11px] rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors {$ttsVoice ===
+                    v.id
+                      ? 'text-teal-500 font-bold bg-zinc-100 dark:bg-zinc-800'
+                      : 'opacity-60'}"
+                    onclick={() => ttsVoice.set(v.id)}
+                  >
+                    <div
+                      class="w-1.5 h-1.5 rounded-full {$ttsVoice === v.id
+                        ? 'bg-teal-500'
+                        : 'bg-transparent border border-white/20'}"
+                    ></div>
+                    {v.name}
+                  </button>
+                {/each}
+              </div>
+
+              <div
+                class="px-4 py-2 flex items-center justify-between gap-4 border-t border-white/5"
+              >
+                <span
+                  class="text-[10px] font-bold uppercase tracking-wider opacity-40"
+                  >Speed: {$ttsSpeed}x</span
+                >
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2.0"
+                  step="0.1"
+                  value={$ttsSpeed}
+                  class="w-24 accent-teal-500 h-1"
+                  oninput={(e) =>
+                    ttsSpeed.set(parseFloat(e.currentTarget.value))}
+                />
+              </div>
+            </div>
           {/if}
         </div>
         <button

@@ -23,7 +23,9 @@
     pinnedFiles,
     fileServerUrl,
     workspaceRoot,
+    ttsEnabled,
   } from "$lib/stores.js";
+  import { speakText, stopTTS } from "$lib/tts.js";
   import {
     getMessages,
     addMessage,
@@ -456,6 +458,7 @@
     const hasImages = imageDataUrls?.length > 0;
     const hasVideos = videoDataUrls?.length > 0;
     if (!convId || (!hasText && !hasImages && !hasVideos)) return;
+    stopTTS();
     chatError.set(null);
     if (!$effectiveModelId) {
       chatError.set("Please select a model from the dropdown above.");
@@ -828,6 +831,9 @@
       assistantMsgId,
     );
     await loadMessages();
+    if (get(ttsEnabled) && fullContent) {
+      speakText(fullContent);
+    }
 
     const promptTokens =
       typeof streamResult?.usage?.prompt_tokens === "number" &&
@@ -1192,7 +1198,10 @@
             {/if}
             <ChatInput
               onSend={sendUserMessage}
-              onStop={() => chatAbortController?.abort?.()}
+              onStop={() => {
+                chatAbortController?.abort?.();
+                stopTTS();
+              }}
               onGenerateImageGrok={$effectiveModelId &&
               isGrokModel($effectiveModelId) &&
               $grokApiKey?.trim()
@@ -1291,7 +1300,10 @@
               {/if}
               <ChatInput
                 onSend={sendUserMessage}
-                onStop={() => chatAbortController?.abort?.()}
+                onStop={() => {
+                  chatAbortController?.abort?.();
+                  stopTTS();
+                }}
                 onGenerateImageGrok={$effectiveModelId &&
                 isGrokModel($effectiveModelId) &&
                 $grokApiKey?.trim()

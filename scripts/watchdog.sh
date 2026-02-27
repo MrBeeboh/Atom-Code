@@ -12,6 +12,7 @@ log() {
 # ── Health checks ──────────────────────────────────────
 check_lm_studio()     { curl -sf http://localhost:1234/v1/models > /dev/null 2>&1; }
 check_voice()         { curl -sf http://localhost:8765/health > /dev/null 2>&1; }
+check_voice_tts()     { curl -sf http://localhost:8765/tts/voices > /dev/null 2>&1; }
 check_file_server()   { curl -sf http://localhost:8768/tree > /dev/null 2>&1; }
 check_terminal()      { curl -sf http://localhost:8767 > /dev/null 2>&1; }
 check_search_proxy()  { curl -sf http://localhost:5174/api/health > /dev/null 2>&1; }
@@ -114,6 +115,7 @@ log "    Check interval: ${CHECK_INTERVAL}s"
 while true; do
   check_lm_studio    || restart_lm_studio
   check_voice        || restart_voice
+  check_voice_tts    || restart_voice
   check_file_server  || restart_file_server
   check_terminal     || restart_terminal
   check_search_proxy || restart_search_proxy

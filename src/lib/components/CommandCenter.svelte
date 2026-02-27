@@ -10,7 +10,10 @@
         lmStudioConnected,
         cloudApisAvailable,
         fileServerUrl,
+        ttsEnabled,
+        ttsPlaying,
     } from "$lib/stores.js";
+    import { stopTTS } from "$lib/tts.js";
     import { buildRepoMapText, repoMapText } from "$lib/repoMap.js";
     import AtomLogo from "./AtomLogo.svelte";
     import ModelSelector from "./ModelSelector.svelte";
@@ -78,7 +81,9 @@
     style="background: var(--glass-bg); border-bottom: 1px solid var(--glass-border); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);"
 >
     <!-- Left: Brand & Breadcrumbs -->
-    <div class="flex items-center gap-3 overflow-hidden pr-4">
+    <div
+        class="flex items-center gap-2 lg:gap-3 overflow-hidden pr-2 lg:pr-4 min-w-0 flex-shrink"
+    >
         <div class="flex items-center gap-2 shrink-0">
             <span
                 class="flex items-center gap-1.5 font-bold text-[11px] uppercase tracking-wider shrink-0"
@@ -114,7 +119,7 @@
 
         <div class="h-4 w-[1px] bg-white/10 mx-1 shrink-0"></div>
 
-        <div class="flex items-center gap-1 text-[11px] truncate">
+        <div class="flex items-center gap-1 text-[11px] truncate min-w-0">
             {#each breadcrumbs as part, i}
                 <span class="opacity-30">/</span>
                 <span
@@ -183,23 +188,27 @@
     </div>
 
     <!-- Center: Model & Preset -->
-    <div class="flex-1 flex items-center justify-center min-w-0 px-4">
+    <div
+        class="flex-1 flex items-center justify-center min-w-0 px-2 lg:px-4 overflow-hidden"
+    >
         <div
-            class="flex items-center gap-2 min-w-0"
+            class="flex items-center gap-2 min-w-0 max-w-full"
             role="group"
             aria-label="Model and preset"
         >
             <div class="shrink-0">
                 <PresetSelect compact={true} />
             </div>
-            <div class="min-w-0 max-w-[20rem]">
+            <div
+                class="min-w-0 max-w-[12rem] md:max-w-[18rem] lg:max-w-[24rem]"
+            >
                 <ModelSelector />
             </div>
         </div>
     </div>
 
     <!-- Right: Stats & Theme -->
-    <div class="flex items-center gap-4 shrink-0 pl-4">
+    <div class="flex items-center gap-2 lg:gap-4 shrink-0 pl-2 lg:pl-4">
         <!-- Stats Tray -->
         <div
             class="hidden md:flex items-center gap-3 px-3 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-white/5"
@@ -241,6 +250,60 @@
         <div class="flex items-center gap-2">
             <UiThemeSelect compact={true} />
             <ThemeToggle />
+
+            <div class="h-4 w-[1px] bg-white/10 mx-1 shrink-0"></div>
+
+            <!-- TTS Controls -->
+            <div
+                class="flex items-center gap-1 bg-black/5 dark:bg-white/5 rounded-full px-1 py-0.5 border border-white/5"
+            >
+                <button
+                    class="w-7 h-7 flex items-center justify-center rounded-full transition-all"
+                    style="color: {$ttsEnabled
+                        ? 'var(--atom-teal)'
+                        : 'currentColor'}; opacity: {$ttsEnabled
+                        ? '1'
+                        : '0.4'};"
+                    title={$ttsEnabled ? "Disable TTS" : "Enable TTS"}
+                    onclick={() => ttsEnabled.set(!$ttsEnabled)}
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"
+                        ></polygon>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    </svg>
+                </button>
+
+                {#if $ttsPlaying}
+                    <button
+                        class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-red-500/20 text-red-500 transition-colors"
+                        title="Stop TTS"
+                        onclick={stopTTS}
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            stroke="none"
+                        >
+                            <rect x="6" y="6" width="12" height="12" />
+                        </svg>
+                    </button>
+                {/if}
+            </div>
 
             <div class="h-4 w-[1px] bg-white/10 mx-1 shrink-0"></div>
 

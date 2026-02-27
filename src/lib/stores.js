@@ -542,6 +542,22 @@ if (typeof localStorage !== 'undefined') {
   floatingMetricsSize.subscribe(saveFloatingMetrics);
 }
 
+/** TTS Settings and State (af_heart natural female voice, speed 1.0 by default) */
+export const ttsEnabled = writable(readBool('tts_enabled', false));
+export const ttsVoice = writable((typeof localStorage !== 'undefined' ? localStorage.getItem('tts_voice') : null) || 'af_heart');
+export const ttsSpeed = writable(Math.max(0.5, readNum('tts_speed', 1.0)));
+export const ttsPlaying = writable(false);
+export const ttsStopped = writable(false);
+
+if (typeof localStorage !== 'undefined') {
+  ttsEnabled.subscribe((v) => localStorage.setItem('tts_enabled', v ? 'true' : 'false'));
+  ttsVoice.subscribe((v) => localStorage.setItem('tts_voice', v ?? 'af_heart'));
+  ttsSpeed.subscribe((v) => {
+    const s = Math.max(0.5, Number(v) || 1.0);
+    localStorage.setItem('tts_speed', String(s));
+  });
+}
+
 export function pushTokSample(rate) {
   const r = Number(rate);
   if (!Number.isFinite(r)) return;
