@@ -20,7 +20,10 @@
     openInEditorFromChat,
     lastCodeBlock,
     activePresetName,
+    ttsEnabled,
+    ttsPlaying,
   } from "$lib/stores.js";
+  import { stopTTS } from "$lib/tts.js";
   import ThinkingAtom from "$lib/components/ThinkingAtom.svelte";
   import ContextRing from "$lib/components/ContextRing.svelte";
   import {
@@ -1264,6 +1267,59 @@
           <div
             class="relative flex items-center justify-center w-[44px] h-[44px]"
           >
+            <!-- TTS Indicator Pill (Polished) -->
+            <div
+              class="absolute -top-14 right-0 flex items-center gap-1.5 bg-white/5 dark:bg-white/10 rounded-full px-2 py-1 border border-white/20 backdrop-blur-xl z-20 shadow-lg transition-all hover:bg-white/10 dark:hover:bg-white/20"
+            >
+              <button
+                type="button"
+                class="w-8 h-8 flex items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95"
+                style="color: {$ttsEnabled
+                  ? 'var(--atom-teal)'
+                  : 'currentColor'}; opacity: {$ttsEnabled ? '1' : '0.5'};"
+                title={$ttsEnabled ? "Disable TTS" : "Enable TTS"}
+                onclick={() => ttsEnabled.set(!$ttsEnabled)}
+                aria-label={$ttsEnabled ? "Disable TTS" : "Enable TTS"}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+              </button>
+
+              {#if $ttsPlaying}
+                <button
+                  type="button"
+                  class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-500/20 text-red-500 transition-all hover:scale-110 active:scale-95"
+                  title="Stop TTS"
+                  onclick={stopTTS}
+                  aria-label="Stop TTS"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    stroke="none"
+                  >
+                    <rect x="6" y="6" width="12" height="12" rx="1" />
+                  </svg>
+                </button>
+              {/if}
+            </div>
+
             <div
               class="absolute inset-0 flex items-center justify-center"
               aria-label="Context usage"
