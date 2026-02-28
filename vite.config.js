@@ -9,6 +9,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [svelte(), tailwindcss()],
+  define: {
+    'process.env': 'window.process.env',
+    'process.browser': 'true',
+    'process.version': '""',
+    'process': 'window.process',
+  },
   resolve: {
     alias: {
       $lib: path.resolve(__dirname, 'src/lib'),

@@ -9,7 +9,13 @@
     ttsEnabled,
     ttsVoice,
     ttsSpeed,
+    perModelOverrides,
+    updateGlobalDefault,
+    setPerModelOverride,
+    hardware as hardwareStore,
   } from "$lib/stores.js";
+  import { get } from "svelte/store";
+  import { getDefaultsForModel } from "$lib/modelDefaults.js";
   import { getModels, modelDisplayName, getModelTypeTag } from "$lib/api.js";
   import {
     getModelIcon,
@@ -64,9 +70,17 @@
     return () => cancelAnimationFrame(id);
   });
 
-  async function applyDefaultsForModel(_modelId) {
-    // Generation params (temperature, etc.) now come from global + recommended + per-model overrides.
-    // Load config is applied in Settings when user clicks Load.
+  async function applyDefaultsForModel(modelId) {
+    if (!modelId) return;
+    const currentHardware = get(hardwareStore) || {};
+    const defaults = getDefaultsForModel(modelId, currentHardware);
+
+    // Merge into per-model and global stores
+    setPerModelOverride(modelId, defaults);
+    updateGlobalDefault(defaults);
+
+    // Special note: the derived 'settings' store in stores.js will pick these up
+    // and components like IntelPanel and ChatView will see the new values.
   }
 
   async function load() {
@@ -133,6 +147,22 @@
     await applyDefaultsForModel(id);
     open = false;
   }
+
+  $effect(() => {
+    if (!open) return;
+    const handleOutsideClick = (e) => {
+      if (triggerEl && !triggerEl.contains(e.target)) {
+        const dropdown = document.getElementById("model-listbox");
+        if (dropdown && !dropdown.contains(e.target)) {
+          open = false;
+        }
+      }
+    };
+    // Use capture to ensure we catch it before other stopPropgation
+    window.addEventListener("mousedown", handleOutsideClick, true);
+    return () =>
+      window.removeEventListener("mousedown", handleOutsideClick, true);
+  });
 
   function toggle() {
     const willOpen = !open;
@@ -320,12 +350,6 @@
             </div>
           {/if}
         </div>
-        <button
-          type="button"
-          class="fixed inset-0 z-40"
-          aria-label="Close"
-          onclick={() => (open = false)}
-        ></button>
       {/if}
     </div>
     {#if $selectedModelId && getQuantization($selectedModelId)}

@@ -12,9 +12,10 @@
         fileServerUrl,
         ttsEnabled,
         ttsPlaying,
+        repoMapText,
     } from "$lib/stores.js";
     import { stopTTS } from "$lib/tts.js";
-    import { buildRepoMapText, repoMapText } from "$lib/repoMap.js";
+    import { buildRepoMapText } from "$lib/repoMap.js";
     import AtomLogo from "./AtomLogo.svelte";
     import ModelSelector from "./ModelSelector.svelte";
     import PresetSelect from "./PresetSelect.svelte";

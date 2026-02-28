@@ -17,8 +17,9 @@ const FAMILY_DEFAULTS = {
     eval_batch_size: 512,
     flash_attention: true,
     offload_kv_cache_to_gpu: true,
-    gpu_offload: 'max',
+    gpu_layers: -1,
     cpu_threads: 8,
+    n_parallel: 4,
     temperature: 0.7,
     max_tokens: 4096,
     top_p: 0.95,
@@ -31,8 +32,9 @@ const FAMILY_DEFAULTS = {
     eval_batch_size: 512,
     flash_attention: true,
     offload_kv_cache_to_gpu: true,
-    gpu_offload: 'max',
+    gpu_layers: -1,
     cpu_threads: 8,
+    n_parallel: 4,
     temperature: 0.7,
     max_tokens: 4096,
     top_p: 0.9,
@@ -45,8 +47,9 @@ const FAMILY_DEFAULTS = {
     eval_batch_size: 256,
     flash_attention: true,
     offload_kv_cache_to_gpu: true,
-    gpu_offload: 'max',
+    gpu_layers: -1,
     cpu_threads: 8,
+    n_parallel: 4,
     temperature: 0.7,
     max_tokens: 4096,
     top_p: 0.9,
@@ -59,8 +62,9 @@ const FAMILY_DEFAULTS = {
     eval_batch_size: 512,
     flash_attention: true,
     offload_kv_cache_to_gpu: true,
-    gpu_offload: 'max',
+    gpu_layers: -1,
     cpu_threads: 8,
+    n_parallel: 4,
     temperature: 0.7,
     max_tokens: 4096,
     top_p: 0.9,
@@ -73,8 +77,9 @@ const FAMILY_DEFAULTS = {
     eval_batch_size: 512,
     flash_attention: true,
     offload_kv_cache_to_gpu: true,
-    gpu_offload: 'max',
+    gpu_layers: -1,
     cpu_threads: 8,
+    n_parallel: 4,
     temperature: 0.7,
     max_tokens: 4096,
     top_p: 0.95,
@@ -87,8 +92,9 @@ const FAMILY_DEFAULTS = {
     eval_batch_size: 512,
     flash_attention: true,
     offload_kv_cache_to_gpu: true,
-    gpu_offload: 'max',
+    gpu_layers: -1,
     cpu_threads: 8,
+    n_parallel: 4,
     temperature: 0.7,
     max_tokens: 4096,
     top_p: 0.95,
@@ -101,9 +107,25 @@ const FAMILY_DEFAULTS = {
     eval_batch_size: 512,
     flash_attention: true,
     offload_kv_cache_to_gpu: true,
-    gpu_offload: 'max',
+    gpu_layers: -1,
     cpu_threads: 8,
+    n_parallel: 4,
     temperature: 0.7,
+    max_tokens: 4096,
+    top_p: 0.95,
+    top_k: 50,
+    repeat_penalty: 1.1,
+  },
+  'deepseek-coder': {
+    name: 'DeepSeek Coder',
+    context_length: 32768,
+    eval_batch_size: 512,
+    flash_attention: true,
+    offload_kv_cache_to_gpu: true,
+    gpu_layers: -1,
+    cpu_threads: 8,
+    n_parallel: 4,
+    temperature: 0.2,
     max_tokens: 4096,
     top_p: 0.95,
     top_k: 50,
@@ -115,8 +137,9 @@ const FAMILY_DEFAULTS = {
     eval_batch_size: 512,
     flash_attention: true,
     offload_kv_cache_to_gpu: true,
-    gpu_offload: 'max',
+    gpu_layers: -1,
     cpu_threads: 8,
+    n_parallel: 4,
     temperature: 0.2,
     max_tokens: 4096,
     top_p: 0.9,
@@ -125,11 +148,11 @@ const FAMILY_DEFAULTS = {
   },
   default: {
     name: 'Default',
-    context_length: 4096,
+    context_length: 8192,
     eval_batch_size: 512,
     flash_attention: true,
     offload_kv_cache_to_gpu: true,
-    gpu_offload: 'max',
+    gpu_layers: -1,
     cpu_threads: 8,
     n_parallel: 4,
     temperature: 0.7,
@@ -143,6 +166,7 @@ const FAMILY_DEFAULTS = {
 /** Match model id (lowercase) to family key. Order matters: more specific first. */
 const FAMILY_PATTERNS = [
   { key: 'codellama', test: (id) => /codellama|code.?llama/i.test(id) },
+  { key: 'deepseek-coder', test: (id) => /deepseek-coder|deepseek.*coder/i.test(id) },
   { key: 'minicpm', test: (id) => /minicpm/i.test(id) },
   { key: 'qwen', test: (id) => /qwen/i.test(id) },
   { key: 'llama', test: (id) => /llama|meta/i.test(id) },
@@ -161,7 +185,7 @@ function inferFamily(modelId) {
   if (!modelId || typeof modelId !== 'string') return 'default';
   const lower = modelId.toLowerCase();
   for (const { key, test } of FAMILY_PATTERNS) {
-    if (test(lower)) return key;
+    if (test(lower)) return /** @type {keyof FAMILY_DEFAULTS} */ (key);
   }
   return 'default';
 }
@@ -174,6 +198,7 @@ const RECOMMENDED_SYSTEM_PROMPTS = {
   mistral: 'You are a helpful assistant.',
   gemma: 'You are a helpful assistant.',
   deepseek: 'You are a helpful assistant.',
+  'deepseek-coder': 'You are an expert programmer. Be concise. Prefer code over prose when relevant.',
   codellama: 'You are an expert programmer. Be concise. Prefer code over prose when relevant.',
   default: 'You are a helpful assistant.',
   // Vision / VLM: stop "text-only" self-description and surface capabilities
@@ -199,6 +224,7 @@ export function getRecommendedSettingsForModel(modelId) {
   const family = inferFamily(modelId);
   const d = FAMILY_DEFAULTS[family] ?? FAMILY_DEFAULTS.default;
   const vision = inferVisionFamily(modelId);
+  /** @type {any} */
   const promptKey = vision ?? family;
   const out = {
     temperature: d.temperature,

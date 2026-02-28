@@ -1,26 +1,39 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <title>ATOM Code</title>
-  </head>
-  <body>
-    <script>
-      (function() {
-        var t = localStorage.getItem('theme');
-        var dark = t === 'dark' || ((t === 'system' || !t) && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        if (dark) document.documentElement.classList.add('dark');
-        var ui = localStorage.getItem('uiTheme');
-        if (ui === 'light' || ui === 'dark' || ui === 'coder') document.documentElement.dataset.uiTheme = ui;
-        else document.documentElement.dataset.uiTheme = 'light';
-      })();
-    </script>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Global shim for libraries like @lmstudio/sdk that expect Node.js globals -->
+  <script>
+    window.process = {
+      env: { NODE_ENV: 'development', LMS_NO_FANCY_ERRORS: 'true' },
+      browser: true,
+      version: '',
+      nextTick: (f) => setTimeout(f, 0)
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <title>ATOM Code</title>
+</head>
+
+<body>
+  <script>
+    (function () {
+      var t = localStorage.getItem('theme');
+      var dark = t === 'dark' || ((t === 'system' || !t) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (dark) document.documentElement.classList.add('dark');
+      var ui = localStorage.getItem('uiTheme');
+      if (ui === 'light' || ui === 'dark' || ui === 'coder') document.documentElement.dataset.uiTheme = ui;
+      else document.documentElement.dataset.uiTheme = 'light';
+    })();
+  </script>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
 </html>

@@ -1,11 +1,9 @@
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
+import { repoMapText, repoMapSignatures } from './stores.js';
 
 /**
  * Phase 2: Repo Map Codebase Indexing
  */
-
-export const repoMapText = writable('');
-export const repoMapSignatures = writable({});
 
 export async function buildRepoMapText(root, fileServerBase = 'http://localhost:8768') {
   if (!root || typeof root !== 'string' || !root.trim()) {

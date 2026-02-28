@@ -481,6 +481,7 @@ export const repoMapText = writable(/** @type {string} */(''));
 export const repoMapFileList = writable(/** @type {string[]} */([]));
 export const repoMapLoading = writable(false);
 export const repoMapError = writable(/** @type {string | null} */(null));
+export const repoMapSignatures = writable(/** @type {Record<string, string[]>} */({}));
 
 /** File explorer panel open (toggle with Ctrl+E). */
 export const fileExplorerOpen = writable(
@@ -556,6 +557,14 @@ if (typeof localStorage !== 'undefined') {
     const s = Math.max(0.5, Number(v) || 1.0);
     localStorage.setItem('tts_speed', String(s));
   });
+}
+
+/** User-customizable system prompt instructions appended to the core ATOM behavior. */
+export const userSystemPrompt = writable('');
+if (typeof localStorage !== 'undefined') {
+  const saved = localStorage.getItem('user_system_prompt');
+  if (saved) userSystemPrompt.set(saved);
+  userSystemPrompt.subscribe((v) => localStorage.setItem('user_system_prompt', v || ''));
 }
 
 export function pushTokSample(rate) {
