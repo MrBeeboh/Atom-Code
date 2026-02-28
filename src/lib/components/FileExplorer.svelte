@@ -16,8 +16,8 @@
     repoMapFileList,
     repoMapLoading,
     repoMapError,
+    repoMapSignatures,
   } from "$lib/stores.js";
-  import { repoMapSignatures } from "$lib/repoMap.js";
   import { addMessage } from "$lib/db.js";
   import { activeConversationId } from "$lib/stores.js";
   import FileTree from "$lib/components/FileTree.svelte";

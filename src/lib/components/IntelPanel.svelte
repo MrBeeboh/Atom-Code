@@ -231,6 +231,8 @@
         eval_batch_size: evalBatchSize,
         flash_attention: flashAttention,
         offload_kv_cache_to_gpu: offloadKvToGpu,
+        gpu_layers: gpuOffload === "max" ? -1 : parseFloat(gpuOffload),
+        cpu_threads: cpuThreads,
       });
     } catch (e) {
       loadError = e?.message || "Failed. Is LM Studio running?";

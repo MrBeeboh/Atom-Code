@@ -8,8 +8,15 @@ const SHELL = process.env.SHELL || (os.platform() === 'win32' ? 'powershell.exe'
 
 // Create an HTTP server that also handles WebSocket upgrades
 const httpServer = http.createServer((req, res) => {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // CORS headers: allow only local UI ports
+  const origin = req.headers.origin || '';
+  const allowed = [
+    'http://localhost:5173', 'http://127.0.0.1:5173',
+    'http://localhost:4173', 'http://127.0.0.1:4173'
+  ];
+  if (allowed.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 

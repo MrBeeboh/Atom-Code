@@ -17,7 +17,11 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
+# Restrict CORS to local UI ports
+CORS(app, origins=[
+    "http://localhost:5173", "http://127.0.0.1:5173",
+    "http://localhost:4173", "http://127.0.0.1:4173"
+])
 
 gpu_handle = None
 if HAS_NVML:
@@ -58,5 +62,5 @@ def get_metrics():
 
 
 if __name__ == "__main__":
-    print("Hardware bridge: http://localhost:5000/metrics")
-    app.run(port=5000)
+    print("Hardware bridge: http://127.0.0.1:5000/metrics")
+    app.run(host="127.0.0.1", port=5000)

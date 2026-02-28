@@ -12,7 +12,11 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
+# Restrict CORS to local UI ports
+CORS(app, origins=[
+    "http://localhost:5173", "http://127.0.0.1:5173",
+    "http://localhost:4173", "http://127.0.0.1:4173"
+])
 
 
 def find_lms_command():
@@ -92,5 +96,5 @@ def status():
 
 
 if __name__ == "__main__":
-    print("Unload helper: http://localhost:8766/unload-all (POST to eject all models)")
-    app.run(port=8766)
+    print("Unload helper: http://127.0.0.1:8766/unload-all (POST to eject all models)")
+    app.run(host="127.0.0.1", port=8766)

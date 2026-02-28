@@ -24,8 +24,16 @@
     fileServerUrl,
     workspaceRoot,
     ttsEnabled,
+    userSystemPrompt,
+    models,
+    repoMapText,
+    repoMapSignatures,
   } from "$lib/stores.js";
-  import { speakText, stopTTS } from "$lib/tts.js";
+  import {
+    buildSystemPrompt,
+    buildCompactSystemPrompt,
+  } from "$lib/systemPrompt.js";
+  import { speakText, speakTextStream, stopTTS } from "$lib/tts.js";
   import {
     getMessages,
     addMessage,
@@ -34,11 +42,7 @@
     getMessageCount,
     createConversation,
   } from "$lib/db.js";
-  import {
-    repoMapText,
-    repoMapSignatures,
-    findRelevantFiles,
-  } from "$lib/repoMap.js";
+  import { findRelevantFiles } from "$lib/repoMap.js";
   import { streamChatCompletionWithMetrics } from "$lib/streamReporter.js";
   import {
     requestGrokImageGeneration,
@@ -669,18 +673,27 @@
 
     const msgsForApi = await getMessages(convId);
     const currentSettings = get(settings);
-    let systemPrompt = (currentSettings?.system_prompt || "").trim();
 
-    // Phase 2: Inject Repo Map
+    // Determine context window size for prompt selection
+    const allModels = get(models);
+    const currentModel = allModels.find((m) => m.id === get(effectiveModelId));
+    const modelContextLength =
+      currentModel?.contextLength || currentModel?.max_context_length || 32768;
+
+    // Build the engineered system prompt
+    const customPrompt = get(userSystemPrompt) || "";
+    const systemPromptBuilder =
+      modelContextLength < 16000 ? buildCompactSystemPrompt : buildSystemPrompt;
+    const baseSystemPrompt = systemPromptBuilder(customPrompt);
+
+    // Inject repo map after system prompt
     const mapText = get(repoMapText) || "";
-    if (mapText) {
-      systemPrompt = systemPrompt
-        .replace(/<repo_map>[\s\S]*?<\/repo_map>\n*/g, "")
-        .trim();
-      systemPrompt = `${systemPrompt}\n\n${mapText}`.trim();
-    }
+    const fullSystemPrompt =
+      mapText && mapText.trim()
+        ? `${baseSystemPrompt}\n\n${mapText}`
+        : baseSystemPrompt;
 
-    let apiMessages = buildApiMessages(msgsForApi, systemPrompt);
+    let apiMessages = buildApiMessages(msgsForApi, fullSystemPrompt);
     const userContextLen = Number(currentSettings?.context_length) || 0;
     const storeContextMax = get(contextUsage)?.contextMax || 0;
     const contextMax =
@@ -697,10 +710,14 @@
     console.log(
       "[context] contextMax:",
       contextMax,
-      "estimated:",
+      "estimatedTokens:",
       estimateTokensForTrim(apiMessages),
       "maxPromptTokens:",
       maxPromptTokens,
+      "systemPromptLength:",
+      fullSystemPrompt.length,
+      "hasRepoMap:",
+      fullSystemPrompt.includes("<repo_map>"),
     );
     if (estimateTokensForTrim(apiMessages) > maxPromptTokens) {
       apiMessages = trimMessagesToFit(apiMessages, maxPromptTokens);
@@ -746,6 +763,9 @@
         onChunk(chunk) {
           fullContent += chunk;
           streamingContent.set(fullContent);
+          if (get(ttsEnabled)) {
+            speakTextStream(fullContent);
+          }
         },
         onImageRef(ref) {
           if (ref?.image_id) {
@@ -762,14 +782,17 @@
     } catch (err) {
       const raw = err?.message || "";
       const isLoadError =
-        raw.includes("Failed to load model") ||
-        raw.includes("Error loading model");
+        (raw.includes("Failed to load model") ||
+          raw.includes("Error loading model")) &&
+        !raw.includes("Context window exceeded");
       const isContextLength =
-        /maximum context length|reduce the length of the messages/i.test(raw);
+        /maximum context length|reduce the length of the messages|Context window exceeded/i.test(
+          raw,
+        );
       const friendly = isLoadError
         ? "Model failed to load in LM Studio. Load the model in LM Studio first (or check memory). If it still fails, try re-downloading the model in case the file is corrupted."
         : isContextLength
-          ? "Context too long for this model. Start a new chat or unpin some files, then try again."
+          ? "Context window too small or message too long. Click 'Save (Load)' in the Intel Panel (CPU/GPU icon) to apply optimized settings (e.g. 32k context), or unpin some files."
           : raw ||
             "Failed to get response. Is your model server running and the model loaded?";
       chatError.set(friendly);
@@ -783,6 +806,9 @@
       messagePreparing.set(false);
       isStreaming.set(false);
       autoInjectedFiles = [];
+      if (get(ttsEnabled) && fullContent) {
+        speakTextStream(fullContent, true);
+      }
     }
 
     if (streamResult?.aborted) {
@@ -831,9 +857,7 @@
       assistantMsgId,
     );
     await loadMessages();
-    if (get(ttsEnabled) && fullContent) {
-      speakText(fullContent);
-    }
+    await loadMessages();
 
     const promptTokens =
       typeof streamResult?.usage?.prompt_tokens === "number" &&
