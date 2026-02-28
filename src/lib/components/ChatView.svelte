@@ -354,58 +354,101 @@
   }
 
   function buildApiMessages(msgs, systemPrompt) {
-    const sanitized = msgs.map((m, i) => {
-      let contentObj =
-        i === msgs.length - 1 ? m.content : sanitizeContentForApi(m.content);
-      if (m.contextString) {
-        if (typeof contentObj === "string") {
-          contentObj = m.contextString + "\n\n" + contentObj;
-        } else if (Array.isArray(contentObj)) {
-          const textPart = contentObj.find((p) => p.type === "text");
-          const rest = contentObj.filter((p) => p.type !== "text");
-          const text =
-            (textPart?.text ?? "")
-              ? m.contextString + "\n\n" + textPart.text
-              : m.contextString;
-          contentObj = [{ type: "text", text }, ...rest];
-        }
-      }
-      return {
-        role: m.role,
-        content: contentObj,
-      };
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
+    const isoStr = now.toISOString().split("T")[0];
+    const unixStr = Math.floor(now.getTime() / 1000);
+
+    let authoritativePrompt = `SYSTEM FACT - NOT NEGOTIABLE:
+Today's date is ${dateStr}.
+ISO: ${isoStr} | Unix: ${unixStr}
+This information is injected at runtime by the host system and is authoritative. 
+Your training cutoff is in the past. Trust this date over any internal assumption or prior knowledge.
+
+INSTRUCTION:
+Background context (web search results, files, or auto-context) may be provided in <details> or 🧱 blocks. 
+DO NOT parrot these tags, their scaffolding, or the raw context in your response. 
+Consume the data silently to answer the user's prompt.`;
+
+    if ($webSearchForNextMessage) {
+      authoritativePrompt += `\n\nWhen using web search, treat any date/time information returned as ground truth. Your training data date is WRONG. The search results date is CORRECT. Always cite the retrieved date, never your assumed date.`;
+    }
+
+    const finalSystemPrompt = systemPrompt?.trim()
+      ? `${authoritativePrompt}\n\n${systemPrompt.trim()}`
+      : authoritativePrompt;
+
+    const sanitized = [];
+    for (const m of msgs) {
+      if (m.contextString) {
+        sanitized.push({
+          role: "system",
+          content: `BACKGROUND CONTEXT:\n\n${m.contextString}`,
+        });
+      }
+      sanitized.push({
+        role: m.role,
+        content: m.content,
+      });
+    }
+
     const out = sanitized.filter((m) => {
       if (m.role === "system") return true;
       if (typeof m.content === "string") return m.content.trim().length > 0;
       if (Array.isArray(m.content)) return m.content.length > 0;
       return false;
     });
-    if (systemPrompt?.trim())
-      out.unshift({ role: "system", content: systemPrompt.trim() });
+
+    out.unshift({ role: "system", content: finalSystemPrompt });
     return out;
   }
 
   /** Rough token count for context ring when API doesn't return usage (e.g. LM Studio stream). */
   function estimatePromptTokens(messages) {
-    let chars = 0;
+    let tokens = 0;
     for (const m of messages || []) {
-      if (typeof m.content === "string") chars += m.content.length;
-      else if (Array.isArray(m.content))
-        for (const p of m.content) chars += (p?.text ?? "").length;
+      const content =
+        typeof m.content === "string"
+          ? m.content
+          : Array.isArray(m.content)
+            ? m.content.map((p) => p.text ?? "").join("")
+            : "";
+
+      // Better heuristic: chars/4 for prose, chars/2.5 for code blocks
+      const codeBlockMatch = content.match(/```[\s\S]*?```/g);
+      let codeChars = 0;
+      if (codeBlockMatch) {
+        codeChars = codeBlockMatch.reduce(
+          (acc, match) => acc + match.length,
+          0,
+        );
+      }
+      const proseChars = Math.max(0, content.length - codeChars);
+      tokens += Math.ceil(proseChars / 4) + Math.ceil(codeChars / 2.5);
     }
-    return Math.max(0, Math.ceil(chars / 4));
+    return Math.max(0, tokens);
   }
 
-  /** Conservative token estimate for trimming (chars/3). Actual tokens often higher than chars/4. */
+  /** Conservative token estimate for trimming (chars/2.5). Avoids over-estimating capacity. */
   function estimateTokensForTrim(messages) {
-    let chars = 0;
+    let tokens = 0;
     for (const m of messages || []) {
-      if (typeof m.content === "string") chars += m.content.length;
-      else if (Array.isArray(m.content))
-        for (const p of m.content) chars += (p?.text ?? "").length;
+      const content =
+        typeof m.content === "string"
+          ? m.content
+          : Array.isArray(m.content)
+            ? m.content.map((p) => p.text ?? "").join("")
+            : "";
+
+      // For pruning, we use a more conservative estimate (chars / 2.5) to avoid context overflow
+      tokens += Math.ceil(content.length / 2.5);
     }
-    return Math.max(0, Math.ceil(chars / 3));
+    return Math.max(0, tokens);
   }
 
   /** Trim messages to fit within maxPromptTokens. Keeps system (first) and newest messages. */
@@ -467,6 +510,7 @@
 
     messagePreparing.set(true);
     let effectiveText = (text || "").trim();
+    let searchContext = "";
     if (get(webSearchForNextMessage) && hasText) {
       // Stay connected: don't turn off webSearchForNextMessage after send.
       // User toggles it off manually via the globe button.
@@ -474,11 +518,7 @@
       try {
         const searchResult = await searchDuckDuckGo(effectiveText);
         webSearchConnected.set(true);
-        const formatted = formatSearchResultForChat(
-          effectiveText,
-          searchResult,
-        );
-        effectiveText = formatted + "\n\n---\nUser question: " + effectiveText;
+        searchContext = formatSearchResultForChat(effectiveText, searchResult);
       } catch (e) {
         webSearchConnected.set(false);
         chatError.set(
@@ -651,6 +691,7 @@
     }
 
     const contextPrefix =
+      (searchContext ? searchContext + "\n\n" : "") +
       (githubContext ? githubContext + "\n\n" : "") +
       (fileContext ? "Code Context:\n\n" + fileContext + "\n\n" : "") +
       (autoContext ? "Auto Context:\n\n" + autoContext + "\n\n" : "");
@@ -745,7 +786,11 @@
         signal: controller.signal,
         onChunk(chunk) {
           fullContent += chunk;
-          streamingContent.set(fullContent);
+          // Apply response filtering safety net to strip accidental parrots of search scaffolding
+          const filtered = fullContent
+            .replace(/<details[\s\S]*?<\/details>/g, "")
+            .trim();
+          streamingContent.set(filtered);
         },
         onImageRef(ref) {
           if (ref?.image_id) {
@@ -795,14 +840,18 @@
     activeMessages.update((arr) => {
       const out = [...arr];
       const last = out[out.length - 1];
-      if (last && last.role === "assistant")
+      if (last && last.role === "assistant") {
+        const filtered = fullContent
+          .replace(/<details[\s\S]*?<\/details>/g, "")
+          .trim();
         out[out.length - 1] = {
           ...last,
-          content: fullContent,
+          content: filtered,
           imageRefs: streamImageRefs.length
             ? [...streamImageRefs]
             : last.imageRefs,
         };
+      }
       return out;
     });
 

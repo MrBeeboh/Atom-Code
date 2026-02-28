@@ -1,97 +1,94 @@
 <script>
-  import { diffLines } from 'diff';
-  import { get } from 'svelte/store';
-  import hljs from 'highlight.js';
-  import { fileServerUrl } from '$lib/stores.js';
+  import { get } from "svelte/store";
+  import hljs from "highlight.js";
+  import { fileServerUrl } from "$lib/stores.js";
+  import DiffWorker from "$lib/diffWorker?worker";
 
   let {
-    originalCode = '',
-    modifiedCode = '',
-    filePath = '',
+    originalCode = "",
+    modifiedCode = "",
+    filePath = "",
     onclose,
     onapply,
   } = $props();
 
   const extToLang = {
-    js: 'javascript',
-    ts: 'typescript',
-    jsx: 'jsx',
-    tsx: 'tsx',
-    svelte: 'svelte',
-    vue: 'vue',
-    py: 'python',
-    rb: 'ruby',
-    go: 'go',
-    rs: 'rust',
-    css: 'css',
-    scss: 'scss',
-    html: 'html',
-    json: 'json',
-    md: 'markdown',
-    yaml: 'yaml',
-    yml: 'yaml',
-    sh: 'bash',
-    bash: 'bash',
+    js: "javascript",
+    ts: "typescript",
+    jsx: "jsx",
+    tsx: "tsx",
+    svelte: "svelte",
+    vue: "vue",
+    py: "python",
+    rb: "ruby",
+    go: "go",
+    rs: "rust",
+    css: "css",
+    scss: "scss",
+    html: "html",
+    json: "json",
+    md: "markdown",
+    yaml: "yaml",
+    yml: "yaml",
+    sh: "bash",
+    bash: "bash",
   };
 
   function langFromPath(path) {
     if (!path) return null;
-    const ext = path.split('.').pop()?.toLowerCase();
+    const ext = path.split(".").pop()?.toLowerCase();
     return ext ? extToLang[ext] || ext : null;
   }
 
   const lang = $derived(langFromPath(filePath));
 
   function highlightLine(line) {
-    const str = line ?? '';
-    if (str === '') return '&nbsp;';
+    const str = line ?? "";
+    if (str === "") return "&nbsp;";
     const l = lang && hljs.getLanguage(lang) ? lang : undefined;
     try {
-      return l ? hljs.highlight(str, { language: l }).value : hljs.highlightAuto(str).value;
+      return l
+        ? hljs.highlight(str, { language: l }).value
+        : hljs.highlightAuto(str).value;
     } catch {
       return escapeHtml(str);
     }
   }
 
   function escapeHtml(s) {
-    if (s == null) return '';
+    if (s == null) return "";
     return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 
-  const lineChanges = $derived.by(() => {
-    const orig = originalCode ?? '';
-    const mod = modifiedCode ?? '';
-    const parts = diffLines(orig, mod);
-    const lines = [];
-    let oldNum = 0;
-    let newNum = 0;
-    for (const part of parts) {
-      let lineTexts = part.value.split('\n');
-      if (part.value.endsWith('\n') && lineTexts.length > 0 && lineTexts[lineTexts.length - 1] === '') {
-        lineTexts = lineTexts.slice(0, -1);
-      }
-      if (lineTexts.length === 0 && part.value !== '') {
-        lineTexts = [part.value];
-      }
-      for (const text of lineTexts) {
-        if (part.removed) {
-          oldNum++;
-          lines.push({ text, type: 'removed', oldNum, newNum: null });
-        } else if (part.added) {
-          newNum++;
-          lines.push({ text, type: 'added', oldNum: null, newNum });
-        } else {
-          oldNum++;
-          newNum++;
-          lines.push({ text, type: 'unchanged', oldNum, newNum });
+  let lineChanges = $state([]);
+  let computing = $state(false);
+  let worker = null;
+
+  $effect(() => {
+    if (!worker && typeof Worker !== "undefined") {
+      worker = new DiffWorker();
+      worker.onmessage = (e) => {
+        if (e.data.lines) {
+          lineChanges = e.data.lines;
         }
-      }
+        computing = false;
+      };
     }
-    return lines;
+
+    const orig = originalCode ?? "";
+    const mod = modifiedCode ?? "";
+
+    computing = true;
+    worker?.postMessage({ originalCode: orig, modifiedCode: mod });
+
+    return () => {
+      worker?.terminate();
+      worker = null;
+    };
   });
 
   let applying = $state(false);
@@ -101,11 +98,14 @@
     applying = true;
     applied = false;
     try {
-      let base = (get(fileServerUrl) || 'http://localhost:8768').replace(/\/$/, '');
-      if (base.includes(':8766')) base = base.replace(':8766', ':8768');
+      let base = (get(fileServerUrl) || "http://localhost:8768").replace(
+        /\/$/,
+        "",
+      );
+      if (base.includes(":8766")) base = base.replace(":8766", ":8768");
       const res = await fetch(`${base}/write`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: filePath, content: modifiedCode }),
       });
       if (!res.ok) {
@@ -118,7 +118,7 @@
         onclose?.();
       }, 1000);
     } catch (err) {
-      console.error('Apply failed:', err);
+      console.error("Apply failed:", err);
     } finally {
       applying = false;
     }
@@ -136,11 +136,13 @@
   aria-label="Diff viewer"
   tabindex="-1"
   onclick={(e) => e.target === e.currentTarget && reject()}
-  onkeydown={(e) => e.key === 'Escape' && reject()}
+  onkeydown={(e) => e.key === "Escape" && reject()}
 >
   <div class="diff-modal">
     <div class="diff-header">
-      <span class="diff-file-path" title={filePath}>{filePath || 'Untitled'}</span>
+      <span class="diff-file-path" title={filePath}
+        >{filePath || "Untitled"}</span
+      >
       <div class="diff-header-actions">
         <button
           type="button"
@@ -148,28 +150,40 @@
           disabled={applying}
           onclick={applyChanges}
         >
-          {applying ? 'Applying…' : applied ? 'Applied!' : 'Apply'}
+          {applying ? "Applying…" : applied ? "Applied!" : "Apply"}
         </button>
         <button type="button" class="diff-btn diff-btn-reject" onclick={reject}>
           Reject
         </button>
-        <button type="button" class="diff-btn diff-btn-close" onclick={reject} aria-label="Close">
+        <button
+          type="button"
+          class="diff-btn diff-btn-close"
+          onclick={reject}
+          aria-label="Close"
+        >
           ✕
         </button>
       </div>
     </div>
     <div class="diff-body">
-      <div class="diff-lines">
-        {#each lineChanges as line, i (i)}
-          <div class="diff-line diff-line-{line.type}" data-type={line.type}>
-            <span class="diff-num diff-num-old">{line.oldNum ?? '−'}</span>
-            <span class="diff-num diff-num-new">{line.newNum ?? '−'}</span>
-            <span class="diff-content">
-              {@html highlightLine(line.text)}
-            </span>
-          </div>
-        {/each}
-      </div>
+      {#if computing}
+        <div class="diff-computing">
+          <div class="diff-spinner"></div>
+          <span>Computing differences…</span>
+        </div>
+      {:else}
+        <div class="diff-lines">
+          {#each lineChanges as line, i (i)}
+            <div class="diff-line diff-line-{line.type}" data-type={line.type}>
+              <span class="diff-num diff-num-old">{line.oldNum ?? "−"}</span>
+              <span class="diff-num diff-num-new">{line.newNum ?? "−"}</span>
+              <span class="diff-content">
+                {@html highlightLine(line.text)}
+              </span>
+            </div>
+          {/each}
+        </div>
+      {/if}
     </div>
   </div>
 </div>
@@ -302,15 +316,27 @@
     font-size: 0.85em;
     user-select: none;
     border-right: 1px solid var(--ui-border);
-    background: color-mix(in srgb, var(--ui-text-secondary) 8%, var(--ui-bg-main));
+    background: color-mix(
+      in srgb,
+      var(--ui-text-secondary) 8%,
+      var(--ui-bg-main)
+    );
   }
 
   .diff-num-old {
-    background: color-mix(in srgb, var(--ui-text-secondary) 10%, var(--ui-bg-main));
+    background: color-mix(
+      in srgb,
+      var(--ui-text-secondary) 10%,
+      var(--ui-bg-main)
+    );
   }
 
   .diff-num-new {
-    background: color-mix(in srgb, var(--ui-text-secondary) 8%, var(--ui-bg-main));
+    background: color-mix(
+      in srgb,
+      var(--ui-text-secondary) 8%,
+      var(--ui-bg-main)
+    );
   }
 
   .diff-content {
@@ -365,14 +391,52 @@
 
   /* Dark mode: line number columns stay distinct */
   :global(.dark) .diff-num {
-    background: color-mix(in srgb, var(--ui-text-secondary) 12%, var(--ui-bg-main));
+    background: color-mix(
+      in srgb,
+      var(--ui-text-secondary) 12%,
+      var(--ui-bg-main)
+    );
   }
 
   :global(.dark) .diff-num-old {
-    background: color-mix(in srgb, var(--ui-text-secondary) 14%, var(--ui-bg-main));
+    background: color-mix(
+      in srgb,
+      var(--ui-text-secondary) 14%,
+      var(--ui-bg-main)
+    );
   }
 
   :global(.dark) .diff-num-new {
-    background: color-mix(in srgb, var(--ui-text-secondary) 12%, var(--ui-bg-main));
+    background: color-mix(
+      in srgb,
+      var(--ui-text-secondary) 12%,
+      var(--ui-bg-main)
+    );
+  }
+
+  .diff-computing {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 1rem;
+    color: var(--ui-text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .diff-spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--ui-border);
+    border-top-color: var(--ui-accent);
+    border-radius: 50%;
+    animation: diff-spin 0.8s linear infinite;
+  }
+
+  @keyframes diff-spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>

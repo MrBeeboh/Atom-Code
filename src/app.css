@@ -63,6 +63,31 @@ body {
   background: var(--ui-accent-hot, #dc2626);
 }
 
+/* Performance Mode: kill expensive effects */
+.performance-mode *,
+.performance-mode ::before,
+.performance-mode ::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition-duration: 0.1s !important;
+  animation-duration: 0.1s !important;
+  /* Keep a tiny duration to avoid logic breaks that depend on completion */
+}
+
+.performance-mode .thinking-atom-orbit,
+.performance-mode .thinking-atom-orbit-2,
+.performance-mode .thinking-atom-orbit-3,
+.performance-mode .atom-logo-orbit-1,
+.performance-mode .atom-logo-orbit-2,
+.performance-mode .atom-logo-orbit-3 {
+  animation: none !important;
+}
+
+.performance-mode .ui-odometer-active::after {
+  animation: none !important;
+  display: none !important;
+}
+
 /* Fallback error UI (main.js): token spacing only */
 .error-pre {
   padding: var(--space-4);

@@ -323,6 +323,14 @@
           {/each}
         </div>
       {/if}
+      {#if message.contextString}
+        <div
+          class="mt-3 pt-3 border-t border-white/10 prose-chat prose-sm dark:prose-invert max-w-none opacity-90"
+        >
+          {@html renderMarkdown(message.contextString)}
+        </div>
+      {/if}
+
       {#if Array.isArray(message.autoInjectedFiles) && message.autoInjectedFiles.length > 0}
         <div class="mt-2 flex flex-wrap gap-2">
           {#each message.autoInjectedFiles as file}

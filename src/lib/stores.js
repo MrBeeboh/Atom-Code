@@ -83,6 +83,14 @@ export const cockpitIntelOpen = writable(false);
 /** Workbench layout: pinned assistant message (markdown string or null). */
 export const pinnedContent = writable(null);
 
+/** Performance mode: disable expensive UI effects (blur, animations) for better responsiveness. */
+export const performanceMode = writable(
+  typeof localStorage !== 'undefined' && localStorage.getItem('performanceMode') === 'true'
+);
+if (typeof localStorage !== 'undefined') {
+  performanceMode.subscribe((v) => localStorage.setItem('performanceMode', v ? 'true' : 'false'));
+}
+
 
 /** UI theme: light | dark | coder. Legacy values mapped to light. */
 const VALID_UI_THEMES = ['light', 'dark', 'coder'];

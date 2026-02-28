@@ -33,6 +33,7 @@
     repoMapFileList,
     repoMapLoading,
     repoMapError,
+    performanceMode,
   } from "$lib/stores.js";
   import { startTemporalController } from "$lib/temporalController.js";
   import {
@@ -295,6 +296,12 @@
   });
   onMount(() => {
     document.body.classList.toggle("is-streaming", !!get(isStreaming));
+  });
+
+  performanceMode.subscribe((v) => {
+    if (typeof document !== "undefined") {
+      document.body.classList.toggle("performance-mode", !!v);
+    }
   });
 
   onMount(() => {
