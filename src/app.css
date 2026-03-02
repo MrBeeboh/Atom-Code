@@ -65,13 +65,12 @@ body {
 
 /* Performance Mode: kill expensive effects */
 .performance-mode *,
-.performance-mode ::before,
-.performance-mode ::after {
+.performance-mode *:before,
+.performance-mode *:after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  transition-duration: 0.1s !important;
-  animation-duration: 0.1s !important;
-  /* Keep a tiny duration to avoid logic breaks that depend on completion */
+  transition-duration: 0s !important;
+  animation: none !important;
 }
 
 .performance-mode .thinking-atom-orbit,
@@ -430,17 +429,17 @@ html {
 
 .thinking-atom-orbit {
   stroke: #00f0ff;
-  animation: atom-orbit-spin 4s linear infinite;
+  animation: atom-orbit-spin 12s linear infinite;
 }
 
 .thinking-atom-orbit-2 {
   stroke: #ff00ff;
-  animation: atom-orbit-spin-reverse 3s linear infinite;
+  animation: atom-orbit-spin-reverse 10s linear infinite;
 }
 
 .thinking-atom-orbit-3 {
   stroke: #00ff00;
-  animation: atom-orbit-spin 5s linear infinite;
+  animation: atom-orbit-spin 15s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -481,17 +480,17 @@ html {
 /* Header atom: animate when preparing message (e.g. fetching GitHub) or streaming */
 .atom-logo-icon-active .atom-logo-orbit-1 {
   transform-origin: 16px 16px;
-  animation: atom-orbit-spin 4s linear infinite;
+  animation: atom-orbit-spin 12s linear infinite;
 }
 
 .atom-logo-icon-active .atom-logo-orbit-2 {
   transform-origin: 16px 16px;
-  animation: atom-orbit-spin-reverse 3s linear infinite;
+  animation: atom-orbit-spin-reverse 10s linear infinite;
 }
 
 .atom-logo-icon-active .atom-logo-orbit-3 {
   transform-origin: 16px 16px;
-  animation: atom-orbit-spin 5s linear infinite;
+  animation: atom-orbit-spin 15s linear infinite;
 }
 
 .atom-logo-icon-active .atom-logo-nucleus {

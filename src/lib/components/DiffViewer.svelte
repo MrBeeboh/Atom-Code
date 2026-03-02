@@ -1,7 +1,8 @@
 <script>
   import { get } from "svelte/store";
   import hljs from "highlight.js";
-  import { fileServerUrl } from "$lib/stores.js";
+  import { fileServerUrl, isTauri } from "$lib/stores.js";
+  import * as tauriFs from "$lib/tauriFs.js";
   import DiffWorker from "$lib/diffWorker?worker";
 
   let {
@@ -98,19 +99,23 @@
     applying = true;
     applied = false;
     try {
-      let base = (get(fileServerUrl) || "http://localhost:8768").replace(
-        /\/$/,
-        "",
-      );
-      if (base.includes(":8766")) base = base.replace(":8766", ":8768");
-      const res = await fetch(`${base}/write`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: filePath, content: modifiedCode }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Write failed: ${res.status}`);
+      if (isTauri) {
+        await tauriFs.writeTextFile(filePath, modifiedCode);
+      } else {
+        let base = (get(fileServerUrl) || "http://localhost:8768").replace(
+          /\/$/,
+          "",
+        );
+        if (base.includes(":8766")) base = base.replace(":8766", ":8768");
+        const res = await fetch(`${base}/write`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: filePath, content: modifiedCode }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Write failed: ${res.status}`);
+        }
       }
       applied = true;
       setTimeout(() => {
@@ -431,7 +436,7 @@
     border: 2px solid var(--ui-border);
     border-top-color: var(--ui-accent);
     border-radius: 50%;
-    animation: diff-spin 0.8s linear infinite;
+    animation: diff-spin 1.6s linear infinite;
   }
 
   @keyframes diff-spin {

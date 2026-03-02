@@ -1,24 +1,32 @@
 import { writable } from 'svelte/store';
+// NOTE: invoke is imported dynamically inside buildRepoMapText so that this
+// module can be safely loaded in the web (non-Tauri) context without crashing.
 
 /**
- * Phase 2: Repo Map Codebase Indexing
+ * Phase 2: Repo Map Codebase Indexing (Tauri Edition)
  */
 
 export const repoMapText = writable('');
 export const repoMapSignatures = writable({});
 
-export async function buildRepoMapText(root, fileServerBase = 'http://localhost:8768') {
+export async function buildRepoMapText(root) {
   if (!root || typeof root !== 'string' || !root.trim()) {
     return '';
   }
 
-  const base = fileServerBase.replace(/\/$/, '').replace(':8766', ':8768');
+  // Guard: only runs inside the Tauri desktop shell.
+  const isTauri = typeof window !== 'undefined' && !!window['__TAURI_INTERNALS__'];
+  if (!isTauri) {
+    return '';
+  }
+
+  const { invoke } = await import('@tauri-apps/api/core');
+
   let treeData;
   try {
-    const res = await fetch(`${base}/repomap?path=${encodeURIComponent(root)}`);
-    if (!res.ok) return '';
-    treeData = await res.json();
+    treeData = await invoke('get_repo_map', { path: root });
   } catch (err) {
+    console.error('Tauri RepoMap Error:', err);
     return '';
   }
 

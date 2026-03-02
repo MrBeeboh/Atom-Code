@@ -16,14 +16,26 @@ export ATOM_WORKSPACE_ROOT="${ATOM_WORKSPACE_ROOT:-$HOME}"
 # LM Studio headless server (OpenAI-compatible API / WebSocket SDK on port 1234)
 LMSPATH="${LMSTUDIO_CLI_PATH:-$HOME/.lmstudio/bin/lms}"
 LLMSTERPATH="${LLMSTER_CLI_PATH:-$HOME/.lmstudio/bin/llmster}"
-if command -v lms &>/dev/null; then
-  (lms server start --cors 2>/dev/null) &
+
+# Helper: resolve the lms binary
+_lms_bin() {
+  if command -v lms &>/dev/null; then echo "lms";
+  elif [ -x "$LMSPATH" ]; then echo "$LMSPATH";
+  else echo ""; fi
+}
+LMS_BIN="$(_lms_bin)"
+
+if [ -n "$LMS_BIN" ]; then
+  # Start headless server (idempotent — safe to call even if already running)
+  ("$LMS_BIN" server start --cors 2>/dev/null) &
   LMS_PID=$!
-  echo "  LM Studio:  starting headless daemon (ws://localhost:1234)"
-elif [ -x "$LMSPATH" ]; then
-  ("$LMSPATH" server start --cors 2>/dev/null) &
-  LMS_PID=$!
-  echo "  LM Studio:  starting headless daemon (ws://localhost:1234)"
+  echo "  LM Studio:  starting headless server (ws://localhost:1234)"
+  # Auto-load a model: use ATOM_LMS_MODEL env var if set, otherwise load first available with --yes
+  if [ -n "${ATOM_LMS_MODEL:-}" ]; then
+    (sleep 3 && "$LMS_BIN" load "$ATOM_LMS_MODEL" --yes 2>/dev/null && echo "  LM Studio:  loaded model $ATOM_LMS_MODEL") &
+  else
+    (sleep 3 && "$LMS_BIN" load --yes 2>/dev/null && echo "  LM Studio:  auto-loaded model") &
+  fi
 elif command -v llmster &>/dev/null; then
   (llmster serve --cors 2>/dev/null || llmster --cors 2>/dev/null) &
   LMS_PID=$!
@@ -34,7 +46,7 @@ elif [ -x "$LLMSTERPATH" ]; then
   echo "  LM Studio:  starting llmster headless daemon (ws://localhost:1234)"
 else
   LMS_PID=""
-  echo "  LM Studio:  not found (install llmster/lms from https://lmstudio.ai); app will use Cloud or prompt to start LM Studio GUI"
+  echo "  LM Studio:  not found (install lms from https://lmstudio.ai/docs/cli)"
 fi
 
 # Terminal server
@@ -54,14 +66,14 @@ else
 fi
 
 # Voice server (optional) — faster-whisper; venv must have deps from voice-server/requirements.txt
-if [ -f voice-server/app.py ]; then
+if [ -f voice-server/server.py ]; then
   if [ -x voice-server/venv/bin/python3 ]; then
     (cd voice-server && ./venv/bin/python3 -m pip install -r requirements.txt -q 2>/dev/null)
-    (cd voice-server && exec ./venv/bin/python3 -m uvicorn app:app --host 0.0.0.0 --port 8765) &
+    (cd voice-server && exec ./venv/bin/python3 -m uvicorn server:app --host 127.0.0.1 --port 8765) &
     VOICE_PID=$!
     echo "  Voice:      starting (http://localhost:8765)"
   else
-    (cd voice-server && exec python3 -m uvicorn app:app --host 0.0.0.0 --port 8765) &
+    (cd voice-server && exec python3 -m uvicorn server:app --host 0.0.0.0 --port 8765) &
     VOICE_PID=$!
     echo "  Voice:      starting (http://localhost:8765, no venv)"
   fi
@@ -72,7 +84,7 @@ fi
 DEV_PID=$!
 
 echo ""
-echo "  ATOM Code:  http://localhost:5173"
+echo "  ATOM Code:  http://localhost:1420"
 echo "  Terminal:   ws://localhost:8767"
 echo "  File:       http://localhost:8768"
 echo "  Voice:      http://localhost:8765"
@@ -100,7 +112,7 @@ cleanup() {
   pkill -f "node.*file-server/server.js" 2>/dev/null
   pkill -f "node.*search-proxy.mjs" 2>/dev/null
   pkill -f "vite" 2>/dev/null
-  pkill -f "uvicorn.*app:app.*8765" 2>/dev/null
+  pkill -f "uvicorn.*server:app.*8765" 2>/dev/null
   
   kill $TERM_PID $FILE_PID $SEARCH_PID $VOICE_PID $DEV_PID $LMS_PID 2>/dev/null
   echo "All services stopped."

@@ -20,8 +20,10 @@
     braveApiKey,
     githubToken,
     performanceMode,
+    isTauri,
   } from "$lib/stores.js";
   import { syncBraveKeyToProxy } from "$lib/duckduckgo.js";
+  import { storeKey } from "$lib/secureKeys.js";
 
   let { onclose } = $props();
 
@@ -71,13 +73,26 @@
     if (modelId) selectedModelId.set(modelId);
   }
 
-  function save() {
+  async function save() {
     updateGlobalDefault({
       audio_enabled: !!audioEnabled,
       audio_clicks: !!audioClicks,
       audio_volume: Math.max(0, Math.min(1, Number(audioVolume) || 0)),
     });
-    onclose?.();
+
+    try {
+      await Promise.all([
+        storeKey("deepSeekApiKey", $deepSeekApiKey),
+        storeKey("grokApiKey", $grokApiKey),
+        storeKey("togetherApiKey", $togetherApiKey),
+        storeKey("deepinfraApiKey", $deepinfraApiKey),
+        storeKey("braveApiKey", $braveApiKey),
+        storeKey("githubToken", $githubToken),
+      ]);
+      onclose?.();
+    } catch (err) {
+      alert(`Failed to save secure keys: ${err.message}`);
+    }
   }
 
   function resetToDefaults() {
@@ -201,26 +216,28 @@
               >. Toggle panel: Ctrl+`
             </p>
           </div>
-          <div>
-            <label
-              for="settings-file-server-url"
-              class="block text-sm font-medium text-zinc-600 dark:text-zinc-400"
-              >File server URL</label
-            >
-            <input
-              id="settings-file-server-url"
-              type="url"
-              bind:value={$fileServerUrl}
-              placeholder="http://localhost:8768"
-              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal"
-            />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              For file explorer and pinned context. Run <code
-                class="bg-zinc-200 dark:bg-zinc-700 px-1 rounded"
-                >services/file-server</code
-              >. Toggle: Ctrl+E
-            </p>
-          </div>
+          {#if !isTauri}
+            <div>
+              <label
+                for="settings-file-server-url"
+                class="block text-sm font-medium text-zinc-600 dark:text-zinc-400"
+                >File server URL</label
+              >
+              <input
+                id="settings-file-server-url"
+                type="url"
+                bind:value={$fileServerUrl}
+                placeholder="http://localhost:8768"
+                class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal"
+              />
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                For file explorer and pinned context. Run <code
+                  class="bg-zinc-200 dark:bg-zinc-700 px-1 rounded"
+                  >services/file-server</code
+                >. Toggle: Ctrl+E
+              </p>
+            </div>
+          {/if}
           <div>
             <label
               for="settings-workspace-root"

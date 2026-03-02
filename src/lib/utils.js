@@ -82,7 +82,7 @@ export function shouldSkipImageResizeForVision(modelId) {
 export function formatTime(date) {
   const d = typeof date === 'number' ? new Date(date) : date;
   const now = new Date();
-  const diff = now - d;
+  const diff = now.getTime() - d.getTime();
   if (diff < 60_000) return 'Just now';
   if (diff < 3600_000) return `${Math.floor(diff / 60_000)}m ago`;
   if (diff < 86400_000) return `${Math.floor(diff / 3600_000)}h ago`;
@@ -223,4 +223,15 @@ export function makeResizable(element, params) {
       if (element.contains(handle)) element.removeChild(handle);
     },
   };
+}
+
+/**
+ * Very rough prompt token estimation (characters / 4).
+ * @param {object[]} messages
+ * @returns {number}
+ */
+export function estimatePromptTokens(messages) {
+  if (!Array.isArray(messages)) return 0;
+  let text = messages.map(m => m.content).join(' ');
+  return Math.ceil(text.length / 4);
 }

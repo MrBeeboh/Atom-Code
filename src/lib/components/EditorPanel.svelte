@@ -32,6 +32,8 @@
     fileServerUrl,
     openInEditorFromChat,
   } from "$lib/stores.js";
+  import * as tauriFs from "$lib/tauriFs.js";
+  import { save as tauriSave } from "@tauri-apps/plugin-dialog";
 
   let containerEl = $state(null);
   let view = $state(null);
@@ -224,61 +226,52 @@
   async function save() {
     const content = get(editorContent) ?? "";
     const path = get(editorFilePath)?.trim();
-    if (path && (path.startsWith("/") || path.match(/^[A-Za-z]:[\\/]/))) {
-      await doSaveViaServer(path, content);
-      return;
-    }
-    if (typeof window !== "undefined" && "showSaveFilePicker" in window) {
+
+    if (path) {
       try {
-        let handle = saveFileHandle;
-        if (!handle) {
-          // @ts-ignore
-          handle = await window.showSaveFilePicker({
-            suggestedName: suggestedSaveName(),
-            types: [
-              {
-                description: "Text/Code",
-                accept: {
-                  "text/*": [
-                    ".txt",
-                    ".js",
-                    ".py",
-                    ".html",
-                    ".css",
-                    ".json",
-                    ".md",
-                    ".svelte",
-                    ".ts",
-                    ".tsx",
-                    ".jsx",
-                  ],
-                },
-              },
-            ],
-          });
-          saveFileHandle = handle;
-          editorFilePath.set(handle.name);
-        }
-        const w = await handle.createWritable();
-        await w.write(content);
-        await w.close();
+        await tauriFs.writeTextFile(path, content);
         savedToast = true;
         setTimeout(() => (savedToast = false), 2000);
-        savePathPrompt = null;
-        return;
       } catch (e) {
-        if (e?.name === "AbortError") return;
         console.error("[EditorPanel] save failed", e);
         alert(e?.message || "Save failed");
-        return;
       }
-    }
-    if (path) {
-      await doSaveViaServer(path, content);
       return;
     }
-    savePathPrompt = true;
-    savePathInput = "";
+
+    try {
+      const selected = await tauriSave({
+        defaultPath: suggestedSaveName(),
+        filters: [
+          {
+            name: "Text/Code",
+            extensions: [
+              "txt",
+              "js",
+              "py",
+              "html",
+              "css",
+              "json",
+              "md",
+              "svelte",
+              "ts",
+              "tsx",
+              "jsx",
+            ],
+          },
+        ],
+      });
+
+      if (selected) {
+        await tauriFs.writeTextFile(selected, content);
+        editorFilePath.set(selected);
+        savedToast = true;
+        setTimeout(() => (savedToast = false), 2000);
+      }
+    } catch (e) {
+      console.error("[EditorPanel] save failed", e);
+      alert(e?.message || "Save failed");
+    }
   }
 
   async function doSaveViaServer(path, content) {
@@ -305,14 +298,20 @@
     }
   }
 
-  function saveWithPath() {
+  async function saveWithPath() {
     const p = savePathInput?.trim();
     if (!p) return;
-    doSaveViaServer(p, get(editorContent) ?? "").then(() => {
+    try {
+      await tauriFs.writeTextFile(p, get(editorContent) ?? "");
       editorFilePath.set(p);
       savePathInput = "";
-    });
-    savePathPrompt = null;
+      savedToast = true;
+      setTimeout(() => (savedToast = false), 2000);
+      savePathPrompt = null;
+    } catch (e) {
+      console.error("[EditorPanel] save failed", e);
+      alert(e?.message || "Save failed");
+    }
   }
 
   function copyContent() {

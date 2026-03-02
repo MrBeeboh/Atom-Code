@@ -8,6 +8,12 @@ import { writable, derived, get } from 'svelte/store';
 import { detectHardware } from '$lib/hardware.js';
 import { getRecommendedSettingsForModel } from '$lib/modelDefaults.js';
 
+/** True if running inside a Tauri container. */
+export const isTauri = typeof window !== 'undefined' && !!window['__TAURI_INTERNALS__'];
+
+// --- Secure Key Helpers (moved to native keychain) ---
+import { getKey, storeKey } from './secureKeys.js';
+
 /** Currently selected conversation id or null */
 export const activeConversationId = writable(null);
 
@@ -125,54 +131,41 @@ if (typeof localStorage !== 'undefined') {
   lmStudioUnloadHelperUrl.subscribe((v) => localStorage.setItem('lmStudioUnloadHelperUrl', v ?? ''));
 }
 
-/** DeepSeek API key (optional). When set, DeepSeek models appear in the model list and can be used for chat. Stored trimmed to avoid copy-paste spaces. */
-const getStoredDeepSeekApiKey = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem('deepSeekApiKey') ?? '').trim() : null) ?? '';
-export const deepSeekApiKey = writable(getStoredDeepSeekApiKey());
-if (typeof localStorage !== 'undefined') {
-  deepSeekApiKey.subscribe((v) => localStorage.setItem('deepSeekApiKey', (typeof v === 'string' ? v : '').trim()));
-}
+/** DeepSeek API key */
+export const deepSeekApiKey = writable('');
+/** Grok (xAI) API key */
+export const grokApiKey = writable('');
+/** Together AI API key */
+export const togetherApiKey = writable('');
+/** DeepInfra API key */
+export const deepinfraApiKey = writable('');
+/** Brave Search API key */
+export const braveApiKey = writable('');
+/** GitHub Personal Access Token */
+export const githubToken = writable('');
 
-/** Grok (xAI) API key (optional). When set, Grok models appear in the model list and can be used for chat. Stored trimmed to avoid copy-paste spaces. */
-const getStoredGrokApiKey = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem('grokApiKey') ?? '').trim() : null) ?? '';
-export const grokApiKey = writable(getStoredGrokApiKey());
-if (typeof localStorage !== 'undefined') {
-  grokApiKey.subscribe((v) => localStorage.setItem('grokApiKey', (typeof v === 'string' ? v : '').trim()));
-}
-
-/** Together AI API key: used only for image generation when DeepSeek is selected (DeepSeek has no native image API). Separate endpoint from Grok. */
-const getStoredTogetherApiKey = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem('togetherApiKey') ?? '').trim() : null) ?? '';
-export const togetherApiKey = writable(getStoredTogetherApiKey());
-if (typeof localStorage !== 'undefined') {
-  togetherApiKey.subscribe((v) => localStorage.setItem('togetherApiKey', (typeof v === 'string' ? v : '').trim()));
-}
-
-/** DeepInfra API key: image + video generation when DeepSeek is selected. Single key for both. */
-const getStoredDeepinfraApiKey = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem('deepinfraApiKey') ?? '').trim() : null) ?? '';
-export const deepinfraApiKey = writable(getStoredDeepinfraApiKey());
-if (typeof localStorage !== 'undefined') {
-  deepinfraApiKey.subscribe((v) => localStorage.setItem('deepinfraApiKey', (typeof v === 'string' ? v : '').trim()));
-}
-
-/** Brave Search API key: web search (globe). Stored in browser, sent to search proxy. */
-const getStoredBraveApiKey = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem('braveApiKey') ?? '').trim() : null) ?? '';
-export const braveApiKey = writable(getStoredBraveApiKey());
-if (typeof localStorage !== 'undefined') {
-  braveApiKey.subscribe((v) => localStorage.setItem('braveApiKey', (typeof v === 'string' ? v : '').trim()));
-}
-
-/** GitHub Personal Access Token: for private repo fetch (Phase 10). Never sent to the model. */
-const getStoredGithubToken = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem('githubToken') ?? '').trim() : null) ?? '';
-export const githubToken = writable(getStoredGithubToken());
-if (typeof localStorage !== 'undefined') {
-  githubToken.subscribe((v) => localStorage.setItem('githubToken', (typeof v === 'string' ? v : '').trim()));
-}
-
-/** Together image endpoint name: required for FLUX.1-schnell-Free (create dedicated endpoint at api.together.ai, then paste the endpoint name here). */
+/** Together image endpoint name (persisted in localStorage as it's non-sensitive) */
 const getStoredTogetherImageEndpoint = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem('togetherImageEndpoint') ?? '').trim() : null) ?? '';
 export const togetherImageEndpoint = writable(getStoredTogetherImageEndpoint());
 if (typeof localStorage !== 'undefined') {
-  togetherImageEndpoint.subscribe((v) => localStorage.setItem('togetherImageEndpoint', (typeof v === 'string' ? v : '').trim()));
+  togetherImageEndpoint.subscribe(v => localStorage.setItem('togetherImageEndpoint', (v ?? '').trim()));
 }
+
+// Initialize secure keys from keychain
+if (typeof window !== 'undefined') {
+  const keys = ['deepSeekApiKey', 'grokApiKey', 'togetherApiKey', 'deepinfraApiKey', 'braveApiKey', 'githubToken'];
+  keys.forEach(k => {
+    getKey(k).then(val => {
+      if (k === 'deepSeekApiKey') deepSeekApiKey.set(val);
+      if (k === 'grokApiKey') grokApiKey.set(val);
+      if (k === 'togetherApiKey') togetherApiKey.set(val);
+      if (k === 'deepinfraApiKey') deepinfraApiKey.set(val);
+      if (k === 'braveApiKey') braveApiKey.set(val);
+      if (k === 'githubToken') githubToken.set(val);
+    });
+  });
+}
+
 
 /** True when at least one cloud API key (DeepSeek or Grok) is set. Used for status line when LM Studio is down. */
 export const cloudApisAvailable = derived(
@@ -353,7 +346,7 @@ export function mergeEffectiveSettings(modelId, globalDefaultVal, perModelOverri
 /** Effective settings for the currently selected model. Reactive. */
 export const settings = derived(
   [globalDefault, perModelOverrides, selectedModelId],
-  ([$g, $p, $sid]) => getEffectiveSettingsForModel($sid || '')
+  ([$g, $p, $sid]) => mergeEffectiveSettings($sid || '', $g, $p)
 );
 
 /** @deprecated Use updateGlobalDefault() or setPerModelOverride(). Kept for compatibility; writes global default. */
@@ -537,17 +530,15 @@ export const floatingMetricsMinimized = writable(floatingInit.minimized);
 export const floatingMetricsPosition = writable({ x: floatingInit.x, y: floatingInit.y });
 export const floatingMetricsSize = writable({ width: floatingInit.width, height: floatingInit.height });
 if (typeof localStorage !== 'undefined') {
-  function saveFloatingMetrics() {
-    const open = get(floatingMetricsOpen);
-    const min = get(floatingMetricsMinimized);
-    const pos = get(floatingMetricsPosition);
-    const sz = get(floatingMetricsSize);
-    localStorage.setItem('floatingMetrics', JSON.stringify({ open, minimized: min, x: pos.x, y: pos.y, width: sz.width, height: sz.height }));
+  const floatingMetricsState = derived(
+    [floatingMetricsOpen, floatingMetricsMinimized, floatingMetricsPosition, floatingMetricsSize],
+    ([open, min, pos, sz]) => ({ open, minimized: min, x: pos.x, y: pos.y, width: sz.width, height: sz.height })
+  );
+  if (typeof localStorage !== 'undefined') {
+    floatingMetricsState.subscribe((st) => {
+      localStorage.setItem('floatingMetrics', JSON.stringify(st));
+    });
   }
-  floatingMetricsOpen.subscribe(saveFloatingMetrics);
-  floatingMetricsMinimized.subscribe(saveFloatingMetrics);
-  floatingMetricsPosition.subscribe(saveFloatingMetrics);
-  floatingMetricsSize.subscribe(saveFloatingMetrics);
 }
 
 /** TTS Settings and State (af_heart natural female voice, speed 1.0 by default) */
@@ -557,12 +548,15 @@ export const ttsSpeed = writable(Math.max(0.5, readNum('tts_speed', 1.0)));
 export const ttsPlaying = writable(false);
 export const ttsStopped = writable(false);
 
+const ttsSettings = derived(
+  [ttsEnabled, ttsVoice, ttsSpeed],
+  ([enabled, voice, speed]) => ({ enabled, voice, speed: Math.max(0.5, Number(speed) || 1.0) })
+);
 if (typeof localStorage !== 'undefined') {
-  ttsEnabled.subscribe((v) => localStorage.setItem('tts_enabled', v ? 'true' : 'false'));
-  ttsVoice.subscribe((v) => localStorage.setItem('tts_voice', v ?? 'af_heart'));
-  ttsSpeed.subscribe((v) => {
-    const s = Math.max(0.5, Number(v) || 1.0);
-    localStorage.setItem('tts_speed', String(s));
+  ttsSettings.subscribe((s) => {
+    localStorage.setItem('tts_enabled', s.enabled ? 'true' : 'false');
+    localStorage.setItem('tts_voice', s.voice ?? 'af_heart');
+    localStorage.setItem('tts_speed', String(s.speed));
   });
 }
 

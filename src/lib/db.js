@@ -5,6 +5,7 @@
  */
 import Dexie from 'dexie';
 
+/** @type {any} */
 const db = new Dexie('LMStudioChat');
 db.version(1).stores({
   conversations: 'id, createdAt, updatedAt',
@@ -33,7 +34,7 @@ export async function createConversation(model = '') {
 
 /**
  * @param {string} id
- * @param {{ title?: string, model?: string }} updates
+ * @param {{ title?: string, model?: string, pinned?: boolean }} updates
  */
 export async function updateConversation(id, updates) {
   await conversationsTable.update(id, { ...updates, updatedAt: Date.now() });
@@ -87,7 +88,7 @@ export async function listPinnedConversations() {
 
 /**
  * @param {string} conversationId
- * @param {{ role: string, content: string|Array, contextString?: string, autoInjectedFiles?: string[], stats?: Object, modelId?: string, imageRefs?: Array<{ image_id: string }>, imageUrls?: string[], videoUrls?: string[] }} message
+ * @param {{ role: string, content: string|Array, contextString?: string, autoInjectedFiles?: string[], stats?: Object, modelId?: string, imageRefs?: Array<{ image_id: string }>, imageUrls?: string[], videoUrls?: string[], interrupted?: boolean, error?: string }} message
  * @param {string} [existingId] - If provided (e.g. streaming placeholder id), use it so the saved message keeps the same id and the UI does not remount.
  */
 export async function addMessage(conversationId, message, existingId) {
@@ -107,6 +108,8 @@ export async function addMessage(conversationId, message, existingId) {
     imageUrls: Array.isArray(imageUrls) ? [...imageUrls] : null,
     videoUrls: Array.isArray(videoUrls) ? [...videoUrls] : null,
     autoInjectedFiles: Array.isArray(autoInjectedFiles) ? [...autoInjectedFiles] : null,
+    interrupted: message.interrupted ?? false,
+    error: message.error ?? null,
     createdAt: Date.now(),
   });
   return id;
@@ -129,7 +132,7 @@ export async function deleteMessage(messageId) {
 
 /**
  * @param {string} conversationId
- * @returns {Promise<Array<{ id: string, role: string, content: string|Array, stats: Object|null, modelId?: string, createdAt: number }>>}
+ * @returns {Promise<Array<{ id: string, role: string, content: string|Array, stats: Object|null, modelId?: string, interrupted?: boolean, error?: string, createdAt: number }>>}
  */
 export async function getMessages(conversationId) {
   return messagesTable.where('conversationId').equals(conversationId).sortBy('createdAt');

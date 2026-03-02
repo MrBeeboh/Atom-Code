@@ -41,9 +41,10 @@
   let {
     onSend,
     onStop,
-    onGenerateImageGrok,
-    onGenerateImageDeepSeek,
-    onGenerateVideoDeepSeek,
+    onOpenImageModal = undefined,
+    onOpenVideoModal = undefined,
+    onGenerateImageDeepSeek = undefined,
+    onGenerateVideoDeepSeek = undefined,
     imageGenerating = false,
     videoGenerating = false,
     videoGenElapsed = "",
@@ -305,14 +306,16 @@
   }
 
   function handleImageClick() {
+    if (typeof onOpenImageModal === "function") {
+      onOpenImageModal();
+      return;
+    }
     const prompt = text.trim();
     if (!prompt) return;
     const fn =
-      typeof onGenerateImageGrok === "function"
-        ? onGenerateImageGrok
-        : typeof onGenerateImageDeepSeek === "function"
-          ? onGenerateImageDeepSeek
-          : null;
+      typeof onGenerateImageDeepSeek === "function"
+        ? onGenerateImageDeepSeek
+        : null;
     if (fn) {
       const result = fn(prompt);
       if (result && typeof result.then === "function") {
@@ -326,6 +329,10 @@
   }
 
   function handleVideoClick() {
+    if (typeof onOpenVideoModal === "function") {
+      onOpenVideoModal();
+      return;
+    }
     const fn =
       typeof onGenerateVideoDeepSeek === "function"
         ? onGenerateVideoDeepSeek
@@ -767,7 +774,7 @@
       (typeof localStorage !== "undefined"
         ? localStorage.getItem("voiceServerUrl")
         : null) ??
-      "http://localhost:8765";
+      "http://127.0.0.1:8765";
     const url = (baseUrl || "").trim().replace(/\/$/, "");
     if (!url) {
       voiceError =
@@ -1049,13 +1056,11 @@
               class="media-icon-btn {imageGenerating
                 ? 'media-icon-btn-active'
                 : ''}"
-              disabled={$isStreaming || imageGenerating || !text.trim()}
+              disabled={$isStreaming ||
+                imageGenerating ||
+                (!text.trim() && !onOpenImageModal)}
               onclick={handleImageClick}
-              title={imageGenerating
-                ? "Generating image…"
-                : onGenerateImageGrok
-                  ? "Generate image (Grok)"
-                  : "Generate image (DeepInfra)"}
+              title={imageGenerating ? "Generating image…" : "Generate image"}
               aria-label={imageGenerating
                 ? "Generating image"
                 : "Generate image"}
@@ -1106,7 +1111,9 @@
               class="media-icon-btn {videoGenerating
                 ? 'media-icon-btn-active'
                 : ''}"
-              disabled={$isStreaming || videoGenerating || !text.trim()}
+              disabled={$isStreaming ||
+                videoGenerating ||
+                (!text.trim() && !onOpenVideoModal)}
               onclick={handleVideoClick}
               title={videoGenerating
                 ? `Generating video… ${videoGenElapsed}`

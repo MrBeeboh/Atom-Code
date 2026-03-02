@@ -16,6 +16,7 @@
     webSearchConnected,
     grokApiKey,
     deepinfraApiKey,
+    togetherApiKey,
     uiTheme,
     contextUsage,
     summarizeAndContinueTrigger,
@@ -41,12 +42,14 @@
   } from "$lib/repoMap.js";
   import { streamChatCompletionWithMetrics } from "$lib/streamReporter.js";
   import {
-    requestGrokImageGeneration,
     requestDeepInfraImageGeneration,
     requestDeepInfraVideoGeneration,
     isGrokModel,
     isDeepSeekModel,
+    isCloud as isCloudModel,
     requestChatCompletion,
+    modelDisplayName,
+    loadModel,
   } from "$lib/api.js";
   import {
     searchDuckDuckGo,
@@ -130,9 +133,9 @@
       .join("\n\n");
     const toSend = text.slice(-80000);
     try {
-      const { content: summary } = await requestChatCompletion({
-        model: $effectiveModelId,
-        messages: [
+      const { content: summary } = await requestChatCompletion(
+        $effectiveModelId,
+        [
           {
             role: "system",
             content:
@@ -140,8 +143,8 @@
           },
           { role: "user", content: toSend },
         ],
-        options: { max_tokens: 1024, temperature: 0.3 },
-      });
+        { max_tokens: 1024, temperature: 0.3 },
+      );
       const newId = await createConversation();
       await addMessage(newId, {
         role: "system",
@@ -226,12 +229,19 @@
   );
   const canGenerateImage = $derived(imageModalPrompt.trim().length > 0);
 
-  /** DeepInfra model IDs (official docs). Our ENGINE_OPTIONS use dot (FLUX.1); DeepInfra uses hyphen (FLUX-1). */
+  /** DeepInfra model IDs (official docs use hyphen FLUX-1, not dot FLUX.1). */
   const DEEPINFRA_MODEL_IDS = [
     "black-forest-labs/FLUX-1-schnell",
     "black-forest-labs/FLUX-1-dev",
-    "black-forest-labs/FLUX-1-dev",
+    "black-forest-labs/FLUX-1-pro",
   ];
+  /** Together AI model IDs (dot notation) — matches ENGINE_OPTIONS labels exactly. */
+  const TOGETHER_MODEL_IDS = [
+    "black-forest-labs/FLUX.1-schnell",
+    "black-forest-labs/FLUX.1-dev",
+    "black-forest-labs/FLUX.1-pro",
+  ];
+
   const getDeepinfraImageKey = () =>
     (
       get(deepinfraApiKey)?.trim() ||
@@ -239,6 +249,11 @@
         import.meta.env?.VITE_DEEPINFRA_API_KEY) ||
       ""
     ).trim();
+
+  const getTogetherImageKey = () => get(togetherApiKey)?.trim() || "";
+
+  /** Returns truthy if ANY image generation key is configured (Together or DeepInfra). */
+  const getAnyImageKey = () => getTogetherImageKey() || getDeepinfraImageKey();
 
   /** Video modal (DeepInfra). Per spec: prompt only; no other params. */
   const VIDEO_ENGINE_OPTIONS = [
@@ -781,7 +796,6 @@ Consume the data silently to answer the user's prompt.`;
           presence_penalty: $settings.presence_penalty,
           frequency_penalty: $settings.frequency_penalty,
           stop: $settings.stop?.length ? $settings.stop : undefined,
-          ttl: $settings.model_ttl_seconds,
         },
         signal: controller.signal,
         onChunk(chunk) {
@@ -808,9 +822,47 @@ Consume the data silently to answer the user's prompt.`;
       const raw = err?.message || "";
       const isLoadError =
         raw.includes("Failed to load model") ||
-        raw.includes("Error loading model");
+        raw.includes("Error loading model") ||
+        raw.includes("No models loaded") ||
+        raw.includes("model is not loaded") ||
+        raw.includes("No model selected");
       const isContextLength =
         /maximum context length|reduce the length of the messages/i.test(raw);
+
+      // Auto-load the selected model when it's not loaded in LM Studio
+      if (isLoadError) {
+        const modelToLoad = get(effectiveModelId);
+        const isLocal =
+          modelToLoad &&
+          !isCloudModel(modelToLoad) &&
+          !isGrokModel(modelToLoad);
+        if (isLocal) {
+          chatError.set(
+            `Model not loaded — auto-loading "${modelDisplayName(modelToLoad)}"…`,
+          );
+          messagePreparing.set(false);
+          isStreaming.set(false);
+          streamingContent.set("");
+          loadModel(modelToLoad)
+            .then(() => {
+              chatError.set(
+                `✓ Model loaded. Send your message again to continue.`,
+              );
+            })
+            .catch((loadErr) => {
+              chatError.set(
+                `Auto-load failed: ${loadErr?.message || "Could not load model"}. Check LM Studio or available memory.`,
+              );
+            })
+            .finally(() => {
+              activeMessages.update((arr) =>
+                arr.filter((m) => m.id !== assistantMsgId),
+              );
+            });
+          return;
+        }
+      }
+
       const friendly = isLoadError
         ? "Model failed to load in LM Studio. Load the model in LM Studio first (or check memory). If it still fails, try re-downloading the model in case the file is corrupted."
         : isContextLength
@@ -895,9 +947,9 @@ Consume the data silently to answer the user's prompt.`;
     if (conv && conv.title === "New chat" && fullContent) {
       let title = fullContent.slice(0, 30).replace(/\n/g, " ").trim() || "Chat";
       try {
-        const titleRes = await requestChatCompletion({
-          model: $effectiveModelId,
-          messages: [
+        const titleRes = await requestChatCompletion(
+          $effectiveModelId,
+          [
             {
               role: "system",
               content:
@@ -905,8 +957,8 @@ Consume the data silently to answer the user's prompt.`;
             },
             { role: "user", content: effectiveText.slice(0, 1000) },
           ],
-          options: { max_tokens: 15, temperature: 0.3 },
-        });
+          { max_tokens: 15, temperature: 0.3 },
+        );
         if (titleRes?.content) {
           title = titleRes.content.replace(/["'\n]/g, "").trim() || title;
         }
@@ -933,58 +985,16 @@ Consume the data silently to answer the user's prompt.`;
     await loadMessages();
   }
 
-  /** Grok image only. Separate code path; does not touch DeepSeek. */
-  async function handleGrokImage(prompt) {
-    if (!convId) {
-      chatError.set("Start or select a conversation first.");
-      return;
-    }
-    if (!get(grokApiKey)?.trim()) {
-      chatError.set("Grok API key required. Add it in Settings → Cloud APIs.");
-      return;
-    }
-    chatError.set(null);
-    imageGenerating = true;
-    try {
-      const data = await requestGrokImageGeneration({
-        prompt,
-        n: 1,
-        aspect_ratio: "1:1",
-        resolution: "1k",
-        response_format: "url",
-      });
-      const urls = data?.data?.map((d) => d?.url).filter(Boolean) ?? [];
-      if (urls.length === 0) {
-        chatError.set(
-          "Image generation failed—no URLs returned. Try text mode.",
-        );
-        return;
-      }
-      const modelId = get(effectiveModelId);
-      await addMessage(convId, {
-        role: "assistant",
-        content: "Generated images for your prompt.",
-        imageUrls: urls,
-        modelId: modelId || "grok:grok-imagine-image",
-      });
-      await loadMessages();
-    } catch (err) {
-      chatError.set(err?.message ?? "Image generation failed—try text mode.");
-    } finally {
-      imageGenerating = false;
-    }
-  }
-
-  /** DeepSeek image flow: open options modal. Uses DeepInfra (single key for image + video). */
+  /** DeepSeek image flow: open options modal. Uses Together AI (preferred) or DeepInfra. */
   function openImageOptionsModal(prompt) {
     if (!convId) {
       chatError.set("Start or select a conversation first.");
       return;
     }
-    const key = getDeepinfraImageKey();
+    const key = getAnyImageKey();
     if (!key) {
       chatError.set(
-        "DeepInfra API key required. Add it in Settings → Cloud APIs.",
+        "Image API key required. Add a Together AI or DeepInfra key in Settings → Cloud APIs.",
       );
       return;
     }
@@ -1037,12 +1047,11 @@ Consume the data silently to answer the user's prompt.`;
         return;
       }
       const modelIdEffective = get(effectiveModelId);
-      const imageUrlsToStore = [...urls];
       await addMessage(convId, {
         role: "assistant",
         content: "Generated images for your prompt.",
-        imageUrls: imageUrlsToStore,
-        modelId: modelIdEffective || "deepseek:deepseek-chat",
+        imageUrls: [...urls],
+        modelId: modelIdEffective || "image-generation",
       });
       await loadMessages();
     } catch (err) {
@@ -1088,13 +1097,12 @@ Consume the data silently to answer the user's prompt.`;
     videoGenerating = true;
     chatError.set(null);
     try {
-      // DeepInfra video: ONLY prompt. Do not pass width, height, duration, negative_prompt, or any other field.
-      const data = await requestDeepInfraVideoGeneration({
+      const result = await requestDeepInfraVideoGeneration({
         apiKey: key,
         modelId,
         prompt: videoModalPrompt,
       });
-      const videoUrl = data?.videoUrl;
+      const videoUrl = result?.videoUrl;
       if (!videoUrl) {
         chatError.set("Video generation failed—no video URL returned.");
         return;
@@ -1251,17 +1259,10 @@ Consume the data silently to answer the user's prompt.`;
                 chatAbortController?.abort?.();
                 stopTTS();
               }}
-              onGenerateImageGrok={$effectiveModelId &&
-              isGrokModel($effectiveModelId) &&
-              $grokApiKey?.trim()
-                ? handleGrokImage
-                : undefined}
-              onGenerateImageDeepSeek={getDeepinfraImageKey()
-                ? openImageOptionsModal
-                : undefined}
-              onGenerateVideoDeepSeek={getDeepinfraImageKey()
-                ? openVideoModal
-                : undefined}
+              onOpenImageModal={openImageOptionsModal}
+              onOpenVideoModal={openVideoModal}
+              onGenerateImageDeepSeek={openImageOptionsModal}
+              onGenerateVideoDeepSeek={openVideoModal}
               {imageGenerating}
               {videoGenerating}
               {videoGenElapsed}
@@ -1353,17 +1354,10 @@ Consume the data silently to answer the user's prompt.`;
                   chatAbortController?.abort?.();
                   stopTTS();
                 }}
-                onGenerateImageGrok={$effectiveModelId &&
-                isGrokModel($effectiveModelId) &&
-                $grokApiKey?.trim()
-                  ? handleGrokImage
-                  : undefined}
-                onGenerateImageDeepSeek={getDeepinfraImageKey()
-                  ? openImageOptionsModal
-                  : undefined}
-                onGenerateVideoDeepSeek={getDeepinfraImageKey()
-                  ? openVideoModal
-                  : undefined}
+                onOpenImageModal={openImageOptionsModal}
+                onOpenVideoModal={openVideoModal}
+                onGenerateImageDeepSeek={openImageOptionsModal}
+                onGenerateVideoDeepSeek={openVideoModal}
                 {imageGenerating}
                 {videoGenerating}
                 {videoGenElapsed}

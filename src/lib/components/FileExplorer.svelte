@@ -16,12 +16,14 @@
     repoMapFileList,
     repoMapLoading,
     repoMapError,
+    isTauri,
   } from "$lib/stores.js";
   import { repoMapSignatures } from "$lib/repoMap.js";
   import { addMessage } from "$lib/db.js";
   import { activeConversationId } from "$lib/stores.js";
   import FileTree from "$lib/components/FileTree.svelte";
   import { parseGitHubUrl } from "$lib/github.js";
+  import * as tauriFs from "$lib/tauriFs.js";
 
   let { standalone = true } = $props();
 
@@ -32,6 +34,8 @@
   let expandedDirs = $state({});
   let contextMenu = $state(null);
   let workspaceInput = $state("");
+  let workspaceEditMode = $state(false);
+  let workspaceEditInput = $state("");
   let cloneModalOpen = $state(false);
   let cloneUrlInput = $state("");
   let cloneError = $state("");
@@ -94,63 +98,90 @@
     localStorage.setItem("workspaceHistory", JSON.stringify(next));
   }
 
-  async function openBrowse() {
-    browseLoading = true;
+  async function openBrowse(startPath = "") {
+    browseLoading = false;
     browseError = null;
-    try {
-      const url = get(fileServerUrl) || "http://localhost:8768";
-      const res = await fetch(`${url}/pick-directory`);
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to open folder picker");
+    browsePath = (
+      startPath ||
+      workspaceInput ||
+      get(workspaceRoot) ||
+      "/home/mike"
+    ).trim();
+
+    // 1. Tauri: try native OS picker
+    if (isTauri) {
+      try {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const selected = await open({
+          directory: true,
+          multiple: false,
+          title: "Choose Workspace Folder",
+          defaultPath: browsePath,
+        });
+        if (selected) {
+          setWorkspace(selected);
+          return;
+        }
+      } catch (_) {
+        // fall through to modal
       }
-      const data = await res.json();
-      if (data.path) {
-        workspaceInput = data.path;
-        setWorkspace(data.path);
+    } else {
+      // 2. Browser: try the file server's native picker (/pick-directory → zenity/kdialog)
+      const server = get(fileServerUrl);
+      if (server) {
+        try {
+          const res = await fetch(
+            `${server}/pick-directory?path=${encodeURIComponent(browsePath)}`,
+          );
+          const data = await res.json();
+          if (res.ok && data.path) {
+            setWorkspace(data.path);
+            return; // picked successfully, no modal needed
+          }
+          // If picker not available, fall through to modal
+        } catch (_) {
+          // network error → fall through to modal
+        }
       }
-    } catch (err) {
-      console.error("[FileExplorer] pick directory failed", err);
-      // Fallback to old modal if zenity is missing or fails
-      browsePath = workspaceInput.trim() || "/home/mike";
-      browseModalOpen = true;
-      fetchBrowseTree();
-    } finally {
-      browseLoading = false;
     }
+
+    // 3. Fallback: show the directory-browser modal
+    browseModalOpen = true;
+    fetchBrowseTree();
   }
 
-  async function fetchBrowseTree(path = browsePath) {
+  async function fetchBrowseTree(dirPath = browsePath) {
     browseLoading = true;
     browseError = null;
+    browsePath = dirPath;
     try {
-      const url = get(fileServerUrl) || "http://localhost:8768";
-      const res = await fetch(
-        `${url}/tree?root=${encodeURIComponent(path)}&depth=1`,
-      );
-      if (!res.ok) throw new Error("Failed to fetch directory tree");
-      const data = await res.json();
-      browseTree = data.filter((n) => n.type === "dir");
-      browsePath = path;
+      if (isTauri) {
+        const data = await tauriFs.listDirectory(dirPath);
+        browseTree = data.filter((n) => n.is_dir);
+      } else {
+        // Use file-server /list-dir endpoint
+        const server = get(fileServerUrl);
+        if (!server)
+          throw new Error(
+            "File server not running. Start atom-code or set a path manually.",
+          );
+        const res = await fetch(
+          `${server}/list-dir?path=${encodeURIComponent(dirPath)}`,
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to list directory");
+        browseTree = data;
+      }
     } catch (err) {
       browseError = err.message;
+      browseTree = [];
     } finally {
       browseLoading = false;
     }
-  }
-
-  function selectBrowse(path) {
-    fetchBrowseTree(path);
-  }
-
-  function confirmBrowse() {
-    workspaceInput = browsePath;
-    setWorkspace();
-    browseModalOpen = false;
   }
 
   function goUpBrowse() {
-    const parent = browsePath.substring(0, browsePath.lastIndexOf("/")) || "/";
+    const parent = browsePath.replace(/\/[^/]+\/?$/, "") || "/";
     fetchBrowseTree(parent);
   }
 
@@ -160,11 +191,6 @@
 
   async function fetchTree() {
     const root = get(workspaceRoot)?.trim();
-    let base = (get(fileServerUrl) || "http://localhost:8768").replace(
-      /\/$/,
-      "",
-    );
-    if (base.includes(":8766")) base = base.replace(":8766", ":8768");
     if (!root) {
       tree = [];
       return;
@@ -172,18 +198,86 @@
     loading = true;
     error = "";
     try {
-      const res = await fetch(
-        `${base}/tree?root=${encodeURIComponent(root)}&depth=${TREE_DEPTH}`,
-      );
-      if (!res.ok) throw new Error(res.statusText);
-      const data = await res.json();
-      tree = Array.isArray(data) ? data : [];
+      if (isTauri) {
+        // Tauri: just fetch top-level; children loaded lazily on expand
+        const data = await tauriFs.listDirectory(root, false);
+        // Ensure each dir node has children: null (meaning "not yet loaded")
+        tree = data.map((n) =>
+          n.is_dir
+            ? { ...n, type: "dir", children: null }
+            : { ...n, type: "file" },
+        );
+      } else {
+        // Browser: use file-server /tree endpoint (returns fully nested structure)
+        const server = get(fileServerUrl);
+        if (!server)
+          throw new Error(
+            "File server not running — run npm run dev:services or start ATOM Code",
+          );
+        const res = await fetch(
+          `${server}/tree?root=${encodeURIComponent(root)}&depth=4`,
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load file tree");
+        tree = data;
+      }
     } catch (e) {
-      error = e?.message || "Failed to load tree";
+      error = e?.message || "Failed to load file tree";
       tree = [];
     } finally {
       loading = false;
     }
+  }
+
+  /** Recursively update a node (by path) in the tree */
+  function updateNodeChildren(nodes, targetPath, children) {
+    return nodes.map((n) => {
+      if (n.path === targetPath) return { ...n, children };
+      if (n.children?.length)
+        return {
+          ...n,
+          children: updateNodeChildren(n.children, targetPath, children),
+        };
+      return n;
+    });
+  }
+
+  async function toggleDir(path) {
+    if (expandedDirs[path]) {
+      // Collapse
+      const updated = { ...expandedDirs };
+      delete updated[path];
+      expandedDirs = updated;
+    } else {
+      // Expand — lazy-load children in Tauri mode
+      expandedDirs = { ...expandedDirs, [path]: true };
+      if (isTauri) {
+        // Check if children not yet loaded
+        const node = findNode(tree, path);
+        if (node && node.children === null) {
+          try {
+            const children = await tauriFs.listDirectory(path, false);
+            const normalized = children.map((n) =>
+              n.is_dir || n.type === "dir" ? { ...n, children: null } : n,
+            );
+            tree = updateNodeChildren(tree, path, normalized);
+          } catch (_) {
+            tree = updateNodeChildren(tree, path, []);
+          }
+        }
+      }
+    }
+  }
+
+  function findNode(nodes, path) {
+    for (const n of nodes) {
+      if (n.path === path) return n;
+      if (n.children?.length) {
+        const found = findNode(n.children, path);
+        if (found) return found;
+      }
+    }
+    return null;
   }
 
   $effect(() => {
@@ -192,20 +286,25 @@
     fetchTree();
   });
 
-  function toggleDir(path) {
-    if (expandedDirs[path]) {
-      delete expandedDirs[path];
-    } else {
-      expandedDirs[path] = true;
-    }
-  }
-
   function setWorkspace(path = workspaceInput) {
     const trimmed = path?.trim() || "";
     workspaceRoot.set(trimmed);
+    workspaceEditMode = false;
     if (trimmed) {
+      workspaceInput = trimmed;
       addToHistory(trimmed);
     }
+  }
+
+  function startEditWorkspace() {
+    workspaceEditInput = get(workspaceRoot) || "";
+    workspaceEditMode = true;
+  }
+
+  function confirmEditWorkspace() {
+    const trimmed = workspaceEditInput.trim();
+    if (trimmed) setWorkspace(trimmed);
+    else workspaceEditMode = false;
   }
 
   async function ejectWorkspace() {
@@ -308,21 +407,21 @@
       editorContent.set("");
       return;
     }
-    let base = (get(fileServerUrl) || "http://localhost:8768").replace(
-      /\/$/,
-      "",
-    );
-    if (base.includes(":8766")) base = base.replace(":8766", ":8768");
     try {
-      const res = await fetch(
-        `${base}/content?path=${encodeURIComponent(absPath)}`,
-      );
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || res.statusText);
+      let content;
+      if (isTauri) {
+        content = await tauriFs.readTextFile(absPath);
+      } else {
+        // Browser: use file-server /content endpoint
+        const server = get(fileServerUrl);
+        if (!server) throw new Error("File server not running");
+        const res = await fetch(
+          `${server}/content?path=${encodeURIComponent(absPath)}`,
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to read file");
+        content = data.content;
       }
-      const data = await res.json();
-      const content = typeof data.content === "string" ? data.content : "";
       editorContent.set(content);
       editorFilePath.set(absPath);
       editorLanguage.set(pathToEditorLang(absPath));
@@ -381,226 +480,227 @@
     : 'none'}; backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);"
 >
   <div
-    class="flex flex-col gap-2 p-2 border-b shrink-0"
+    class="flex flex-col gap-0 p-2 border-b shrink-0"
     style="border-color: var(--ui-border);"
   >
-    <div class="w-full flex-col flex gap-2">
-      <div class="flex items-center justify-between pl-1">
-        <span
-          class="text-[10px] font-semibold uppercase tracking-wider block"
-          style="color: var(--ui-text-secondary);">Local Workspace</span
-        >
-        {#if $workspaceRoot}
-          <div class="flex items-center gap-2">
-            {#if $repoMapLoading}
-              <div
-                class="flex items-center gap-1.5 no-drag scale-in"
-                title="Indexing codebase context..."
-              >
-                <div class="relative w-2.5 h-2.5">
-                  <div
-                    class="absolute inset-0 border-2 border-[var(--ui-accent)] opacity-20 rounded-full"
-                  ></div>
-                  <div
-                    class="absolute inset-0 border-2 border-[var(--ui-accent)] border-t-transparent rounded-full animate-spin"
-                  ></div>
-                </div>
-              </div>
-            {/if}
-
-            <button
-              type="button"
-              class="p-0.5 rounded-full hover:bg-white/10 transition-colors"
-              title="Eject workspace"
-              onclick={ejectWorkspace}
-            >
-              <svg
-                class="w-3 h-3"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg
-              >
-            </button>
-          </div>
-        {/if}
-      </div>
-
-      {#if $workspaceRoot}
-        <div
-          class="group relative flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-all duration-200"
-          style="background: var(--ui-input-bg); border-color: var(--ui-border);"
-          title={$workspaceRoot}
-        >
+    <!-- Section label row -->
+    <div class="flex items-center justify-between pl-1 mb-2">
+      <span
+        class="text-[10px] font-semibold uppercase tracking-wider"
+        style="color: var(--ui-text-secondary);">Workspace</span
+      >
+      {#if $workspaceRoot && $repoMapLoading}
+        <div class="flex items-center gap-1" title="Indexing…">
           <div
-            class="w-2 h-2 rounded-full shrink-0 animate-pulse bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+            class="w-2 h-2 border border-[var(--ui-accent)] border-t-transparent rounded-full animate-spin"
           ></div>
           <span
-            class="text-xs font-bold truncate flex-1 uppercase tracking-tight"
-            >{$workspaceRoot.split(/[/\\]/).pop() || "/"}</span
+            class="text-[9px] opacity-50"
+            style="color:var(--ui-text-secondary);">Indexing…</span
           >
-          <button
-            type="button"
-            class="shrink-0 p-1 rounded-md border transition-all hover:bg-white/5 active:scale-95"
-            style="color: var(--ui-text-secondary); border-color: var(--ui-border);"
-            onclick={openBrowse}
-            disabled={browseLoading}
-            title="Switch workspace"
-          >
-            {#if browseLoading}
-              <div
-                class="w-3 h-3 border-2 border-white/20 border-t-white/80 rounded-full animate-spin"
-              ></div>
-            {:else}
-              <svg
-                class="w-3 h-3"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                ><path
-                  d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"
-                /></svg
-              >
-            {/if}
-          </button>
-        </div>
-      {:else}
-        <div class="flex items-center gap-1.5 w-full">
-          {#if standalone}
-            <button
-              type="button"
-              class="shrink-0 p-1 rounded hover:bg-[color-mix(in_srgb,var(--ui-accent)_15%,transparent)] transition-colors"
-              title="Close file explorer (Ctrl+E)"
-              aria-label="Close file explorer"
-              onclick={() => fileExplorerOpen.set(false)}
-            >
-              <svg
-                class="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                style="color: var(--ui-text-secondary);"
-                ><path d="M15 19l-7-7 7-7" /></svg
-              >
-            </button>
-          {/if}
-          <div class="flex-1 relative flex items-center min-w-0">
-            <input
-              type="text"
-              class="w-full rounded border px-2 py-1 text-xs font-mono pr-7"
-              style="background: var(--ui-input-bg); border-color: var(--ui-border); color: var(--ui-text-primary);"
-              placeholder="Path or pick folder..."
-              bind:value={workspaceInput}
-              onkeydown={(e) => e.key === "Enter" && setWorkspace()}
-            />
-            {#if workspaceHistory.length > 0}
-              <div class="absolute right-1 top-1/2 -translate-y-1/2 group">
-                <button
-                  type="button"
-                  class="p-0.5 rounded hover:bg-white/10 opacity-40 hover:opacity-100 transition-all"
-                  title="Workspace history"
-                >
-                  <svg
-                    class="w-3 h-3"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"><path d="M19 9l-7 7-7-7" /></svg
-                  >
-                </button>
-                <div
-                  class="hidden group-hover:block absolute top-full right-0 mt-1 w-64 bg-black/90 backdrop-blur-xl border border-white/10 rounded-lg shadow-2xl z-50 py-1 overflow-hidden scale-in"
-                >
-                  <div
-                    class="px-2 py-1 text-[9px] uppercase tracking-widest font-bold opacity-30 border-b border-white/5 mb-1 flex justify-between items-center"
-                  >
-                    <span>Pinned & Recent</span>
-                    <button
-                      class="hover:text-white transition-colors p-0.5"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        workspaceHistory = ["/home/mike", "/"];
-                        localStorage.setItem(
-                          "workspaceHistory",
-                          JSON.stringify(workspaceHistory),
-                        );
-                      }}
-                      title="Reset to defaults"
-                    >
-                      <svg
-                        class="w-2.5 h-2.5"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        ><path
-                          d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
-                        /><path d="M3 3v5h5" /></svg
-                      >
-                    </button>
-                  </div>
-                  {#each workspaceHistory as hist}
-                    <button
-                      type="button"
-                      class="w-full px-3 py-2 text-[11px] text-left hover:bg-white/5 truncate transition-colors"
-                      onclick={() => {
-                        workspaceInput = hist;
-                        setWorkspace(hist);
-                      }}
-                    >
-                      <div class="font-bold mb-0.5 uppercase tracking-tighter">
-                        {hist.split(/[/\\]/).pop()}
-                      </div>
-                      <div
-                        class="opacity-40 text-[9px] truncate font-mono italic"
-                      >
-                        {hist}
-                      </div>
-                    </button>
-                  {/each}
-                </div>
-              </div>
-            {/if}
-          </div>
-          <button
-            type="button"
-            class="shrink-0 p-1.5 rounded-lg border transition-all hover:bg-white/5 active:scale-95"
-            style="color: var(--ui-text-secondary); border-color: var(--ui-border);"
-            onclick={openBrowse}
-            disabled={browseLoading}
-            title="Browse local folders"
-          >
-            {#if browseLoading}
-              <div
-                class="w-3.5 h-3.5 border-2 border-white/20 border-t-white/80 rounded-full animate-spin"
-              ></div>
-            {:else}
-              <svg
-                class="w-3.5 h-3.5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                ><path
-                  d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"
-                /></svg
-              >
-            {/if}
-          </button>
         </div>
       {/if}
     </div>
 
-    <div class="w-full flex-col flex gap-1.5 mt-2">
-      <span
-        class="text-[10px] font-semibold uppercase tracking-wider pl-1 block"
-        style="color: var(--ui-text-secondary);">GitHub</span
-      >
-      <div class="flex items-center gap-1.5 w-full">
+    {#if $workspaceRoot}
+      <!-- ── ACTIVE workspace bar ── -->
+      {#if workspaceEditMode}
+        <!-- Inline edit mode -->
+        <div class="flex items-center gap-1">
+          <input
+            type="text"
+            class="flex-1 min-w-0 rounded-lg border px-2 py-1.5 text-xs font-mono"
+            style="background: var(--ui-input-bg); border-color: var(--ui-accent); color: var(--ui-text-primary); outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-accent) 20%, transparent);"
+            bind:value={workspaceEditInput}
+            placeholder="Enter absolute path…"
+            onkeydown={(e) => {
+              if (e.key === "Enter") confirmEditWorkspace();
+              if (e.key === "Escape") workspaceEditMode = false;
+            }}
+            autofocus
+          />
+          <button
+            type="button"
+            class="shrink-0 px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-all active:scale-95"
+            style="background: var(--ui-accent); color: white;"
+            onclick={confirmEditWorkspace}>Set</button
+          >
+          <button
+            type="button"
+            class="shrink-0 px-1.5 py-1.5 rounded-lg text-[11px] transition-all hover:bg-white/5"
+            style="color: var(--ui-text-secondary);"
+            onclick={() => (workspaceEditMode = false)}>✕</button
+          >
+        </div>
+      {:else}
+        <!-- Normal active bar -->
+        <div
+          class="group flex items-center gap-2 px-2.5 py-2 rounded-lg border transition-all duration-200 cursor-default"
+          style="background: var(--ui-input-bg); border-color: var(--ui-border);"
+          title={$workspaceRoot}
+        >
+          <!-- Pulsing green dot -->
+          <div
+            class="w-2 h-2 rounded-full shrink-0 bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)] animate-pulse"
+          ></div>
+          <!-- Folder name (truncated, full path in title) -->
+          <button
+            class="text-xs font-bold truncate flex-1 text-left hover:text-[var(--ui-accent)] transition-colors"
+            onclick={startEditWorkspace}
+            title={"Click to edit: " + $workspaceRoot}
+            >{$workspaceRoot.split(/[/\\]/).pop() || "/"}</button
+          >
+          <!-- Switch folder -->
+          <button
+            type="button"
+            class="shrink-0 p-1 rounded-md transition-all opacity-0 group-hover:opacity-100 hover:bg-white/10 active:scale-95"
+            style="color: var(--ui-text-secondary);"
+            onclick={() => openBrowse()}
+            title="Switch workspace folder"
+          >
+            <svg
+              class="w-3 h-3"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <path
+                d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"
+              />
+            </svg>
+          </button>
+          <!-- Eject -->
+          <button
+            type="button"
+            class="shrink-0 p-1 rounded-md transition-all opacity-0 group-hover:opacity-100 hover:bg-red-500/10 active:scale-95"
+            style="color: var(--ui-text-secondary);"
+            onclick={ejectWorkspace}
+            title="Close workspace"
+          >
+            <svg
+              class="w-3 h-3"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <!-- Full path (small, dimmed, always visible) -->
+        <p
+          class="text-[9px] font-mono truncate mt-1 px-1 opacity-40 select-all"
+          style="color:var(--ui-text-secondary);"
+          title={$workspaceRoot}
+        >
+          {$workspaceRoot}
+        </p>
+      {/if}
+    {:else}
+      <!-- ── NO workspace: onboarding ── -->
+      <div class="flex flex-col gap-2">
+        <!-- Path input -->
+        <div class="flex items-center gap-1">
+          <input
+            id="workspace-path-input"
+            type="text"
+            class="flex-1 min-w-0 rounded-lg border px-2 py-1.5 text-xs font-mono"
+            style="background: var(--ui-input-bg); border-color: var(--ui-border); color: var(--ui-text-primary);"
+            placeholder="/home/user/my-project…"
+            bind:value={workspaceInput}
+            onkeydown={(e) => e.key === "Enter" && setWorkspace()}
+          />
+          <button
+            type="button"
+            class="shrink-0 px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-all active:scale-95 disabled:opacity-40"
+            style="background: var(--ui-accent); color: white;"
+            onclick={() => setWorkspace()}
+            disabled={!workspaceInput.trim()}>Open</button
+          >
+        </div>
+
+        <!-- Browse button (prominent) -->
+        <button
+          type="button"
+          id="workspace-browse-btn"
+          class="w-full py-2.5 rounded-xl border-2 border-dashed transition-all duration-200 flex items-center justify-center gap-2 text-xs font-semibold hover:border-[var(--ui-accent)] hover:text-[var(--ui-accent)] active:scale-[0.98] group"
+          style="border-color: var(--ui-border); color: var(--ui-text-secondary); background: transparent;"
+          onclick={() => openBrowse()}
+        >
+          <svg
+            class="w-4 h-4 transition-transform group-hover:scale-110"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"
+            />
+            <line x1="12" y1="11" x2="12" y2="17" />
+            <line x1="9" y1="14" x2="15" y2="14" />
+          </svg>
+          Browse & Open Folder
+        </button>
+
+        <!-- Recent history -->
+        {#if workspaceHistory.length > 0}
+          <div>
+            <div class="flex items-center justify-between mb-1 px-0.5">
+              <span
+                class="text-[9px] uppercase tracking-widest font-bold opacity-30"
+                style="color:var(--ui-text-secondary);">Recent</span
+              >
+            </div>
+            <div class="flex flex-col gap-0.5">
+              {#each workspaceHistory.slice(0, 5) as hist}
+                <button
+                  type="button"
+                  class="w-full text-left flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-all hover:border-[var(--ui-accent)] hover:bg-[color-mix(in_srgb,var(--ui-accent)_4%,transparent)] group"
+                  style="border-color: var(--ui-border); background: var(--ui-input-bg);"
+                  onclick={() => {
+                    workspaceInput = hist;
+                    setWorkspace(hist);
+                  }}
+                  title={hist}
+                >
+                  <svg
+                    class="w-3 h-3 shrink-0 opacity-50 group-hover:opacity-80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
+                    />
+                    <path d="M3 3v5h5" />
+                  </svg>
+                  <div class="flex flex-col min-w-0">
+                    <span
+                      class="text-[11px] font-semibold truncate"
+                      style="color:var(--ui-text-primary);"
+                      >{hist.split(/[/\\]/).pop() || "/"}</span
+                    >
+                    <span class="text-[9px] font-mono truncate opacity-40"
+                      >{hist}</span
+                    >
+                  </div>
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
+      </div>
+    {/if}
+
+    <!-- GitHub -->
+    <div class="mt-3 pt-2.5 border-t" style="border-color: var(--ui-border);">
+      <div class="flex items-center gap-1.5">
         <button
           type="button"
           class="flex-1 px-2 py-1.5 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors hover:bg-black/5 dark:hover:bg-white/5"
@@ -610,23 +710,24 @@
         >
           <svg
             viewBox="0 0 24 24"
-            width="12"
-            height="12"
+            width="11"
+            height="11"
             stroke="currentColor"
             stroke-width="2"
             fill="none"
             stroke-linecap="round"
             stroke-linejoin="round"
-            ><path
-              d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"
-            ></path></svg
           >
-          Clone Repository
+            <path
+              d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"
+            />
+          </svg>
+          Clone Repo
         </button>
         {#if ($pinnedFiles || []).length > 0}
           <button
             type="button"
-            class="flex-1 px-2 py-1.5 rounded-lg text-xs transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+            class="shrink-0 px-2 py-1.5 rounded-lg text-xs transition-colors hover:bg-black/5 dark:hover:bg-white/5"
             style="color: var(--ui-text-secondary); border: 1px solid var(--ui-border);"
             onclick={unpinAll}
             title="Unpin all files">Unpin all</button
@@ -635,114 +736,188 @@
       </div>
     </div>
   </div>
+
+  <!-- ── BROWSE MODAL ── -->
   {#if browseModalOpen}
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 transition-all fade-in"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 fade-in"
       role="dialog"
       aria-modal="true"
-      aria-label="Browse Directory"
+      aria-label="Choose Workspace Folder"
       onclick={() => (browseModalOpen = false)}
     >
       <div
-        class="rounded-xl shadow-2xl border p-4 w-full max-w-lg flex flex-col gap-3 min-h-[400px] max-h-[80vh] scale-in glass-modal"
+        class="rounded-2xl shadow-2xl border w-full max-w-lg flex flex-col gap-0 max-h-[80vh] scale-in glass-modal overflow-hidden"
         onclick={(e) => e.stopPropagation()}
+        style="min-height: 420px;"
       >
-        <div class="flex items-center justify-between">
-          <h3
-            class="text-sm font-semibold"
-            style="color: var(--ui-text-primary);"
-          >
-            Choose Workspace
+        <!-- Modal header -->
+        <div
+          class="flex items-center justify-between px-4 py-3 border-b shrink-0"
+          style="border-color: var(--ui-border);"
+        >
+          <h3 class="text-sm font-bold" style="color: var(--ui-text-primary);">
+            Choose Workspace Folder
           </h3>
           <button
             type="button"
-            class="text-xs px-2 py-1 rounded transition-colors hover:bg-black/5"
+            class="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
             style="color: var(--ui-text-secondary);"
-            onclick={() => (browseModalOpen = false)}>Close</button
-          >
-        </div>
-
-        <div
-          class="flex items-center gap-2 p-2 rounded bg-black/5 dark:bg-white/5"
-        >
-          <button
-            type="button"
-            class="shrink-0 p-1 rounded hover:bg-black/10"
-            onclick={goUpBrowse}
-            title="Go to parent directory"
+            onclick={() => (browseModalOpen = false)}
+            aria-label="Close"
           >
             <svg
               class="w-4 h-4"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              stroke-width="2"><path d="M11 19l-7-7 7-7M4 12h16" /></svg
+              stroke-width="2"
             >
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
           </button>
-          <span
-            class="text-xs font-mono truncate flex-1"
-            style="color: var(--ui-text-secondary);">{browsePath}</span
+        </div>
+
+        <!-- Typeable path bar -->
+        <div
+          class="px-4 py-3 border-b shrink-0 flex items-center gap-2"
+          style="border-color: var(--ui-border); background: var(--ui-input-bg);"
+        >
+          <button
+            type="button"
+            class="shrink-0 p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            onclick={goUpBrowse}
+            title="Go up to parent directory"
+          >
+            <svg
+              class="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              style="color:var(--ui-text-secondary);"
+            >
+              <path
+                d="M11 17l-5-5 5-5M18 17l-5-5 5-5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+          <input
+            type="text"
+            class="flex-1 min-w-0 text-xs font-mono rounded-lg px-2 py-1.5 border"
+            style="background: transparent; border-color: transparent; color: var(--ui-text-primary); outline: none;"
+            bind:value={browsePath}
+            placeholder="/path/to/folder"
+            title="Type a path and press Enter to navigate"
+            onkeydown={(e) => {
+              if (e.key === "Enter") fetchBrowseTree(browsePath);
+            }}
+          />
+          <button
+            type="button"
+            class="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all active:scale-95 hover:opacity-90"
+            style="background: var(--ui-accent); color: white;"
+            onclick={() => {
+              workspaceInput = browsePath;
+              setWorkspace(browsePath);
+              browseModalOpen = false;
+            }}
+            title="Use this folder as workspace">Use Folder</button
           >
         </div>
 
-        <div
-          class="flex-1 overflow-y-auto border rounded min-h-0"
-          style="border-color: var(--ui-border);"
-        >
+        <!-- Directory listing -->
+        <div class="flex-1 min-h-0 overflow-y-auto">
           {#if browseLoading}
             <div
-              class="p-4 text-center text-xs animate-pulse"
-              style="color: var(--ui-text-secondary);"
+              class="flex items-center justify-center h-32 gap-2"
+              style="color:var(--ui-text-secondary);"
             >
-              Scanning folders...
+              <div
+                class="w-4 h-4 border-2 border-[var(--ui-accent)] border-t-transparent rounded-full animate-spin"
+              ></div>
+              <span class="text-xs animate-pulse">Scanning…</span>
             </div>
           {:else if browseError}
-            <div class="p-4 text-center text-xs text-red-500">
-              {browseError}
+            <div class="p-4 text-center">
+              <p class="text-xs text-red-400 mb-2">{browseError}</p>
+              <p class="text-[10px] opacity-50">
+                Check the path and try again.
+              </p>
             </div>
           {:else if browseTree.length === 0}
             <div
-              class="p-4 text-center text-xs"
-              style="color: var(--ui-text-secondary);"
+              class="p-6 text-center"
+              style="color:var(--ui-text-secondary);"
             >
-              No subdirectories here.
+              <svg
+                class="w-8 h-8 mx-auto mb-2 opacity-20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <path
+                  d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"
+                />
+              </svg>
+              <p class="text-xs">No subfolders in this directory.</p>
             </div>
           {:else}
-            <div class="flex flex-col">
+            <div class="flex flex-col py-1">
               {#each browseTree as node}
                 <button
                   type="button"
-                  class="flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-black/5 dark:hover:bg-white/5 border-b border-black/5 last:border-0"
+                  class="flex items-center gap-3 px-4 py-2.5 text-xs text-left transition-colors hover:bg-[color-mix(in_srgb,var(--ui-accent)_5%,transparent)] group border-b border-black/5 dark:border-white/5 last:border-0"
                   style="color: var(--ui-text-primary);"
-                  onclick={() => selectBrowse(node.path)}
+                  onclick={() => fetchBrowseTree(node.path)}
+                  ondblclick={() => {
+                    setWorkspace(node.path);
+                    browseModalOpen = false;
+                  }}
+                  title={"Navigate: " +
+                    node.path +
+                    "\nDouble-click to open as workspace"}
                 >
                   <svg
-                    class="w-4 h-4"
+                    class="w-4 h-4 shrink-0"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     stroke-width="2"
                     style="color: var(--ui-accent);"
-                    ><path
-                      d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"
-                    /></svg
                   >
-                  <span class="truncate">{node.name}</span>
+                    <path
+                      d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"
+                    />
+                  </svg>
+                  <span class="flex-1 truncate font-medium">{node.name}</span>
+                  <svg
+                    class="w-3 h-3 opacity-0 group-hover:opacity-40 shrink-0 transition-opacity"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                  >
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
                 </button>
               {/each}
             </div>
           {/if}
         </div>
 
+        <!-- Footer hint -->
         <div
-          class="flex gap-2 justify-end pt-2 border-t"
-          style="border-color: var(--ui-border);"
+          class="px-4 py-2.5 border-t shrink-0 flex items-center justify-between"
+          style="border-color:var(--ui-border); background: var(--ui-input-bg);"
         >
-          <button
-            type="button"
-            class="px-4 py-2 rounded text-xs font-medium transition-all active:scale-95"
-            style="background: var(--ui-accent); color: var(--ui-bg-main);"
-            onclick={confirmBrowse}>Select Folder</button
+          <span
+            class="text-[10px] opacity-40"
+            style="color:var(--ui-text-secondary);"
+            >Single-click to navigate · Double-click to open as workspace</span
           >
         </div>
       </div>

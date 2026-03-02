@@ -7,6 +7,7 @@
   import AuthVideo from "$lib/components/AuthVideo.svelte";
   import ModelCapabilityBadges from "$lib/components/ModelCapabilityBadges.svelte";
   import { modelDisplayName } from "$lib/api.js";
+  import { speakText, stopTTS } from "$lib/tts.js";
   import {
     pinnedContent,
     deepinfraApiKey,
@@ -241,7 +242,7 @@
     applyToFileError = "";
     applyToFileLoading = true;
     try {
-      let base = (get(fileServerUrl) || "http://localhost:8768").replace(
+      let base = (get(fileServerUrl) || "http://127.0.0.1:8765").replace(
         /\/$/,
         "",
       );
@@ -681,6 +682,32 @@
             >
           {/if}
         </button>
+        {#if isAssistant && (displayContent || hasThinkingOrAnswer)}
+          <!-- Speaker button -->
+          <button
+            type="button"
+            class="flex items-center justify-center w-[26px] h-[26px] rounded border border-zinc-200 dark:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-700/80 transition-all duration-200"
+            style="color: var(--ui-text-secondary);"
+            onclick={() => speakText(displayContent)}
+            title="Speak message"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+          </button>
+        {/if}
       </div>
       {#if isAssistant && (message.stats || displayContent)}
         <div class="perf-stats-wrap mt-2 flex justify-start">

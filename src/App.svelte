@@ -34,6 +34,7 @@
     repoMapLoading,
     repoMapError,
     performanceMode,
+    isTauri,
   } from "$lib/stores.js";
   import { startTemporalController } from "$lib/temporalController.js";
   import {
@@ -162,7 +163,7 @@
     repoMapLoading.set(true);
     repoMapError.set(null);
     import("$lib/repoMap.js").then(({ buildRepoMapText }) => {
-      buildRepoMapText(root, base)
+      buildRepoMapText(root)
         .then((text) => {
           if (cancelled) return;
           repoMapText.set(text || "");
@@ -257,6 +258,7 @@
     function handleBeforeUnload() {
       // Signal both backend servers to shut down
       // sendBeacon is fire-and-forget, works reliably on tab close
+      if (isTauri) return;
       const fsUrl = get(fileServerUrl) || "http://localhost:8768";
       const tsUrl = (get(terminalServerUrl) || "ws://localhost:8767").replace(
         /^ws/,

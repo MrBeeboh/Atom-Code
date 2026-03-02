@@ -16,7 +16,7 @@ check_voice_tts()     { curl -sf http://localhost:8765/tts/voices > /dev/null 2>
 check_file_server()   { curl -sf http://localhost:8768/tree > /dev/null 2>&1; }
 check_terminal()      { curl -sf http://localhost:8767 > /dev/null 2>&1; }
 check_search_proxy()  { curl -sf http://localhost:5174/api/health > /dev/null 2>&1; }
-check_ui()            { curl -sf http://localhost:5173 > /dev/null 2>&1; }
+check_ui()            { curl -sf http://localhost:1420 > /dev/null 2>&1; }
 
 # ── Restart functions (exact commands from start-atom-code.sh) ──
 

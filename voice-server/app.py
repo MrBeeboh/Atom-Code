@@ -18,7 +18,7 @@ REQUEST_LOCK = threading.Lock()
 LOCK_TIMEOUT = 300  # 5 min max wait for lock
 
 # Model: large-v3-turbo with int8 for lower VRAM
-WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "large-v3-turbo")
+WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "tiny")
 COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE_TYPE", "int8")
 
 import logging
@@ -55,6 +55,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://localhost:1420",
+        "http://127.0.0.1:1420",
         "http://127.0.0.1:5173",
         "http://localhost:4173",
         "http://127.0.0.1:4173",
@@ -145,8 +147,10 @@ import soundfile as sf
 import numpy as np
 import io
 import base64
+import re
 from fastapi import Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+import torch
 
 # Initialize Kokoro pipeline once at startup — not per request
 # Use 'a' for American English voice, 'af_heart' is natural and clear
@@ -155,26 +159,20 @@ tts_pipeline = None
 def get_tts_pipeline():
     global tts_pipeline
     if tts_pipeline is None:
-        tts_pipeline = KPipeline(lang_code='a')
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        logger.info(f"Initializing Kokoro pipeline on {device}")
+        tts_pipeline = KPipeline(lang_code='a', device=device)
     return tts_pipeline
 
 @app.post("/tts")
 async def text_to_speech(request: Request):
     try:
-        raw_body = await request.body()
-        logger.debug(f"Received TTS request body length: {len(raw_body)}")
-        try:
-            body = await request.json()
-        except Exception as json_err:
-            logger.error(f"JSON decode failed: {json_err}")
-            return JSONResponse({"error": f"Invalid JSON: {str(json_err)}"}, status_code=400)
-            
+        body = await request.json()
         text = body.get("text", "").strip()
         voice = body.get("voice", "af_heart")
         try:
             speed = float(body.get("speed", 1.0))
-            if speed <= 0:
-                speed = 1.0
+            if speed <= 0: speed = 1.0
         except (TypeError, ValueError):
             speed = 1.0
         
@@ -184,82 +182,48 @@ async def text_to_speech(request: Request):
             return JSONResponse({"error": "no text provided"}, status_code=400)
         
         # Strip markdown and aggressive cleaning
-        import re
-        # Remove bold, italics, code, headers, links
         text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
         text = re.sub(r'\*(.+?)\*', r'\1', text)
         text = re.sub(r'`{1,3}[^`]*`{1,3}', '', text)
         text = re.sub(r'#{1,6}\s', '', text)
         text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
-        
-        # Remove non-ASCII (emojis, special icons/badges)
-        # This is the critical fix for "RuntimeError: Storage size calculation overflowed"
-        text = re.sub(r'[^\x00-\x7F]+', ' ', text)
-        
-        # Remove multiple spaces
+        text = re.sub(r'[^\x00-\x7F]+', ' ', text) # Remove non-ASCII
         text = re.sub(r'\s+', ' ', text).strip()
-        
-        logger.info(f"Cleaned TTS text: {text[:100]}...")
         
         if not text:
             return JSONResponse({"error": "no speakable text after cleaning"}, status_code=400)
         
-        # Robust sentence/chunk splitting
-        # Kokoro can fail on very long individual sentences or large tensors.
-        # We split into sentences and then group them into ~400 char chunks.
-        sentences = re.split(r'([.?!]+\s+)', text)
-        chunks = []
-        current_chunk = ""
-        
-        # Re-combine re.split results (it keeps the delimiters)
-        parts = []
-        for i in range(0, len(sentences)-1, 2):
-            parts.append(sentences[i] + sentences[i+1])
-        if len(sentences) % 2 != 0:
-            parts.append(sentences[-1])
-            
-        for p in parts:
-            if len(current_chunk) + len(p) < 400:
-                current_chunk += p
-            else:
-                if current_chunk: chunks.append(current_chunk.strip())
-                current_chunk = p
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-            
-        # Use existing REQUEST_LOCK to prevent concurrent GPU/resource heavy operations
+        # Split into sentences for streaming playback
+        # We split by . ! ? followed by space
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        sentences = [s.strip() for s in sentences if s.strip()]
+
+        # Generate full audio first to avoid concatenated WAV headers in StreamingResponse
+        # which browsers cannot play correctly.
         acquired = REQUEST_LOCK.acquire(timeout=LOCK_TIMEOUT)
         if not acquired:
-            return JSONResponse({"error": "Server busy; try again in a moment"}, status_code=503)
+            return JSONResponse({"error": "server busy"}, status_code=503)
             
         try:
             pipeline = get_tts_pipeline()
-            audio_chunks = []
+            full_audio = []
             
-            for i, chunk in enumerate(chunks):
-                if not chunk.strip(): continue
-                logger.debug(f"Generating audio for chunk {i+1}/{len(chunks)}: {len(chunk)} chars")
-                # Use split_pattern=None because we've already chunked it manually
-                generator = pipeline(chunk, voice=voice, speed=speed, split_pattern=None)
+            for sentence in sentences:
+                logger.debug(f"Processing sentence: {len(sentence)} chars")
+                generator = pipeline(sentence, voice=voice, speed=speed, split_pattern=None)
                 for _, _, audio in generator:
-                    audio_chunks.append(audio)
+                    full_audio.append(audio)
             
-            if not audio_chunks:
+            if not full_audio:
                 return JSONResponse({"error": "no audio generated"}, status_code=500)
+                
+            combined_audio = np.concatenate(full_audio)
             
-            # Combine chunks and encode as base64 WAV
-            combined = np.concatenate(audio_chunks)
             buffer = io.BytesIO()
-            sf.write(buffer, combined, 24000, format='WAV')
+            sf.write(buffer, combined_audio, 24000, format='WAV')
             buffer.seek(0)
-            audio_b64 = base64.b64encode(buffer.read()).decode('utf-8')
             
-            logger.info(f"Successfully generated audio: {len(audio_b64)} b64 bytes")
-            return JSONResponse({
-                "audio": audio_b64,
-                "format": "wav",
-                "sample_rate": 24000
-            })
+            return StreamingResponse(buffer, media_type="audio/wav")
         finally:
             REQUEST_LOCK.release()
         

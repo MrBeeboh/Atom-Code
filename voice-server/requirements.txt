@@ -1,9 +1,9 @@
-# Voice-to-text server (faster-whisper, int8)
-# Use a venv: python -m venv venv && source venv/bin/activate (Unix)
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-python-multipart>=0.0.6
-faster-whisper>=1.0.0
-# Audio loading (webm, etc.) and 16 kHz resample for Whisper
-librosa>=0.10.0
-soundfile>=0.12.0
+faster-whisper
+kokoro-onnx
+soundfile
+numpy
+fastapi
+uvicorn
+python-multipart
+librosa
+torch

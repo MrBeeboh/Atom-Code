@@ -4,7 +4,7 @@
  */
 
 :root {
-  /* Spacing scale (--spacing in @theme points at --space-1; one multiplier base) */
+  /* Spacing scale (--spacing in @theme animation: atom-orbit-spin 15s linear infinite;iplier base) */
   --space-0: 0;
   --space-half: 0.125rem;
   --space-1: 0.25rem;
@@ -19,13 +19,13 @@
   --space-16: 4rem;
   --space-20: 5rem;
 
-  /* Motion durations (locked scale: instant | fast | normal | slow | slower | long) */
+  /* Motion animation: atom-orbit-spin 12s linear infinite;ant | fast | normal | slow | slower | long) */
   --duration-instant: 0ms;
-  --duration-fast: 100ms;
-  --duration-normal: 200ms;
-  --duration-slow: 350ms;
-  --duration-slower: 500ms;
-  --duration-long: 2s;
+  --duration-fast: 200ms;
+  --duration-normal: 400ms;
+  --duration-slow: 700ms;
+  --duration-slower: 1000ms;
+  --duration-long: 8s;
 
   /* Motion curves (canonical set only) */
   --ease-default: cubic-bezier(0.4, 0, 0.2, 1);

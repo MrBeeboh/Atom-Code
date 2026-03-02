@@ -102,7 +102,7 @@ async function fetchWithTimeout(url, options = {}) {
     if (!response.ok) {
       const text = await response.text().catch(() => 'Unknown error');
       throw new ApiError(
-        HTTP :  - ,
+        `HTTP ${response.status}: ${text}`,
         response.status
       );
     }
@@ -119,6 +119,6 @@ async function fetchWithTimeout(url, options = {}) {
       throw error;
     }
 
-    throw new ApiError(Network error: , 0, error);
+    throw new ApiError(`Network error: ${error.message}`, 0, error);
   }
 }

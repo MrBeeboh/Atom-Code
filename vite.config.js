@@ -9,15 +9,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [svelte(), tailwindcss()],
-  resolve: {
-    alias: {
-      $lib: path.resolve(__dirname, 'src/lib'),
-    },
-  },
+  // 1. prevent vite from obscuring rust errors
+  clearScreen: false,
+  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
-    port: 5173,
+    port: 1420,
     strictPort: true,
-    host: true, // listen on 0.0.0.0 so you can open the UI from other devices (e.g. bedroom mini at http://<this-pc-ip>:5173)
+    host: true,
     proxy: {
       '/api/lmstudio': {
         target: 'http://localhost:1234',
@@ -42,6 +40,14 @@ export default defineConfig({
       },
       '/api/health': { target: 'http://localhost:5174', changeOrigin: true },
       '/api/set-key': { target: 'http://localhost:5174', changeOrigin: true },
+    },
+  },
+  // 3. to make use of `TAURI_DEBUG` and other env variables
+  // https://tauri.studio/v1/api/config#buildconfig.beforedevcommand
+  envPrefix: ['VITE_', 'TAURI_'],
+  resolve: {
+    alias: {
+      $lib: path.resolve(__dirname, 'src/lib'),
     },
   },
 })

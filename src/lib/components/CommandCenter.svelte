@@ -10,6 +10,7 @@
         lmStudioConnected,
         cloudApisAvailable,
         fileServerUrl,
+        isTauri,
     } from "$lib/stores.js";
     import { buildRepoMapText, repoMapText } from "$lib/repoMap.js";
     import AtomLogo from "./AtomLogo.svelte";
@@ -42,10 +43,7 @@
         if (!$workspaceRoot?.trim() || isRefreshing) return;
         isRefreshing = true;
         try {
-            const text = await buildRepoMapText(
-                $workspaceRoot.trim(),
-                $fileServerUrl,
-            );
+            const text = await buildRepoMapText($workspaceRoot.trim());
             repoMapText.set(text || "");
             showCheckmark = true;
             setTimeout(() => (showCheckmark = false), 1500);

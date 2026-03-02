@@ -62,3 +62,8 @@ Thumbs.db
 
 # Archives (historical docs)
 docs/archive/
+
+# Voice server models
+voice-server/*.onnx
+voice-server/voices.bin
+voice-server/voices.json

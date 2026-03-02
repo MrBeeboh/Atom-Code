@@ -12,6 +12,8 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1:5173',
   'http://localhost:4173',
   'http://127.0.0.1:4173',
+  'http://localhost:1420',
+  'http://127.0.0.1:1420',
 ];
 app.use(cors({ origin: ALLOWED_ORIGINS }));
 app.use(express.json());
@@ -40,21 +42,46 @@ function checkPathAccess(normalized, res) {
   return true;
 }
 
-// GET /pick-directory - Opens a native folder picker (Linux: zenity)
+// GET /pick-directory - Opens a native folder picker (Linux: zenity/kdialog)
 app.get('/pick-directory', async (req, res) => {
+  const startPath = req.query.path ? String(req.query.path).trim() : (process.env.HOME || '/');
+  const escapedPath = startPath.replace(/"/g, '\\"');
+  // Try zenity first, then kdialog as fallback
+  const commands = [
+    `zenity --file-selection --directory --title="Choose Workspace Folder" --filename="${escapedPath}/"`,
+    `kdialog --getexistingdirectory "${escapedPath}"`,
+  ];
+  for (const cmd of commands) {
+    try {
+      const { stdout } = await execAsync(cmd, { timeout: 60000 });
+      const pickedPath = stdout.trim();
+      if (pickedPath) return res.json({ path: pickedPath });
+    } catch (_) { /* try next */ }
+  }
+  res.status(503).json({ error: 'No native folder picker available (zenity/kdialog not found). Please type the path manually.' });
+});
+
+// GET /list-dir?path=/abs/path — lists subdirectories at any absolute path (no workspace restriction)
+app.get('/list-dir', async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const raw = req.query.path;
+  if (typeof raw !== 'string' || !raw.trim()) {
+    return res.status(400).json({ error: 'path query required' });
+  }
+  const target = path.resolve(raw.trim());
   try {
-    // Attempt to use zenity to select a directory
-    const { stdout } = await execAsync('zenity --file-selection --directory --title="Choose Workspace Folder"');
-    const pickedPath = stdout.trim();
-    if (!pickedPath) {
-      return res.status(400).json({ error: 'No directory selected' });
-    }
-    // We don't strictly enforce checkPathAccess here because the user
-    // manually picked it via OS dialog, but we'll return it so the UI can set it.
-    res.json({ path: pickedPath });
+    const stat = await fs.stat(target);
+    if (!stat.isDirectory()) return res.status(400).json({ error: 'Not a directory' });
+    const entries = await fs.readdir(target, { withFileTypes: true });
+    const dirs = entries
+      .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+      .map(e => ({ name: e.name, path: path.join(target, e.name), is_dir: true }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    res.json(dirs);
   } catch (err) {
-    // If zenity is cancelled or fails
-    res.status(500).json({ error: 'Folder picker closed or zenity not found' });
+    if (err.code === 'ENOENT') return res.status(404).json({ error: 'Directory not found' });
+    if (err.code === 'EACCES') return res.status(403).json({ error: 'Permission denied' });
+    res.status(500).json({ error: err.message });
   }
 });
 

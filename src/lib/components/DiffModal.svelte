@@ -1,6 +1,7 @@
 <script>
     import { get } from "svelte/store";
-    import { workspaceRoot, fileServerUrl } from "$lib/stores.js";
+    import { workspaceRoot, fileServerUrl, isTauri } from "$lib/stores.js";
+    import { invoke } from "@tauri-apps/api/core";
 
     let { isOpen = $bindable(false), filePath = "" } = $props();
     let diffContent = $state("");
@@ -17,19 +18,26 @@
         loading = true;
         error = "";
         const root = get(workspaceRoot);
-        const server = get(fileServerUrl);
         try {
-            const res = await fetch(
-                `${server}/git/diff?path=${encodeURIComponent(filePath)}&root=${encodeURIComponent(root)}`,
-            );
-            if (!res.ok) {
+            if (isTauri) {
+                diffContent = await invoke("git_diff", {
+                    root,
+                    path: filePath,
+                });
+            } else {
+                const server = get(fileServerUrl);
+                const res = await fetch(
+                    `${server}/git/diff?path=${encodeURIComponent(filePath)}&root=${encodeURIComponent(root)}`,
+                );
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || "Failed to fetch diff");
+                }
                 const data = await res.json();
-                throw new Error(data.error || "Failed to fetch diff");
+                diffContent = data.diff;
             }
-            const data = await res.json();
-            diffContent = data.diff;
         } catch (e) {
-            error = e.message;
+            error = e.message || e;
         } finally {
             loading = false;
         }

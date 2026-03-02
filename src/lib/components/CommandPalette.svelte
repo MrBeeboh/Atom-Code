@@ -20,11 +20,13 @@
     fileExplorerOpen,
     workspaceRoot,
     fileServerUrl,
+    isTauri,
     editorContent,
     editorFilePath,
     editorLanguage,
     editorOpen,
   } from "$lib/stores.js";
+  import * as tauriFs from "$lib/tauriFs.js";
   import {
     createConversation,
     listConversations,
@@ -267,27 +269,39 @@
 
   async function fetchFiles() {
     const root = get(workspaceRoot)?.trim();
-    let base = (get(fileServerUrl) || "http://localhost:8768").replace(
-      /\/$/,
-      "",
-    );
-    if (base.includes(":8766")) base = base.replace(":8766", ":8768");
-    if (!root) return;
     try {
-      const res = await fetch(
-        `${base}/tree?root=${encodeURIComponent(root)}&depth=5`,
-      );
-      if (res.ok) {
-        const tree = await res.json();
+      if (isTauri) {
+        const tree = await tauriFs.listDirectory(root, true);
         const flat = [];
-        function traverse(nodes) {
-          for (const n of nodes) {
-            if (n.type === "file") flat.push(n);
-            if (n.children) traverse(n.children);
+        if (Array.isArray(tree)) {
+          for (const n of tree) {
+            if (!n.is_dir) {
+              flat.push({ name: n.name, path: n.path, type: "file" });
+            }
           }
         }
-        if (Array.isArray(tree)) traverse(tree);
         filesList = flat;
+      } else {
+        let base = (get(fileServerUrl) || "http://localhost:8768").replace(
+          /\/$/,
+          "",
+        );
+        if (base.includes(":8766")) base = base.replace(":8766", ":8768");
+        const res = await fetch(
+          `${base}/tree?root=${encodeURIComponent(root)}&depth=5`,
+        );
+        if (res.ok) {
+          const tree = await res.json();
+          const flat = [];
+          function traverse(nodes) {
+            for (const n of nodes) {
+              if (n.type === "file") flat.push(n);
+              if (n.children) traverse(n.children);
+            }
+          }
+          if (Array.isArray(tree)) traverse(tree);
+          filesList = flat;
+        }
       }
     } catch {}
   }
@@ -306,23 +320,32 @@
   async function openFileInEditor(filePath) {
     const absPath = (filePath || "").trim().replace(/\/+$/, "") || "";
     if (!absPath) return;
-    let base = (get(fileServerUrl) || "http://localhost:8768").replace(
-      /\/$/,
-      "",
-    );
-    if (base.includes(":8766")) base = base.replace(":8766", ":8768");
     try {
-      const res = await fetch(
-        `${base}/content?path=${encodeURIComponent(absPath)}`,
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const content = typeof data.content === "string" ? data.content : "";
+      if (isTauri) {
+        const content = await tauriFs.readTextFile(absPath);
         editorContent.set(content);
         editorFilePath.set(absPath);
         editorLanguage.set(pathToEditorLang(absPath));
         editorOpen.set(true);
         if (!get(terminalOpen)) terminalOpen.set(true);
+      } else {
+        let base = (get(fileServerUrl) || "http://localhost:8768").replace(
+          /\/$/,
+          "",
+        );
+        if (base.includes(":8766")) base = base.replace(":8766", ":8768");
+        const res = await fetch(
+          `${base}/content?path=${encodeURIComponent(absPath)}`,
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const content = typeof data.content === "string" ? data.content : "";
+          editorContent.set(content);
+          editorFilePath.set(absPath);
+          editorLanguage.set(pathToEditorLang(absPath));
+          editorOpen.set(true);
+          if (!get(terminalOpen)) terminalOpen.set(true);
+        }
       }
     } catch {}
   }

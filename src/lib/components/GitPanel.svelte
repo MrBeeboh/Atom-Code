@@ -1,7 +1,8 @@
 <script>
     import { get } from "svelte/store";
-    import { workspaceRoot, fileServerUrl } from "$lib/stores.js";
+    import { workspaceRoot, fileServerUrl, isTauri } from "$lib/stores.js";
     import { onMount } from "svelte";
+    import { invoke } from "@tauri-apps/api/core";
     import DiffModal from "./DiffModal.svelte";
 
     let status = $state("");
@@ -47,23 +48,28 @@
 
     async function fetchStatus() {
         const root = get(workspaceRoot);
-        const server = get(fileServerUrl);
         if (!root) return;
         try {
-            const res = await fetch(
-                `${server}/git/status?root=${encodeURIComponent(root)}`,
-            );
-            if (!res.ok) {
+            if (isTauri) {
+                status = await invoke("git_status", { root });
+                error = "";
+            } else {
+                const server = get(fileServerUrl);
+                const res = await fetch(
+                    `${server}/git/status?root=${encodeURIComponent(root)}`,
+                );
+                if (!res.ok) {
+                    const data = await res.json();
+                    error = data.error || "Git not initialized or not found";
+                    status = "";
+                    return;
+                }
                 const data = await res.json();
-                error = data.error || "Git not initialized or not found";
-                status = "";
-                return;
+                status = data.status;
+                error = "";
             }
-            const data = await res.json();
-            status = data.status;
-            error = "";
         } catch (e) {
-            error = e.message;
+            error = e.message || e;
         }
     }
 
@@ -106,23 +112,32 @@
         error = "";
         output = "";
         const root = get(workspaceRoot);
-        const server = get(fileServerUrl);
         try {
-            const res = await fetch(`${server}/git/commit`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ root, message: commitMessage }),
-            });
-            const data = await res.json();
-            if (res.ok) {
-                output = data.output;
+            if (isTauri) {
+                output = await invoke("git_commit", {
+                    root,
+                    message: commitMessage,
+                });
                 commitMessage = "";
                 fetchStatus();
             } else {
-                error = data.error;
+                const server = get(fileServerUrl);
+                const res = await fetch(`${server}/git/commit`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ root, message: commitMessage }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    output = data.output;
+                    commitMessage = "";
+                    fetchStatus();
+                } else {
+                    error = data.error;
+                }
             }
         } catch (e) {
-            error = e.message;
+            error = e.message || e;
         } finally {
             loading = false;
         }
@@ -133,22 +148,27 @@
         error = "";
         output = "";
         const root = get(workspaceRoot);
-        const server = get(fileServerUrl);
         try {
-            const res = await fetch(`${server}/git/push`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ root }),
-            });
-            const data = await res.json();
-            if (res.ok) {
-                output = data.output;
+            if (isTauri) {
+                output = await invoke("git_push", { root });
                 fetchStatus();
             } else {
-                error = data.error;
+                const server = get(fileServerUrl);
+                const res = await fetch(`${server}/git/push`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ root }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    output = data.output;
+                    fetchStatus();
+                } else {
+                    error = data.error;
+                }
             }
         } catch (e) {
-            error = e.message;
+            error = e.message || e;
         } finally {
             loading = false;
         }

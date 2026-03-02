@@ -1,5 +1,6 @@
 import { marked } from 'marked';
 import hljs from 'highlight.js';
+import DOMPurify from 'dompurify';
 import 'highlight.js/styles/github-dark.css';
 
 function highlightCode(code, lang) {
@@ -21,12 +22,7 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-// @ts-ignore
-marked.setOptions({
-  highlight(code, lang) {
-    return highlightCode(code, lang);
-  },
-});
+// Highlighting is handled via the marked.use extension below.
 
 marked.use({
   renderer: {
@@ -55,17 +51,35 @@ marked.use({
   },
 });
 
+// Force target="_blank" and rel="noopener noreferrer" for all rendered anchors
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName === 'A') {
+    node.setAttribute('target', '_blank');
+    node.setAttribute('rel', 'noopener noreferrer');
+  }
+});
+
 /**
  * @param {string} raw
- * @returns {string} HTML string (use with {@html} in Svelte, or sanitize first)
+ * @returns {string} HTML string (use with {@html} in Svelte)
  */
 export function renderMarkdown(raw) {
   if (!raw || typeof raw !== 'string') return '';
-  return marked.parse(raw, { async: false });
+  const html = marked.parse(raw, { async: false });
+  return DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ['style', 'script', 'iframe', 'object', 'embed', 'form'],
+    FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover', 'onfocus'],
+    ADD_ATTR: ['target', 'rel']
+  });
 }
 
 /**
- * Split assistant content into thinking vs answer using think/reasoning/thought tags.
+ * Audit: splitThinkingAndAnswer
+ * This function manually splits the raw model response into thinking vs answer blocks.
+ * To maintain security, ALL resulting strings are passed through the single sanitization
+ * pipeline (renderMarkdown), ensuring no raw model-controlled substring reaches a DOM sink unsanitized.
+ * 
  * @param {string} raw
  * @returns {{ type: 'thinking'|'answer', html: string }[]} Empty if no thinking block found
  */

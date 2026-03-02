@@ -105,36 +105,44 @@ export function warmUpSearchConnection() {
 }
 
 /**
- * Format search result as a single string for the chat (user message).
+ * Format search result as a single string for the chat context.
+ * Strips noise, limits length, and uses structured Markdown.
  */
 export function formatSearchResultForChat(query, result) {
-  const lines = [
-    '<details class="bg-zinc-100 dark:bg-zinc-800/60 p-3 rounded-lg text-sm mb-4 border border-zinc-200 dark:border-zinc-700">',
-    `<summary class="cursor-pointer font-medium text-blue-600 dark:text-blue-400 select-none">🔍 Searched the web for: "${query}"</summary>`,
-    '<div class="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300">',
-    'The user asked a question that required a web search. Use the following search results to answer. Base your answer on these results.',
-    '',
-  ];
+  const clean = (text) => {
+    if (!text) return "";
+    return text
+      .replace(/<[^>]*>/g, "") // Strip HTML tags
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  const lines = [`### Web Search: "${query}"`, ""];
+
   if (result.abstract) {
-    lines.push('');
-    lines.push(result.abstract);
-    if (result.abstractUrl) lines.push(`Source: ${result.abstractUrl}`);
+    const abs = clean(result.abstract);
+    if (abs) {
+      lines.push(`**Featured Snippet** (${result.abstractUrl || "Source"}):`);
+      lines.push(abs);
+      lines.push("");
+    }
   }
+
   if (result.related?.length) {
-    lines.push('');
-    lines.push('Search results:');
-    result.related.slice(0, 8).forEach((r, i) => {
-      if (r.thumbnail) {
-        lines.push(`${i + 1}. ${r.text}`);
-        lines.push(`   ${r.url}`);
-        lines.push(`   [Image: ${r.thumbnail}]`);
-      } else {
-        lines.push(`${i + 1}. ${r.text}`);
-        lines.push(`   ${r.url}`);
+    result.related.slice(0, 5).forEach((r, i) => {
+      const snippet = clean(r.text);
+      if (snippet) {
+        lines.push(`${i + 1}. **${r.url}**`);
+        lines.push(`   ${snippet}`);
+        lines.push("");
       }
     });
   }
-  if (lines.length <= 5) lines.push('', '(No results found for this query.)');
-  lines.push('</div></details>');
-  return lines.join('\n');
+
+  if (lines.length <= 2) {
+    lines.push("_No relevant search results found._");
+  }
+
+  return lines.join("\n").trim();
 }
