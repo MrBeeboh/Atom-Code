@@ -372,8 +372,11 @@
       activeConversationId.set(list[0].id);
 
     try {
-      const modelList = await getModels();
-      models.set(modelList.map((m) => ({ id: m.id })));
+      // Small delay to allow secure keys to load from keychain
+      setTimeout(async () => {
+        const modelList = await getModels();
+        models.set(modelList.map((m) => ({ id: m.id })));
+      }, 500);
     } catch (_) {
       // LM Studio may not be running; selectors will refetch when opened
     }

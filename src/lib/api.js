@@ -8,6 +8,10 @@ import { get } from 'svelte/store';
 import {
   lmStudioBaseUrl,
   togetherImageEndpoint,
+  deepSeekApiKey,
+  grokApiKey,
+  togetherApiKey,
+  deepinfraApiKey,
 } from '$lib/stores.js';
 
 // Internal modules
@@ -58,20 +62,85 @@ export function getModelTypeTag(modelId) {
 }
 
 /**
- * Fetch available models from local LM Studio.
+ * Helper to fetch cloud models from an OpenAI-compatible /models endpoint.
+ */
+async function tryFetchCloudModels(provider, apiKey, baseUrl) {
+  if (!apiKey) return null;
+  try {
+    const res = await fetch(`${baseUrl}/models`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      // Short timeout for background fetch
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const list = data.data || [];
+      // Heuristic: filter out models that are clearly not chat/language (like image/video generation)
+      // unless the user specifically wants them in the chat.
+      return list
+        .filter(m => !m.id.includes('imagine') && !m.id.includes('video'))
+        .map(m => ({ id: `${provider}:${m.id}` }));
+    }
+  } catch (e) {
+    console.warn(`[api] Dynamic fetch failed for ${provider}:`, e.message);
+  }
+  return null; // Return null to indicate fetch failed (trigger fallback)
+}
+
+/**
+ * Fetch available models from local LM Studio and include cloud models if keys are set.
  * @returns {Promise<object[]>}
  */
 export async function getModels() {
   const base = get(lmStudioBaseUrl) || 'http://localhost:1234';
   const url = `${base}/v1/models`;
+  let localModels = [];
   try {
     const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.data || [];
-  } catch {
-    return [];
+    if (res.ok) {
+      const data = await res.json();
+      localModels = data.data || [];
+    }
+  } catch (e) {
+    // No-op
   }
+
+  const dsKey = get(deepSeekApiKey);
+  const grKey = get(grokApiKey);
+
+  // Attempt dynamic fetch first for "once and for all" accuracy
+  const [dynamicDeepSeek, dynamicGrok] = await Promise.all([
+    tryFetchCloudModels('deepseek', dsKey, 'https://api.deepseek.com/v1'),
+    tryFetchCloudModels('grok', grKey, 'https://api.x.ai/v1'),
+  ]);
+
+  const cloudModels = [];
+
+  // DeepSeek logic
+  if (dynamicDeepSeek) {
+    cloudModels.push(...dynamicDeepSeek);
+  } else if (dsKey) {
+    // Fallback if API fails or is unreachable
+    cloudModels.push({ id: "deepseek:deepseek-chat" });
+    cloudModels.push({ id: "deepseek:deepseek-reasoner" });
+  }
+
+  // Grok logic
+  if (dynamicGrok && dynamicGrok.length > 0) {
+    cloudModels.push(...dynamicGrok);
+  } else if (grKey) {
+    // Verified fallback from user's xAI console screenshot
+    cloudModels.push({ id: "grok:grok-4-1-fast-reasoning" });
+    cloudModels.push({ id: "grok:grok-4-1-fast-non-reasoning" });
+    cloudModels.push({ id: "grok:grok-code-fast-1" });
+    cloudModels.push({ id: "grok:grok-4-fast-reasoning" });
+    cloudModels.push({ id: "grok:grok-4-fast-non-reasoning" });
+    cloudModels.push({ id: "grok:grok-4-0709" });
+    cloudModels.push({ id: "grok:grok-3-mini" });
+    cloudModels.push({ id: "grok:grok-3" });
+  }
+
+  return [...localModels, ...cloudModels];
 }
 
 /**
@@ -127,32 +196,50 @@ export async function checkLmStudioConnection() {
 }
 
 /**
- * Single-shot chat completion (non-streaming).
- * @param {string} model - Model identifier.
- * @param {object[]} messages - Chat messages.
- * @param {import('./api/types').ChatOptions} [options] - Generation options.
- * @returns {Promise<{ content: string, usage?: object }>}
+ * Resolves all necessary parameters (URL, headers, model ID) for a given provider/model.
+ * Centralizes configuration to ensure "once and for all" stability.
  */
-export async function requestChatCompletion(model, messages, options = {}) {
-  const isCloud = isCloudModel(model);
+async function resolveRequestConfig(modelId) {
+  const isCloud = isCloudModel(modelId);
+  const isGrok = isGrokModel(modelId);
+
   let base, authHeaders, resolvedModel;
 
   if (isCloud) {
-    const r = await getBaseAndAuth(model);
+    const r = await getBaseAndAuth(modelId);
     base = r.base;
     authHeaders = r.headers;
-    resolvedModel = resolveModelId(model);
+    resolvedModel = resolveModelId(modelId);
   } else {
-    // For local models, we use the stored base URL or default
+    // Standardize local model path
     base = get(lmStudioBaseUrl) || 'http://localhost:1234';
     if (!base.endsWith('/v1')) base += '/v1';
     authHeaders = {};
-    const client = getLMStudioClient();
-    resolvedModel = await resolveLMSModelId(client, model);
+
+    // For local models, we MUST resolve the actual identifier from LM Studio
+    // otherwise requests to /v1/chat/completions might fail with 400 (Bad Request).
+    try {
+      const client = getLMStudioClient();
+      resolvedModel = await resolveLMSModelId(client, modelId);
+    } catch (e) {
+      console.warn(`[api] Local model resolution failed for ${modelId}, using as-is:`, e.message);
+      resolvedModel = modelId;
+    }
   }
 
   const url = base.includes('/v1') ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
   const headers = { 'Content-Type': 'application/json', ...authHeaders };
+
+  return { url, headers, resolvedModel, isGrok };
+}
+
+/**
+ * Single-shot chat completion (non-streaming).
+ * Now uses the unified config resolver.
+ */
+export async function requestChatCompletion(model, messages, options = {}) {
+  const { url, headers, resolvedModel } = await resolveRequestConfig(model);
+
   const rawMax = options.max_tokens ?? 1024;
   const maxTokens = Math.max(1, Math.min(8192, Number(rawMax) || 1024));
 
@@ -163,7 +250,6 @@ export async function requestChatCompletion(model, messages, options = {}) {
     temperature: options.temperature ?? 0.3,
     max_tokens: maxTokens,
     ...(options.top_p != null && { top_p: options.top_p }),
-    ...(options.top_k != null && { top_k: options.top_k }),
   };
 
   const ctrl = new AbortController();
@@ -177,8 +263,10 @@ export async function requestChatCompletion(model, messages, options = {}) {
       throw new Error(parseChatApiError(res.status, text, model));
     }
     const data = await res.json();
-    const content = data.choices?.[0]?.message?.content ?? '';
-    return { content: String(content).trim(), usage: data.usage };
+    return {
+      content: String(data.choices?.[0]?.message?.content ?? '').trim(),
+      usage: data.usage
+    };
   } catch (err) {
     clearTimeout(to);
     throw err;
@@ -186,12 +274,12 @@ export async function requestChatCompletion(model, messages, options = {}) {
 }
 
 /**
- * Orchestrator for streaming chat completions.
+ * Unified Orchestrator for streaming chat completions.
+ * Standardizes on streamHttpSse for Local, Grok, and DeepSeek.
  * @param {import('./api/types').StreamParams} params
  * @returns {Promise<{ usage?: object, elapsedMs: number, aborted?: boolean }>}
  */
 export async function streamChatCompletion({ model, messages, options = {}, onChunk, onUsage, onDone, onImageRef, signal }) {
-  const isCloud = isCloudModel(model);
   const startTime = Date.now();
   let doneCalled = false;
   const callOnDone = () => {
@@ -201,94 +289,25 @@ export async function streamChatCompletion({ model, messages, options = {}, onCh
     }
   };
 
-  // 1. Grok-specific Responses API (web search)
-  if (isGrokModel(model)) {
-    const apiKeys = await getBaseAndAuth(model);
+  // 1. Resolve configuration (URL, Headers, Model ID)
+  const { url, headers, resolvedModel, isGrok } = await resolveRequestConfig(model);
+
+  // 2. Specialized path for Grok Responses API (for web search/multimodal if needed)
+  if (isGrok) {
+    // Note: We use the specialized grok module but standardized on the /chat/completions path there too.
     const result = await streamGrokResponsesApi({
       model,
       messages,
-      options: { ...options, apiKey: apiKeys.headers.Authorization?.split(' ')[1] },
+      options,
       onChunk, onUsage, onDone, onImageRef, signal
     });
     return { ...result, elapsedMs: Date.now() - startTime };
   }
 
-  // 2. Local Vision/PDF path (SSE via HTTP)
-  const hasImageContent = Array.isArray(messages) && messages.some(
-    m => Array.isArray(m.content) && m.content.some(c => c?.type === 'image_url')
-  );
-
-  // 3. Local Model via SDK (Standard Chat)
-  if (!isCloud && !hasImageContent) {
-    const client = getLMStudioClient();
-    let onAbortToken = null;
-    try {
-      const identifier = await resolveLMSModelId(client, model);
-      const lmsModel = await client.llm.model(identifier);
-      const stream = lmsModel.respond(messages, {
-        temperature: options.temperature,
-        // The SDK uses maxTokens for prediction limit
-        maxTokens: options.max_tokens,
-        stopStrings: options.stop,
-      });
-
-      onAbortToken = () => stream.cancel();
-      if (signal) {
-        if (signal.aborted) onAbortToken();
-        else signal.addEventListener('abort', onAbortToken);
-      }
-
-      for await (const chunk of stream) {
-        if (chunk.content) onChunk(chunk.content);
-      }
-
-      // After the for-await loop, the OngoingPrediction is complete.
-      // Call .result() to get stats without re-consuming the stream.
-      let usageParams = { prompt_tokens: undefined, completion_tokens: undefined };
-      try {
-        const result = await stream.result();
-        usageParams = {
-          prompt_tokens: result?.stats?.promptTokensCount,
-          completion_tokens: result?.stats?.predictedTokensCount,
-        };
-      } catch (_) {
-        // Stats not critical; continue even if unavailable
-      }
-      onUsage?.(usageParams);
-      if (signal && onAbortToken) signal.removeEventListener('abort', onAbortToken);
-      callOnDone();
-      return { usage: usageParams, elapsedMs: Date.now() - startTime };
-    } catch (err) {
-      if (err?.name === 'AbortError' || signal?.aborted) {
-        if (signal && onAbortToken) signal.removeEventListener('abort', onAbortToken);
-        callOnDone();
-        return { usage: {}, elapsedMs: Date.now() - startTime, aborted: true };
-      }
-      if (signal && onAbortToken) signal.removeEventListener('abort', onAbortToken);
-      callOnDone();
-      const msg = (err instanceof Error ? err.message : String(err)) || 'Unknown LM Studio error';
-      throw new Error(`LM Studio Stream Error: ${msg}`);
-    }
-  }
-
-  // 4. Cloud Models OR Local Vision (SSE via HTTP)
-  let streamBase, resolvedModel, authHeaders;
-  if (isCloud) {
-    const r = await getBaseAndAuth(model);
-    streamBase = r.base;
-    authHeaders = r.headers;
-    resolvedModel = resolveModelId(model);
-  } else {
-    streamBase = get(lmStudioBaseUrl) || 'http://localhost:1234';
-    if (!streamBase.endsWith('/v1')) streamBase += '/v1';
-    authHeaders = {};
-    resolvedModel = model;
-  }
-
-  const streamUrl = streamBase.includes('/v1') ? `${streamBase}/chat/completions` : `${streamBase}/v1/chat/completions`;
-  const headers = { 'Content-Type': 'application/json', ...authHeaders };
+  // 3. Unified path for Local and other Cloud models (OpenAI compatible SSE)
   const rawMax = options.max_tokens ?? 4096;
   const maxTokens = Math.max(1, Math.min(8192, Number(rawMax) || 4096));
+
   const streamBody = {
     model: resolvedModel,
     messages,
@@ -297,6 +316,7 @@ export async function streamChatCompletion({ model, messages, options = {}, onCh
     max_tokens: maxTokens,
     ...(options.top_p != null && { top_p: options.top_p }),
     ...(options.top_k != null && { top_k: options.top_k }),
+    ...(options.stop != null && { stop: options.stop }),
   };
 
   const timeoutCtrl = new AbortController();
@@ -313,7 +333,7 @@ export async function streamChatCompletion({ model, messages, options = {}, onCh
   }
 
   try {
-    const res = await streamHttpSse(streamUrl, headers, streamBody, model, onChunk, timeoutCtrl.signal, onUsage, callOnDone);
+    const res = await streamHttpSse(url, headers, streamBody, model, onChunk, timeoutCtrl.signal, onUsage, callOnDone);
     if (toId) clearTimeout(toId);
     if (signal) signal.removeEventListener('abort', onSseAbort);
     return { usage: res?.usage, elapsedMs: Date.now() - startTime, aborted: res?.aborted };
@@ -341,18 +361,102 @@ export async function requestDeepInfraImageGeneration({
   height = 1024,
   negative_prompt,
 }) {
-  const key = (apiKey || '').trim();
-  if (!key) throw new Error('DeepInfra API key required. Add it in Settings → Cloud APIs.');
+  const key = (apiKey || "").trim();
+  if (!key)
+    throw new Error(
+      "DeepInfra API key required. Add it in Settings → Cloud APIs.",
+    );
   const body = {
     prompt: String(prompt).trim(),
     num_images: Math.max(1, Math.min(4, Number(num_images) || 1)),
-    num_inference_steps: Math.max(1, Math.min(50, Number(num_inference_steps) || 30)),
+    num_inference_steps: Math.max(
+      1,
+      Math.min(50, Number(num_inference_steps) || 30),
+    ),
     guidance_scale: Number(guidance_scale) || 7.5,
     width: Math.max(128, Math.min(1024, Number(width) || 1024)),
     height: Math.max(128, Math.min(1024, Number(height) || 1024)),
   };
-  if (negative_prompt != null && String(negative_prompt).trim() !== '') body.negative_prompt = String(negative_prompt).trim();
+  if (negative_prompt != null && String(negative_prompt).trim() !== "")
+    body.negative_prompt = String(negative_prompt).trim();
   const url = `${DEEPINFRA_INFERENCE_BASE}/${encodeURIComponent(modelId)}`;
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), CLOUD_REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+    clearTimeout(to);
+    const data = await res.json();
+    if (!res.ok) {
+      const msg =
+        data?.detail?.error ||
+        data?.detail ||
+        JSON.stringify(data) ||
+        res.statusText;
+      throw new Error(parseChatApiError(res.status, msg, "deepinfra:image"));
+    }
+    const rawImages = data?.images ?? data?.result?.images ?? [];
+    const images = Array.isArray(rawImages) ? rawImages : [];
+    if (images.length === 0)
+      throw new Error("DeepInfra image response had no images.");
+    const urls = images
+      .map((item) => {
+        if (typeof item === "string") {
+          if (
+            item.startsWith("data:") ||
+            item.startsWith("http://") ||
+            item.startsWith("https://")
+          )
+            return item;
+          return `data:image/png;base64,${item}`;
+        }
+        if (item && typeof item === "object" && typeof item.url === "string")
+          return item.url;
+        return null;
+      })
+      .filter(Boolean);
+    if (urls.length === 0)
+      throw new Error("DeepInfra image response had no images.");
+    return { data: urls.map((url) => ({ url })) };
+  } catch (err) {
+    clearTimeout(to);
+    throw err;
+  }
+}
+
+/**
+ * Text-to-image via Together AI. Synchronous; returns base64.
+ * @param {{ apiKey: string, modelId: string, prompt: string, width?: number, height?: number, steps?: number, n?: number }} opts
+ * @returns {Promise<{ data: Array<{ url: string }> }>}
+ */
+export async function requestTogetherImageGeneration({
+  apiKey,
+  modelId,
+  prompt,
+  width = 1024,
+  height = 1024,
+  steps = 4,
+  n = 1,
+}) {
+  const key = (apiKey || '').trim();
+  if (!key) throw new Error('Together AI API key required. Add it in Settings → Cloud APIs.');
+  const body = {
+    model: modelId,
+    prompt: String(prompt).trim(),
+    width: Number(width) || 1024,
+    height: Number(height) || 1024,
+    steps: Number(steps) || 4,
+    n: Number(n) || 1,
+    response_format: 'base64',
+  };
+  const url = 'https://api.together.xyz/v1/images/generations';
   const ctrl = new AbortController();
   const to = setTimeout(() => ctrl.abort(), CLOUD_REQUEST_TIMEOUT_MS);
   try {
@@ -365,22 +469,15 @@ export async function requestDeepInfraImageGeneration({
     clearTimeout(to);
     const data = await res.json();
     if (!res.ok) {
-      const msg = data?.detail?.error || data?.detail || JSON.stringify(data) || res.statusText;
-      throw new Error(parseChatApiError(res.status, msg, 'deepinfra:image'));
+      const msg = data?.error?.message || res.statusText;
+      throw new Error(parseChatApiError(res.status, msg, 'together:image'));
     }
-    const rawImages = data?.images ?? data?.result?.images ?? [];
-    const images = Array.isArray(rawImages) ? rawImages : [];
-    if (images.length === 0) throw new Error('DeepInfra image response had no images.');
-    const urls = images.map((item) => {
-      if (typeof item === 'string') {
-        if (item.startsWith('data:') || item.startsWith('http://') || item.startsWith('https://')) return item;
-        return `data:image/png;base64,${item}`;
-      }
-      if (item && typeof item === 'object' && typeof item.url === 'string') return item.url;
-      return null;
-    }).filter(Boolean);
-    if (urls.length === 0) throw new Error('DeepInfra image response had no images.');
-    return { data: urls.map((url) => ({ url })) };
+    const images = data?.data ?? [];
+    return {
+      data: images.map((img) => ({
+        url: img.b64_json ? `data:image/png;base64,${img.b64_json}` : img.url,
+      })),
+    };
   } catch (err) {
     clearTimeout(to);
     throw err;

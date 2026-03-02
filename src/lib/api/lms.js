@@ -38,15 +38,31 @@ export function getLMStudioClient() {
 
 /**
  * Resolve human-readable model id to LM Studio internal identifier.
+ * More robust: tries exact match, then substring match, then first loaded.
  * @param {LMStudioClient} client
  * @param {string} modelId
  * @returns {Promise<string>}
  */
 export async function resolveLMSModelId(client, modelId) {
     if (!modelId) throw new Error('No model selected');
+
+    // Clean potential prefixes if mistakenly passed here
+    const cleanId = String(modelId).replace(/^(lms|local):/, '');
+
     const lmsModels = await client.llm.listLoaded();
-    const found = lmsModels.find(m => m.identifier === modelId || m.path === modelId);
-    if (found) return found.identifier;
-    if (lmsModels.length > 0) return lmsModels[0].identifier;
-    throw new Error('No models loaded in LM Studio');
+    if (lmsModels.length === 0) throw new Error('No models loaded in LM Studio. Please load one first.');
+
+    // 1. Exact match
+    const exact = lmsModels.find(m => m.identifier === cleanId || m.path === cleanId);
+    if (exact) return exact.identifier;
+
+    // 2. Substring match (e.g. "gemma" matches "google/gemma-2b-it")
+    const partial = lmsModels.find(m =>
+        m.identifier.toLowerCase().includes(cleanId.toLowerCase()) ||
+        m.path.toLowerCase().includes(cleanId.toLowerCase())
+    );
+    if (partial) return partial.identifier;
+
+    // 3. Fallback to first loaded model (best effort)
+    return lmsModels[0].identifier;
 }

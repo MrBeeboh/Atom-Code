@@ -74,12 +74,12 @@
     try {
       const list = await getModels();
       const ids = list.map((m) => m.id);
-      models.set(ids.map((id) => ({ id })));
+      models.set(list); // list already has {id} objects
       ensureModelIcons(ids);
 
       if (list.length === 0) {
         modelSelectionNotification.set(
-          "No models available. Please load a model in LM Studio.",
+          "No models available. Please load a model in LM Studio or add API keys for Cloud models.",
         );
         return;
       }
@@ -89,10 +89,12 @@
         typeof localStorage !== "undefined"
           ? localStorage.getItem("selectedModel") || ""
           : "";
+
+      const isCloud = (id) => id && id.includes(":");
       const storedValid =
         typeof stored === "string" &&
         stored.trim() &&
-        ids.includes(stored.trim());
+        (ids.includes(stored.trim()) || isCloud(stored.trim()));
 
       if (storedValid) {
         selectedModelId.set(stored.trim());
@@ -225,35 +227,85 @@
               No models found. Is LM Studio running?
             </div>
           {:else}
-            {#each $models as m}
-              {@const icon = getModelIcon(m.id, $modelIconOverrides)}
-              <button
-                type="button"
-                class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700/80 transition-colors {m.id ===
-                $selectedModelId
-                  ? 'bg-zinc-50 dark:bg-zinc-700/50 font-medium'
-                  : ''}"
-                role="option"
-                aria-selected={m.id === $selectedModelId}
-                onclick={() => select(m.id)}
-              >
-                <img
-                  src={icon}
-                  alt=""
-                  class="w-5 h-5 shrink-0 rounded object-contain"
-                />
-                <span class="min-w-0 flex-1 flex items-center gap-1.5">
-                  <span class="truncate">{modelDisplayName(m.id)}</span>
-                  {#if getModelTypeTag(m.id)}
-                    <span
-                      class="shrink-0 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded"
-                      style="background: color-mix(in srgb, var(--ui-accent) 12%, transparent); color: var(--ui-accent);"
-                      >{getModelTypeTag(m.id)}</span
-                    >
-                  {/if}
-                  <ModelCapabilityBadges modelId={m.id} />
-                </span>
-              </button>
+            {@const groupedModels = $models.reduce((acc, m) => {
+              const tag = getModelTypeTag(m.id) || "Local";
+              if (!acc[tag]) acc[tag] = [];
+              acc[tag].push(m);
+              return acc;
+            }, {})}
+
+            {#each ["Local", "DeepSeek", "Grok"] as provider}
+              {#if groupedModels[provider]}
+                {@const sortedItems = [...groupedModels[provider]].sort(
+                  (a, b) => {
+                    const nameA = modelDisplayName(a.id);
+                    const nameB = modelDisplayName(b.id);
+                    if (provider === "Grok") {
+                      // Sort Grok models: 4.1, 4, 3, 2, Beta, Vision, etc.
+                      const rank = (n) => {
+                        const lower = n.toLowerCase();
+                        if (lower.includes("4-1") || lower.includes("4.1"))
+                          return -1;
+                        if (lower.includes(" 4")) return 0;
+                        if (lower.includes(" 3")) return 1;
+                        if (lower.includes(" 2")) return 2;
+                        if (lower.includes("beta")) return 3;
+                        if (lower.includes("vision")) return 4;
+                        if (lower.includes("code")) return 5;
+                        return 6;
+                      };
+                      const rA = rank(nameA);
+                      const rB = rank(nameB);
+                      if (rA !== rB) return rA - rB;
+                      // secondary sort by name (reasoning variants first)
+                      const lowerA = nameA.toLowerCase();
+                      const lowerB = nameB.toLowerCase();
+                      if (
+                        lowerA.includes("reasoning") &&
+                        !lowerB.includes("reasoning")
+                      )
+                        return -1;
+                      if (
+                        !lowerA.includes("reasoning") &&
+                        lowerB.includes("reasoning")
+                      )
+                        return 1;
+                      return nameA.localeCompare(nameB);
+                    }
+                    return nameA.localeCompare(nameB);
+                  },
+                )}
+                <div
+                  class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider opacity-40 border-b border-white/5 bg-white/5 mb-1 mt-1 first:mt-0"
+                >
+                  {provider === "Local"
+                    ? "Local Systems (LM Studio)"
+                    : provider}
+                </div>
+                {#each sortedItems as m}
+                  {@const icon = getModelIcon(m.id, $modelIconOverrides)}
+                  <button
+                    type="button"
+                    class="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700/80 transition-colors {m.id ===
+                    $selectedModelId
+                      ? 'bg-zinc-50 dark:bg-zinc-700/50 font-medium'
+                      : ''}"
+                    role="option"
+                    aria-selected={m.id === $selectedModelId}
+                    onclick={() => select(m.id)}
+                  >
+                    <img
+                      src={icon}
+                      alt=""
+                      class="w-5 h-5 shrink-0 rounded object-contain"
+                    />
+                    <span class="min-w-0 flex-1 flex items-center gap-1.5">
+                      <span class="truncate">{modelDisplayName(m.id)}</span>
+                      <ModelCapabilityBadges modelId={m.id} />
+                    </span>
+                  </button>
+                {/each}
+              {/if}
             {/each}
 
             <!-- TTS Settings Section -->

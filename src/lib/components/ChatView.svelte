@@ -43,6 +43,7 @@
   import { streamChatCompletionWithMetrics } from "$lib/streamReporter.js";
   import {
     requestDeepInfraImageGeneration,
+    requestTogetherImageGeneration,
     requestDeepInfraVideoGeneration,
     isGrokModel,
     isDeepSeekModel,
@@ -1007,16 +1008,28 @@ Consume the data silently to answer the user's prompt.`;
     imageModalOpen = false;
   }
 
-  /** Generate image via DeepInfra (synchronous; response.images[0] base64 → data URL). */
+  /** Generate image via DeepInfra or Together AI. */
   async function handleImageModalGenerate() {
     if (!convId || !imageModalPrompt.trim()) return;
-    const key = getDeepinfraImageKey();
-    if (!key) {
-      chatError.set("DeepInfra API key required.");
+
+    // Together AI engines are 0, 1, 2 in ENGINE_OPTIONS
+    // DeepInfra engines can be the same or handled separately.
+    // Given ENGINE_OPTIONS labels are FLUX.1 ..., we can check keys.
+    const togetherKey = getTogetherImageKey();
+    const deepinfraKey = getDeepinfraImageKey();
+
+    // Default to Together if key is present, otherwise DeepInfra
+    const useTogether = !!togetherKey;
+
+    if (!togetherKey && !deepinfraKey) {
+      chatError.set("API key required (Together or DeepInfra).");
       return;
     }
-    const modelId =
-      DEEPINFRA_MODEL_IDS[imageModalEngine] ?? DEEPINFRA_MODEL_IDS[0];
+
+    const modelId = useTogether
+      ? (TOGETHER_MODEL_IDS[imageModalEngine] ?? TOGETHER_MODEL_IDS[0])
+      : (DEEPINFRA_MODEL_IDS[imageModalEngine] ?? DEEPINFRA_MODEL_IDS[0]);
+
     const qualityOpts =
       STEP_OPTIONS_PER_ENGINE[imageModalEngine] ?? STEP_OPTIONS_PER_ENGINE[0];
     const quality =
@@ -1027,20 +1040,36 @@ Consume the data silently to answer the user's prompt.`;
     const size =
       sizeOpts[Math.min(imageModalSize, sizeOpts.length - 1)] ?? sizeOpts[0];
     const n = N_OPTIONS[imageModalN] ?? 1;
+
     closeImageModal();
     imageGenerating = true;
     chatError.set(null);
+
     try {
-      const data = await requestDeepInfraImageGeneration({
-        apiKey: key,
-        modelId,
-        prompt: imageModalPrompt,
-        num_images: n,
-        num_inference_steps: quality?.steps ?? 4,
-        guidance_scale: 7.5,
-        width: size.width ?? 1024,
-        height: size.height ?? 1024,
-      });
+      let data;
+      if (useTogether) {
+        data = await requestTogetherImageGeneration({
+          apiKey: togetherKey,
+          modelId,
+          prompt: imageModalPrompt,
+          width: size.width ?? 1024,
+          height: size.height ?? 1024,
+          steps: quality?.steps ?? 4,
+          n,
+        });
+      } else {
+        data = await requestDeepInfraImageGeneration({
+          apiKey: deepinfraKey,
+          modelId,
+          prompt: imageModalPrompt,
+          num_images: n,
+          num_inference_steps: quality?.steps ?? 4,
+          guidance_scale: 7.5,
+          width: size.width ?? 1024,
+          height: size.height ?? 1024,
+        });
+      }
+
       const urls = data?.data?.map((d) => d?.url).filter(Boolean) ?? [];
       if (urls.length === 0) {
         chatError.set("Image generation failed—no images returned.");
