@@ -1,7 +1,8 @@
 // Hive — original OpenSCAD enclosure for a Radxa ZERO 3W
 //
 // Generated hex lattice lid, snap barbs on the short ends, visors over
-// the cable ports. The board drops onto four locating pins. No screws.
+// the cable ports. The board clicks onto four split locating pins
+// (detent bulge + slot). No screws.
 //
 // Board coordinates still come from Radxa's v1.11 DXF (see zero3w_board.scad).
 //
@@ -160,18 +161,36 @@ module snap_windows() {
 }
 
 module standoffs() {
-    // Board rests on the boss and drops onto a pin through the Ø2.82 mm hole.
-    // No screws. Pin is undersize for FDM; chamfered tip so it starts easy.
-    pin_d = 2.5;
-    pin_h = 1.8;
+    // Split pin with a detent. Ø2.82 mm board hole snaps over a 3.05 mm
+    // bulge; the 0.7 mm slot lets the pin squeeze, then it springs back
+    // so the board is held, not just sitting on a slip fit.
+    pin_d    = 2.55;
+    detent_d = 3.05;
+    detent_z = 1.10;
+    pin_h    = 2.2;
+    slot     = 0.8;  // 0.4 mm nozzle: a 0.7 mm kerf often fuses shut
     for (p = hole_xy)
-        translate([bx(p[0]), by(p[1]), floor_t]) {
-            cylinder(h = under_clear, d = 6.4);
-            translate([0, 0, under_clear])
-                cylinder(h = pin_h - 0.5, d = pin_d);
-            translate([0, 0, under_clear + pin_h - 0.5])
-                cylinder(h = 0.5, d1 = pin_d, d2 = 1.7);
-        }
+        translate([bx(p[0]), by(p[1]), floor_t])
+            difference() {
+                union() {
+                    cylinder(h = under_clear, d = 6.4);
+                    translate([0, 0, under_clear]) {
+                        cylinder(h = pin_h, d = pin_d);
+                        translate([0, 0, detent_z])
+                            hull() {
+                                cylinder(h = 0.12, d = pin_d);
+                                translate([0, 0, 0.14])
+                                    cylinder(h = 0.22, d = detent_d);
+                                translate([0, 0, 0.36])
+                                    cylinder(h = 0.12, d = pin_d);
+                            }
+                        translate([0, 0, pin_h - 0.45])
+                            cylinder(h = 0.45, d1 = pin_d, d2 = 1.6);
+                    }
+                }
+                translate([-slot / 2, -5, under_clear - 0.15])
+                    cube([slot, 10, pin_h + 0.8]);
+            }
 }
 
 module floor_hex_vents() {

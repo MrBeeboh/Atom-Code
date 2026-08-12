@@ -13,7 +13,7 @@ git pull origin cursor/radxa-zero-3w-case-fe04
 
 Then open `PRINTS/START-HERE.md`.
 
-**Hive** is two parts: base + lid. The board drops onto four pins in the base. The lid snaps on at the short ends. No screws.
+**Hive** is two parts: base + lid. The board clicks onto four split pins in the base. The lid snaps on at the short ends. No screws.
 
 ## Tomorrow, in this order
 
@@ -26,7 +26,7 @@ Then open `PRINTS/START-HERE.md`.
 2. **Hive case**  
    `PRINTS/stl/zero3w_hive-base.stl`  
    `PRINTS/stl/zero3w_hive-lid.stl`  
-   Board onto the four pins. Lid snaps — **one clip on each short end**. To open, press the barb in through the window on the outside of each end, then lift.
+   Board onto the four pins — they are **split pins with a detent**, so the board clicks on and stays. Lid snaps — **one clip on each short end**. To open, press the barb in through the window on the outside of each end, then lift.
 
 One-plate file: `PRINTS/stl/zero3w_hive-print.stl`.
 
@@ -59,6 +59,8 @@ openscad -D 'part="lid"' -o stl/zero3w_hive-lid.stl zero3w_hive.scad
 ## Previews
 
 ![Hive assembled](preview/hive-assembled.png)
+
+![Hive base — split detent pins](preview/hive-base.png)
 
 ![Hive lid](preview/hive-lid.png)
 
