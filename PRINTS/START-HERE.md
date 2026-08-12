@@ -13,7 +13,7 @@ git pull origin cursor/radxa-zero-3w-case-fe04
 
 Then open `PRINTS/START-HERE.md`.
 
-**Hive** is two parts: base + lid. The board clicks onto four split pins in the base. The lid snaps on at the short ends. No screws.
+**Hive** is two parts: base + lid. The board sits on four bosses and is held with **M2.5 screws**. The lid snaps on at the short ends.
 
 ## Tomorrow, in this order
 
@@ -26,9 +26,11 @@ Then open `PRINTS/START-HERE.md`.
 2. **Hive case**  
    `PRINTS/stl/zero3w_hive-base.stl`  
    `PRINTS/stl/zero3w_hive-lid.stl`  
-   Board onto the four pins — they are **split pins with a detent**, so the board clicks on and stays. Lid snaps — **one clip on each short end**. To open, press the barb in through the window on the outside of each end, then lift.
+   Board onto the four bosses, **M2.5 through the PCB into the 2.1 mm pilots** (6–8 mm screws, thread-form into the plastic). Lid snaps — **one clip on each short end**. To open, press the barb in through the window on the outside of each end, then lift.
 
 One-plate file: `PRINTS/stl/zero3w_hive-print.stl`.
+
+Hardware: **4 × M2.5**, 6–8 mm, pan or button head. The pilots are 2.1 mm so the screw cuts its own thread. Lid has no screw holes.
 
 ## Slice (Ender 3 V3 SE, 0.4 mm nozzle)
 
@@ -49,7 +51,7 @@ Do not print until the slicer layer view looks right.
 |---|---|
 | `zero3w_board.scad` | Official v1.11 DXF coordinates. Shared by coupon + Hive. |
 | `zero3w_coupon.scad` | Open tray. First print. |
-| `zero3w_hive.scad` | Lattice lid, end snaps, visors, locating pins. `part` = `preview` / `base` / `lid` / `print`. |
+| `zero3w_hive.scad` | Lattice lid, end snaps, visors, M2.5 bosses. `part` = `preview` / `base` / `lid` / `print`. |
 
 ```bash
 cd PRINTS
@@ -60,7 +62,7 @@ openscad -D 'part="lid"' -o stl/zero3w_hive-lid.stl zero3w_hive.scad
 
 ![Hive assembled](preview/hive-assembled.png)
 
-![Hive base — split detent pins](preview/hive-base.png)
+![Hive base — M2.5 bosses](preview/hive-base.png)
 
 ![Hive lid](preview/hive-lid.png)
 
