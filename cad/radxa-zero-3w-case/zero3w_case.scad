@@ -147,11 +147,11 @@ module port_cutouts() {
     // merges the openings into one slot.
     usb3_w   = (46.04 - 36.93) + 2 * port_clear;
     usbotg_w = (58.50 - 49.51) + 2 * port_clear;
-    hdmi_w   = (15.68 -  9.18) + 2 * port_clear + 3.0;
+    hdmi_w   = (15.68 -  9.18) + 2 * port_clear;  // micro HDMI, not padded to USB-C
     usb_z0 = z_pcb_top - 1.0;
     usb_z1 = z_pcb_top + 6.6;
-    hdmi_z0 = z_pcb_top - 1.0;
-    hdmi_z1 = z_pcb_top + 5.4;
+    hdmi_z0 = z_pcb_top - 0.5;
+    hdmi_z1 = z_pcb_top + 4.2;
 
     wall_slot("y0", hdmi_cx,   hdmi_z0, hdmi_z1, hdmi_w);
     wall_slot("y0", usb3_cx,   usb_z0,  usb_z1,  usb3_w);
@@ -212,9 +212,11 @@ module screw_bores(z0, h, d) {
 }
 
 module countersinks() {
+    // 90° M2.5 CSK, wide end on the outer lid face
+    csk_h = (5.2 - screw_clear_d) / 2;
     for (p = hole_xy)
-        translate([bx(p[0]), by(p[1]), lid_h - 1.4])
-            cylinder(h = 1.5, d1 = screw_clear_d, d2 = 5.2);
+        translate([bx(p[0]), by(p[1]), lid_h - csk_h])
+            cylinder(h = csk_h + 0.1, d1 = screw_clear_d, d2 = 5.2);
 }
 
 // ---------------------------------------------------------------------------

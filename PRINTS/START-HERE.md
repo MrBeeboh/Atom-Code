@@ -10,13 +10,14 @@ The first case in `cad/radxa-zero-3w-case/` is a measured tray: rounded box, hol
 
 1. **Fit coupon first** (~15 min, little filament)  
    `PRINTS/stl/zero3w_coupon.stl`  
-   Drop the real ZERO 3W in. Try micro HDMI, USB 3.0 Host, and USB 2.0 OTG (that last one is **power**).  
+   Drop the real ZERO 3W in. Try **micro HDMI** (the small hole on the left), USB 3.0 Host, and USB 2.0 OTG (that last one is **power**).  
+   This board is micro HDMI (Type D), not mini HDMI. The left opening is sized to that 6.5 mm shell, not copied from the USB-C holes.  
    If the plugs line up, print Hive. If they don’t, stop — don’t print the full case.
 
 2. **Hive case**  
    `PRINTS/stl/zero3w_hive-base.stl`  
    `PRINTS/stl/zero3w_hive-lid.stl`  
-   Snap the lid on (4 barbs). Optional 4× M2.5 through the corner holes if a snap lets go.
+   Snap the lid on (4 barbs). Optional 4× **M2.5 flat-head (countersunk)** screws in the corner holes if a snap lets go. Pan-head screws will sit proud.
 
 3. **Desk cradle** (optional)  
    `PRINTS/stl/zero3w_hive-cradle.stl`  

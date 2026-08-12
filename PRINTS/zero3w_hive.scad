@@ -124,25 +124,22 @@ module visor(cx, w, z1) {
 }
 
 module port_cutouts() {
-    usb3_w = (usb3_x1 - usb3_x0) + 2 * port_clear;
-    otg_w  = (otg_x1  - otg_x0)  + 2 * port_clear;
-    hdmi_w = (hdmi_x1 - hdmi_x0) + 2 * port_clear + 3.0;
+    usb3_w = usb3_cut_w(port_clear);
+    otg_w  = otg_cut_w(port_clear);
+    hdmi_w = hdmi_cut_w(port_clear);
     usb_z0 = z_pcb_top - 1.0;
-    usb_z1 = z_pcb_top + 6.6;
-    hdmi_z0 = z_pcb_top - 1.0;
-    hdmi_z1 = z_pcb_top + 5.4;
+    usb_z1 = z_pcb_top + usb_above;
+    hdmi_z0 = z_pcb_top - 0.5;
+    hdmi_z1 = z_pcb_top + hdmi_above;
     wall_slot("y0", hdmi_cx, hdmi_z0, hdmi_z1, hdmi_w);
     wall_slot("y0", usb3_cx, usb_z0,  usb_z1,  usb3_w);
     wall_slot("y0", otg_cx,  usb_z0,  usb_z1,  otg_w);
 }
 
 module visors() {
-    usb3_w = (usb3_x1 - usb3_x0) + 2 * port_clear;
-    otg_w  = (otg_x1  - otg_x0)  + 2 * port_clear;
-    hdmi_w = (hdmi_x1 - hdmi_x0) + 2 * port_clear + 3.0;
-    visor(hdmi_cx, hdmi_w, z_pcb_top + 5.4);
-    visor(usb3_cx, usb3_w, z_pcb_top + 6.6);
-    visor(otg_cx,  otg_w,  z_pcb_top + 6.6);
+    visor(hdmi_cx, hdmi_cut_w(port_clear), z_pcb_top + hdmi_above);
+    visor(usb3_cx, usb3_cut_w(port_clear), z_pcb_top + usb_above);
+    visor(otg_cx,  otg_cut_w(port_clear),  z_pcb_top + usb_above);
 }
 
 module gpio_cutout(z0, h) {
@@ -271,10 +268,14 @@ module lid() {
                 }
         gpio_cutout(hook_len - 0.2, lid_t + 0.5);
         lid_label();
-        // optional M2.5 clearance if a snap ever lets go
-        for (p = hole_xy)
+        // M2.5 through-holes + 90° countersink on the outer face
+        for (p = hole_xy) {
             translate([bx(p[0]), by(p[1]), hook_len - 0.2])
-                cylinder(h = lid_t + 0.4, d = 2.9);
+                cylinder(h = lid_t + 0.4, d = 2.9, $fn = 32);
+            // 90° CSK for M2.5 flat-head: depth = (5.2 - 2.9) / 2
+            translate([bx(p[0]), by(p[1]), hook_len + lid_t - 1.15])
+                cylinder(h = 1.25, d1 = 2.9, d2 = 5.2, $fn = 64);
+        }
     }
 }
 

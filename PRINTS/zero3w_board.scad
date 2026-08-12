@@ -28,3 +28,11 @@ sd_cy  = 15.00; sd_len  = 12.8;
 
 maskrom_xy = [21.84, 2.20];
 ufl_xy     = [63.50, 19.685];
+
+// Cutouts: HDMI is micro (Type D), 6.50 mm metal in the DXF.
+// Do not pad it out to USB-C width. Plug is 6.4 x 2.8 mm.
+function hdmi_cut_w(clear) = (hdmi_x1 - hdmi_x0) + 2 * clear;
+function usb3_cut_w(clear) = (usb3_x1 - usb3_x0) + 2 * clear;
+function otg_cut_w(clear)  = (otg_x1  - otg_x0)  + 2 * clear;
+hdmi_above = 4.2;   // mm above PCB top
+usb_above  = 6.6;

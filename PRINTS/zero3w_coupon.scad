@@ -41,15 +41,15 @@ difference() {
     translate([wall + 2, oy - wall - 0.1, floor_t + 0.6])
         cube([ix - 4, wall + 1, tall]);
     // ports
-    usb3_w = (usb3_x1 - usb3_x0) + 2 * port_clear;
-    otg_w  = (otg_x1  - otg_x0)  + 2 * port_clear;
-    hdmi_w = (hdmi_x1 - hdmi_x0) + 2 * port_clear + 3.0;
-    translate([bx(hdmi_cx) - hdmi_w / 2, -0.2, z_top - 1.0])
-        cube([hdmi_w, wall + 2, 5.4]);
+    usb3_w = usb3_cut_w(port_clear);
+    otg_w  = otg_cut_w(port_clear);
+    hdmi_w = hdmi_cut_w(port_clear);
+    translate([bx(hdmi_cx) - hdmi_w / 2, -0.2, z_top - 0.5])
+        cube([hdmi_w, wall + 2, hdmi_above + 0.5]);
     translate([bx(usb3_cx) - usb3_w / 2, -0.2, z_top - 1.0])
-        cube([usb3_w, wall + 2, 6.6]);
+        cube([usb3_w, wall + 2, usb_above + 1.0]);
     translate([bx(otg_cx) - otg_w / 2, -0.2, z_top - 1.0])
-        cube([otg_w, wall + 2, 6.6]);
+        cube([otg_w, wall + 2, usb_above + 1.0]);
     // hole dimples so you can see if the board sits on the DXF holes
     for (p = hole_xy)
         translate([bx(p[0]), by(p[1]), -0.1])
