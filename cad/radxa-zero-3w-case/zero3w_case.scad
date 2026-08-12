@@ -147,11 +147,11 @@ module port_cutouts() {
     // merges the openings into one slot.
     usb3_w   = (46.04 - 36.93) + 2 * port_clear;
     usbotg_w = (58.50 - 49.51) + 2 * port_clear;
-    hdmi_w   = (15.68 -  9.18) + 2 * port_clear;  // micro HDMI, not padded to USB-C
+    hdmi_w   = (15.68 -  9.18) + 2 * port_clear + 3.0;  // cable overmold, not just 6.5 mm metal
     usb_z0 = z_pcb_top - 1.0;
     usb_z1 = z_pcb_top + 6.6;
-    hdmi_z0 = z_pcb_top - 0.5;
-    hdmi_z1 = z_pcb_top + 4.2;
+    hdmi_z0 = z_pcb_top - 1.0;
+    hdmi_z1 = z_pcb_top + 6.6;
 
     wall_slot("y0", hdmi_cx,   hdmi_z0, hdmi_z1, hdmi_w);
     wall_slot("y0", usb3_cx,   usb_z0,  usb_z1,  usb3_w);

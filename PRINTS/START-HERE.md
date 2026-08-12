@@ -2,6 +2,17 @@
 
 Printer arrives tomorrow. This folder is the pile.
 
+**On your machine, this lives on branch `cursor/radxa-zero-3w-case-fe04`, not `main`.** Sync with:
+
+```bash
+cd /path/to/Atom-Code
+git fetch origin
+git checkout cursor/radxa-zero-3w-case-fe04
+git pull origin cursor/radxa-zero-3w-case-fe04
+```
+
+Then open `PRINTS/START-HERE.md`.
+
 The first case in `cad/radxa-zero-3w-case/` is a measured tray: rounded box, holes for ports, screw lid. Useful, not a design exercise.
 
 **Hive** (this folder) is the OpenSCAD design: a hex lattice generated with a loop, cantilever snap barbs, visors over the cables, recessed `ZERO 3W` text, and a 12° desk cradle.
@@ -10,8 +21,8 @@ The first case in `cad/radxa-zero-3w-case/` is a measured tray: rounded box, hol
 
 1. **Fit coupon first** (~15 min, little filament)  
    `PRINTS/stl/zero3w_coupon.stl`  
-   Drop the real ZERO 3W in. Try **micro HDMI** (the small hole on the left), USB 3.0 Host, and USB 2.0 OTG (that last one is **power**).  
-   This board is micro HDMI (Type D), not mini HDMI. The left opening is sized to that 6.5 mm shell, not copied from the USB-C holes.  
+   Drop the real ZERO 3W in. Try **micro HDMI** (left), USB 3.0 Host, and USB 2.0 OTG (**power**).  
+   The left hole is sized for the **cable’s plastic housing**, not just the 6.5 mm metal. Typical Type-D overmolds are ~11 mm wide, so that opening will look close to the USB-C holes. That is required for the plug to seat.  
    If the plugs line up, print Hive. If they don’t, stop — don’t print the full case.
 
 2. **Hive case**  

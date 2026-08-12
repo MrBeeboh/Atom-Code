@@ -44,8 +44,8 @@ difference() {
     usb3_w = usb3_cut_w(port_clear);
     otg_w  = otg_cut_w(port_clear);
     hdmi_w = hdmi_cut_w(port_clear);
-    translate([bx(hdmi_cx) - hdmi_w / 2, -0.2, z_top - 0.5])
-        cube([hdmi_w, wall + 2, hdmi_above + 0.5]);
+    translate([bx(hdmi_cx) - hdmi_w / 2, -0.2, z_top - 1.0])
+        cube([hdmi_w, wall + 2, hdmi_above + 1.0]);
     translate([bx(usb3_cx) - usb3_w / 2, -0.2, z_top - 1.0])
         cube([usb3_w, wall + 2, usb_above + 1.0]);
     translate([bx(otg_cx) - otg_w / 2, -0.2, z_top - 1.0])

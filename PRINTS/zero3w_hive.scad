@@ -129,7 +129,7 @@ module port_cutouts() {
     hdmi_w = hdmi_cut_w(port_clear);
     usb_z0 = z_pcb_top - 1.0;
     usb_z1 = z_pcb_top + usb_above;
-    hdmi_z0 = z_pcb_top - 0.5;
+    hdmi_z0 = z_pcb_top - 1.0;
     hdmi_z1 = z_pcb_top + hdmi_above;
     wall_slot("y0", hdmi_cx, hdmi_z0, hdmi_z1, hdmi_w);
     wall_slot("y0", usb3_cx, usb_z0,  usb_z1,  usb3_w);
