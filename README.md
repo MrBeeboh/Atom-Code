@@ -2,6 +2,12 @@
 
 A local-first AI coding assistant built with Svelte 5 and LM Studio. No cloud required, no subscriptions, no data leaving your machine.
 
+## 3D prints (Ender 3 V3 SE)
+
+**Start here tomorrow:** [`PRINTS/START-HERE.md`](PRINTS/START-HERE.md)
+
+Radxa ZERO 3W enclosure — print the small fit coupon first, then the Hive case.
+
 ## What It Does
 
 - AI chat interface powered by local LLM models via LM Studio
@@ -87,6 +93,7 @@ atom-code/
 │   └── terminal-server/    # Terminal backend (WebSocket + HTTP)
 ├── voice-server/           # Whisper voice input server
 ├── scripts/                # Start, stop, watchdog, and search proxy
+├── PRINTS/                 # Ender 3 V3 SE — ZERO 3W case (start at START-HERE.md)
 ├── docs/                   # Documentation
 └── public/                 # Static assets
 ```
