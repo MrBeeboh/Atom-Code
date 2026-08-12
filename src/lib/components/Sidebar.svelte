@@ -97,15 +97,15 @@
         <div
           role="button"
           tabindex="0"
-          class="w-full text-left py-1.5 px-2 rounded-lg flex items-center gap-2 cursor-pointer transition-colors group rounded-l-none {isActive ? 'ui-sidebar-active' : ''}"
+          class="w-full text-left py-1.5 px-2 rounded-lg flex items-start gap-2 cursor-pointer transition-colors group rounded-l-none {isActive ? 'ui-sidebar-active' : ''}"
           style:background={isActive ? 'var(--ui-sidebar-active)' : 'transparent'}
           style:color={isActive ? 'var(--ui-text-primary)' : 'var(--ui-text-secondary)'}
           onclick={() => select(conv.id)}
           onkeydown={(e) => e.key === 'Enter' && select(conv.id)}>
           {#if icon}
-            <img src={icon} alt="" class="w-4 h-4 shrink-0 rounded object-contain opacity-80" />
+            <img src={icon} alt="" class="w-4 h-4 shrink-0 rounded object-contain opacity-80 mt-0.5" />
           {/if}
-          <span class="truncate flex-1 text-xs min-w-0">{conv.title}</span>
+          <span class="convo-title flex-1 text-xs min-w-0" title={conv.title}>{conv.title}</span>
           <span class="text-[10px] shrink-0 font-mono opacity-80">{conv.messageCount ?? 0}</span>
           <span class="text-[10px] shrink-0 opacity-80">{formatTime(conv.updatedAt)}</span>
           <button
@@ -121,3 +121,11 @@
     {/each}
   </ul>
 </div>
+
+<style>
+  .convo-title {
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+</style>
