@@ -156,12 +156,9 @@ function hook_xs() = [ox * 0.28, ox * 0.72];
 module snap_windows() {
     wz = 2.5;
     zc = base_h - 3.3;
-    for (x = hook_xs()) {
+    for (x = hook_xs())
         translate([x - (hook_w + 0.7) / 2, -0.2, zc - wz / 2])
             cube([hook_w + 0.7, wall + 0.5, wz]);
-        translate([x - (hook_w + 0.7) / 2, oy - wall - 0.3, zc - wz / 2])
-            cube([hook_w + 0.7, wall + 0.5, wz]);
-    }
 }
 
 module standoffs() {
@@ -250,13 +247,12 @@ module lid() {
         union() {
             translate([0, 0, hook_len])
                 rounded_cube([ox, oy, lid_t], outer_r);
-            // snap barbs — two per long side
-            for (x = hook_xs()) {
+            // snap barbs — port-side wall only.
+            // The GPIO edge is an open slot, so clips there would hang in
+            // the header cutout and not catch anything.
+            for (x = hook_xs())
                 translate([x - hook_w / 2, wall - hook_t - hook_gap, 0])
                     snap_barb(1);
-                translate([x - hook_w / 2, oy - wall + hook_gap, 0])
-                    snap_barb(-1);
-            }
         }
         // hex lattice through the lid plate, clipped to an inner window
         translate([0, 0, hook_len - 0.1])
