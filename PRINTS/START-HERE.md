@@ -28,7 +28,7 @@ The first case in `cad/radxa-zero-3w-case/` is a measured tray: rounded box, hol
 2. **Hive case**  
    `PRINTS/stl/zero3w_hive-base.stl`  
    `PRINTS/stl/zero3w_hive-lid.stl`  
-   Snap the lid on (4 barbs). Optional 4× **M2.5 flat-head (countersunk)** screws in the corner holes if a snap lets go. Pan-head screws will sit proud.
+   Snap the lid on — **one clip on each short end**. To open, press the barb in through the window on the outside of each end (fingernail or small screwdriver), then lift. Optional 4× **M2.5 flat-head (countersunk)** screws if you want it locked down. Pan-head screws will sit proud.
 
 3. **Desk cradle** (optional)  
    `PRINTS/stl/zero3w_hive-cradle.stl`  

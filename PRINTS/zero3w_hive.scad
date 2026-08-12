@@ -1,8 +1,8 @@
 // Hive — original OpenSCAD enclosure for a Radxa ZERO 3W
 //
 // This is the designed-in-code case: a generated hex lattice lid,
-// cantilever snap barbs (no screws required), visor hoods over the
-// cable ports, and an optional 12° desk cradle.
+// cantilever snap barbs on the short ends (press-from-outside to release),
+// visor hoods over the cable ports, and an optional 12° desk cradle.
 //
 // Board coordinates still come from Radxa's v1.11 DXF (see zero3w_board.scad).
 // The *shape* is not a rounded box with holes punched in it.
@@ -150,15 +150,18 @@ module gpio_cutout(z0, h) {
               h]);
 }
 
-// Snap windows: two per long side, through the wall, so the barb is visible.
-function hook_xs() = [ox * 0.28, ox * 0.72];
+// Snap windows on the short ends, through the wall, so you can press
+// the barb in from outside to release the lid.
+function hook_y() = oy / 2;
 
 module snap_windows() {
-    wz = 2.5;
-    zc = base_h - 3.3;
-    for (x = hook_xs())
-        translate([x - (hook_w + 0.7) / 2, -0.2, zc - wz / 2])
-            cube([hook_w + 0.7, wall + 0.5, wz]);
+    wz = 3.4;                 // tall enough for a fingernail
+    zc = base_h - 2.6;        // near the rim, above CSI / SD
+    wy = hook_w + 1.2;
+    translate([-0.2, hook_y() - wy / 2, zc - wz / 2])
+        cube([wall + 0.6, wy, wz]);
+    translate([ox - wall - 0.4, hook_y() - wy / 2, zc - wz / 2])
+        cube([wall + 0.6, wy, wz]);
 }
 
 module standoffs() {
@@ -213,24 +216,22 @@ module base() {
 // ---------------------------------------------------------------------------
 // Lid — hex lattice + snap barbs + recessed label
 // ---------------------------------------------------------------------------
-module snap_barb(outward = 1) {
-    // Sits in lid space: z=0 is hook tip (prints on the bed).
-    // Catch points toward +Y if outward=+1 (front wall), -Y if -1 (back).
+module snap_barb_end(outward = 1) {
+    // Short-end clip: beam along Y, thickness along X, prints standing on the bed.
+    // Catch points toward +X if outward=+1 (CSI / left wall), -X if -1 (SD / right).
     difference() {
         union() {
-            cube([hook_w, hook_t, hook_len + 0.2]);
-            // triangular catch
-            translate([0, outward > 0 ? hook_t : -catch, hook_len - 3.5])
+            cube([hook_t, hook_w, hook_len + 0.2]);
+            translate([outward > 0 ? hook_t : -catch, 0, hook_len - 3.5])
                 hull() {
-                    translate([0, outward > 0 ? 0 : catch, 0])
-                        cube([hook_w, 0.05, 1.8]);
-                    translate([0, outward > 0 ? catch : 0, 0.45])
-                        cube([hook_w, 0.05, 0.7]);
+                    translate([outward > 0 ? 0 : catch, 0, 0])
+                        cube([0.05, hook_w, 1.8]);
+                    translate([outward > 0 ? catch : 0, 0, 0.45])
+                        cube([0.05, hook_w, 0.7]);
                 }
         }
-        // flex slot so the beam can bend
-        translate([hook_w / 2 - 0.35, outward > 0 ? -0.1 : -0.1, 0.6])
-            cube([0.7, hook_t + catch + 0.2, hook_len - 2.4]);
+        translate([outward > 0 ? -0.1 : -catch - 0.1, hook_w / 2 - 0.4, 0.6])
+            cube([hook_t + catch + 0.2, 0.8, hook_len - 2.4]);
     }
 }
 
@@ -247,12 +248,13 @@ module lid() {
         union() {
             translate([0, 0, hook_len])
                 rounded_cube([ox, oy, lid_t], outer_r);
-            // snap barbs — port-side wall only.
-            // The GPIO edge is an open slot, so clips there would hang in
-            // the header cutout and not catch anything.
-            for (x = hook_xs())
-                translate([x - hook_w / 2, wall - hook_t - hook_gap, 0])
-                    snap_barb(1);
+            // One snap on each short end (CSI and microSD). They oppose
+            // each other. Windows in the base let you press the barb in
+            // from outside to release — otherwise these are hard to open.
+            translate([wall - hook_t - hook_gap, hook_y() - hook_w / 2, 0])
+                snap_barb_end(1);
+            translate([ox - wall + hook_gap, hook_y() - hook_w / 2, 0])
+                snap_barb_end(-1);
         }
         // hex lattice through the lid plate, clipped to an inner window
         translate([0, 0, hook_len - 0.1])
