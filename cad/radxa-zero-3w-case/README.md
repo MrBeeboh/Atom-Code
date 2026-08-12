@@ -1,6 +1,6 @@
 # Radxa ZERO 3W printable enclosure
 
-Measured screw-together tray for a **Radxa ZERO 3W**. For the designed-in-OpenSCAD version (hex lattice, snap lid, desk cradle) and the “printer arrives tomorrow” checklist, start at **[`PRINTS/START-HERE.md`](../../PRINTS/START-HERE.md)**.
+Measured screw-together tray for a **Radxa ZERO 3W**. For the Hive case (hex lattice, snap lid, locating pins) and the “printer arrives tomorrow” checklist, start at **[`PRINTS/START-HERE.md`](../../PRINTS/START-HERE.md)**.
 
 This is not a Raspberry Pi Zero case with the ports renamed. Connector positions come from Radxa’s official ZERO 3W v1.11 2D DXF ([`radxa_zero_3w_2d_dxf.zip`](https://dl.radxa.com/zero3/docs/hw/3w/radxa_zero_3w_2d_dxf.zip)).
 

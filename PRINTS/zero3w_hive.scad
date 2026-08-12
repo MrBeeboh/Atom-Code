@@ -1,18 +1,16 @@
 // Hive — original OpenSCAD enclosure for a Radxa ZERO 3W
 //
-// This is the designed-in-code case: a generated hex lattice lid,
-// cantilever snap barbs on the short ends (press-from-outside to release),
-// visor hoods over the cable ports, and an optional 12° desk cradle.
+// Generated hex lattice lid, snap barbs on the short ends, visors over
+// the cable ports. The board drops onto four locating pins. No screws.
 //
 // Board coordinates still come from Radxa's v1.11 DXF (see zero3w_board.scad).
-// The *shape* is not a rounded box with holes punched in it.
 //
-// part = preview | base | lid | cradle | print
+// part = preview | base | lid | print
 
 include <zero3w_board.scad>
 
 /* [Export] */
-part = "print"; // [preview, base, lid, cradle, print]
+part = "print"; // [preview, base, lid, print]
 
 /* [Fit] */
 xy_clear   = 0.45;
@@ -35,9 +33,6 @@ hook_w    = 7.2;
 hook_t    = 1.35;
 catch     = 0.95;
 hook_gap  = 0.35;
-
-/* [Cradle] */
-cradle_deg = 12;
 
 $fn = 40;
 
@@ -165,13 +160,18 @@ module snap_windows() {
 }
 
 module standoffs() {
+    // Board rests on the boss and drops onto a pin through the Ø2.82 mm hole.
+    // No screws. Pin is undersize for FDM; chamfered tip so it starts easy.
+    pin_d = 2.5;
+    pin_h = 1.8;
     for (p = hole_xy)
-        translate([bx(p[0]), by(p[1]), floor_t])
-            difference() {
-                cylinder(h = under_clear, d = 6.4);
-                translate([0, 0, -0.1])
-                    cylinder(h = under_clear + 0.2, d = 2.1);
-            }
+        translate([bx(p[0]), by(p[1]), floor_t]) {
+            cylinder(h = under_clear, d = 6.4);
+            translate([0, 0, under_clear])
+                cylinder(h = pin_h - 0.5, d = pin_d);
+            translate([0, 0, under_clear + pin_h - 0.5])
+                cylinder(h = 0.5, d1 = pin_d, d2 = 1.7);
+        }
 }
 
 module floor_hex_vents() {
@@ -207,9 +207,6 @@ module base() {
         gpio_cutout(z_pcb_top + 1.0, gpio_h + 1);
         snap_windows();
         floor_hex_vents();
-        for (p = hole_xy)
-            translate([bx(p[0]), by(p[1]), -0.2])
-                cylinder(h = floor_t + under_clear + 0.4, d = 2.1);
     }
 }
 
@@ -266,37 +263,6 @@ module lid() {
                 }
         gpio_cutout(hook_len - 0.2, lid_t + 0.5);
         lid_label();
-        // M2.5 through-holes + 90° countersink on the outer face
-        for (p = hole_xy) {
-            translate([bx(p[0]), by(p[1]), hook_len - 0.2])
-                cylinder(h = lid_t + 0.4, d = 2.9, $fn = 32);
-            // 90° CSK for M2.5 flat-head: depth = (5.2 - 2.9) / 2
-            translate([bx(p[0]), by(p[1]), hook_len + lid_t - 1.15])
-                cylinder(h = 1.25, d1 = 2.9, d2 = 5.2, $fn = 64);
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// 12° desk cradle — the case drops in; prints as a ramp, no supports
-// ---------------------------------------------------------------------------
-module cradle() {
-    pad = 3.2;
-    cx = ox + 2 * pad;
-    cy = oy + 2 * pad;
-    toe = 3.6;
-    rise = tan(cradle_deg) * cy;
-    difference() {
-        hull() {
-            cube([cx, 0.2, toe]);
-            translate([0, cy - 0.2, 0])
-                cube([cx, 0.2, toe + rise]);
-        }
-        translate([pad - 0.2, pad - 0.2, toe - 0.15])
-            rotate([cradle_deg, 0, 0])
-                rounded_cube([ox + 0.4, oy + 0.4, 50], outer_r + 0.15);
-        translate([pad + bx(hdmi_cx) - 9, -0.2, toe - 0.5])
-            cube([bx(otg_cx) - bx(hdmi_cx) + 18, pad + 8, 24]);
     }
 }
 
@@ -317,13 +283,10 @@ module print_plate() {
     base();
     translate([ox + 10, 0, 0])
         lid();
-    translate([0, oy + 12, 0])
-        cradle();
 }
 
 if (part == "base") base();
 else if (part == "lid") lid();
-else if (part == "cradle") cradle();
 else if (part == "print") print_plate();
 else {
     base();
