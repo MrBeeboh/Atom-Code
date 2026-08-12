@@ -32,7 +32,7 @@
       ? "280px"
       : activeSection === "git"
         ? "320px"
-        : "220px",
+        : "280px",
   );
   let convosList = $state([]);
   const groups = $derived(groupByDate(convosList));
@@ -434,7 +434,7 @@
                   <div
                     role="button"
                     tabindex="0"
-                    class="w-full text-left py-1.5 px-2 rounded flex items-center gap-2 min-w-0 cursor-pointer transition-colors group"
+                    class="w-full text-left py-1.5 px-2 rounded flex items-start gap-2 min-w-0 cursor-pointer transition-colors group"
                     style:background={isActive
                       ? "var(--ui-sidebar-active)"
                       : "transparent"}
@@ -444,8 +444,9 @@
                     onclick={() => select(conv.id)}
                     onkeydown={(e) => e.key === "Enter" && select(conv.id)}
                   >
-                    <span class="truncate flex-1 text-xs min-w-0"
-                      >{conv.title}</span
+                    <span
+                      class="convo-title flex-1 text-xs min-w-0"
+                      title={conv.title}>{conv.title}</span
                     >
                     <button
                       type="button"
@@ -503,7 +504,7 @@
                     <div
                       role="button"
                       tabindex="0"
-                      class="w-full text-left py-1.5 px-2 rounded flex items-center gap-2 min-w-0 cursor-pointer transition-colors group"
+                      class="w-full text-left py-1.5 px-2 rounded flex items-start gap-2 min-w-0 cursor-pointer transition-colors group"
                       style:background={isActive
                         ? "var(--ui-sidebar-active)"
                         : "transparent"}
@@ -515,7 +516,7 @@
                     >
                       <button
                         type="button"
-                        class="p-0.5 rounded shrink-0 hover:bg-black/10"
+                        class="p-0.5 rounded shrink-0 hover:bg-black/10 mt-0.5"
                         style="color: var(--ui-accent);"
                         onclick={(e) => onTogglePin(e, conv.id)}
                         aria-label="Unpin"
@@ -530,8 +531,9 @@
                           /></svg
                         >
                       </button>
-                      <span class="truncate flex-1 text-xs min-w-0"
-                        >{conv.title}</span
+                      <span
+                        class="convo-title flex-1 text-xs min-w-0"
+                        title={conv.title}>{conv.title}</span
                       >
                       <button
                         type="button"
@@ -575,7 +577,7 @@
                   <div
                     role="button"
                     tabindex="0"
-                    class="w-full text-left py-1.5 px-2 rounded flex items-center gap-2 min-w-0 cursor-pointer transition-colors group"
+                    class="w-full text-left py-1.5 px-2 rounded flex items-start gap-2 min-w-0 cursor-pointer transition-colors group"
                     style:background={isActive
                       ? "var(--ui-sidebar-active)"
                       : "transparent"}
@@ -587,7 +589,7 @@
                   >
                     <button
                       type="button"
-                      class="p-0.5 rounded shrink-0 hover:bg-black/10 {conv.pinned
+                      class="p-0.5 rounded shrink-0 hover:bg-black/10 mt-0.5 {conv.pinned
                         ? ''
                         : 'opacity-50'}"
                       style:color={conv.pinned
@@ -614,8 +616,9 @@
                         /></svg
                       >
                     </button>
-                    <span class="truncate flex-1 text-xs min-w-0"
-                      >{conv.title}</span
+                    <span
+                      class="convo-title flex-1 text-xs min-w-0"
+                      title={conv.title}>{conv.title}</span
                     >
                     <button
                       type="button"
@@ -668,5 +671,10 @@
     letter-spacing: 0.01em;
     line-height: 1;
     opacity: 0.85;
+  }
+  .convo-title {
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 </style>

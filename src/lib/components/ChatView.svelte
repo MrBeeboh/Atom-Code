@@ -34,6 +34,8 @@
     deleteMessage,
     getMessageCount,
     createConversation,
+    updateConversation,
+    listConversations,
   } from "$lib/db.js";
   import {
     repoMapText,
@@ -724,6 +726,22 @@ Consume the data silently to answer the user's prompt.`;
     });
     await loadMessages();
 
+    const convForTitle = get(conversations).find((c) => c.id === convId);
+    if (convForTitle?.title === "New chat" && effectiveText) {
+      const title = effectiveText.replace(/\n/g, " ").trim();
+      if (title) {
+        await updateConversation(convId, { title });
+        const list = await listConversations();
+        const withCount = await Promise.all(
+          list.map(async (c) => ({
+            ...c,
+            messageCount: await getMessageCount(c.id),
+          })),
+        );
+        conversations.set(withCount);
+      }
+    }
+
     const msgsForApi = await getMessages(convId);
     const currentSettings = get(settings);
     let systemPrompt = (currentSettings?.system_prompt || "").trim();
@@ -943,41 +961,6 @@ Consume the data silently to answer the user's prompt.`;
         ? streamResult.usage.prompt_tokens
         : estimatedPromptTokens;
     contextUsage.update((u) => ({ ...u, promptTokens }));
-
-    const conv = $conversations.find((c) => c.id === convId);
-    if (conv && conv.title === "New chat" && fullContent) {
-      let title = fullContent.slice(0, 30).replace(/\n/g, " ").trim() || "Chat";
-      try {
-        const titleRes = await requestChatCompletion(
-          $effectiveModelId,
-          [
-            {
-              role: "system",
-              content:
-                "Summarize the user's prompt into a concise, 3-word title. Do not use quotes, punctuation, or extra words.",
-            },
-            { role: "user", content: effectiveText.slice(0, 1000) },
-          ],
-          { max_tokens: 15, temperature: 0.3 },
-        );
-        if (titleRes?.content) {
-          title = titleRes.content.replace(/["'\n]/g, "").trim() || title;
-        }
-      } catch (e) {
-        console.warn("[ChatView] Auto-title failed:", e);
-      }
-      const { updateConversation } = await import("$lib/db.js");
-      await updateConversation(convId, { title });
-      const { listConversations } = await import("$lib/db.js");
-      const list = await listConversations();
-      const withCount = await Promise.all(
-        list.map(async (c) => ({
-          ...c,
-          messageCount: await getMessageCount(c.id),
-        })),
-      );
-      conversations.set(withCount);
-    }
   }
 
   async function clearChat() {
