@@ -494,7 +494,7 @@
             Model to switch to when selecting a preset from the header.
           </p>
           <div class="space-y-2">
-            {#each PRESETS as p}
+            {#each PRESETS as p (p.name)}
               <div class="flex flex-wrap items-center gap-2">
                 <span
                   class="text-xs text-zinc-600 dark:text-zinc-400 min-w-[4rem]"
@@ -511,7 +511,7 @@
                   aria-label="Default model for {p.name}"
                 >
                   <option value="">None</option>
-                  {#each $models as m}
+                  {#each $models as m (m.id)}
                     <option value={m.id}>{m.id}</option>
                   {/each}
                 </select>

@@ -34,10 +34,10 @@
         ? "320px"
         : "220px",
   );
-  let convosList = $state([]);
+  const convosList = $derived($conversations ?? []);
   const groups = $derived(groupByDate(convosList));
-  let activeId = $state(null);
-  let layoutVal = $state("flow");
+  const activeId = $derived($activeConversationId);
+  const layoutVal = $derived($layout);
   let searchQuery = $state("");
   const filteredList = $derived(
     searchQuery.trim() === ""
@@ -53,17 +53,6 @@
     (convosList || []).filter((c) => c.pinned === true),
   );
   const pinnedGroups = $derived(groupByDate(pinnedList));
-
-  $effect(() => {
-    const unsubC = conversations.subscribe((v) => (convosList = v ?? []));
-    const unsubA = activeConversationId.subscribe((v) => (activeId = v));
-    const unsubL = layout.subscribe((v) => (layoutVal = v));
-    return () => {
-      unsubC();
-      unsubA();
-      unsubL();
-    };
-  });
 
   onMount(() => {
     function onKeydown(e) {
@@ -414,7 +403,7 @@
         <ul
           class="flex-1 overflow-y-auto overflow-x-hidden mt-1 space-y-0.5 px-1 min-h-0 min-w-0"
         >
-          {#each ["today", "yesterday", "week", "older"] as key}
+          {#each ["today", "yesterday", "week", "older"] as key (key)}
             {#if filteredGroups[key]?.length > 0}
               <li
                 class="px-2 pt-2 pb-0.5 text-[10px] font-medium uppercase tracking-wider"
@@ -428,7 +417,7 @@
                       ? "This week"
                       : "Older"}
               </li>
-              {#each filteredGroups[key] as conv}
+              {#each filteredGroups[key] as conv (conv.id)}
                 {@const isActive = activeId === conv.id}
                 <li>
                   <div
@@ -483,7 +472,7 @@
               No pinned conversations.
             </li>
           {:else}
-            {#each ["today", "yesterday", "week", "older"] as key}
+            {#each ["today", "yesterday", "week", "older"] as key (key)}
               {#if pinnedGroups[key]?.length > 0}
                 <li
                   class="px-2 pt-2 pb-0.5 text-[10px] font-medium uppercase tracking-wider"
@@ -497,7 +486,7 @@
                         ? "This week"
                         : "Older"}
                 </li>
-                {#each pinnedGroups[key] as conv}
+                {#each pinnedGroups[key] as conv (conv.id)}
                   {@const isActive = activeId === conv.id}
                   <li>
                     <div
@@ -555,7 +544,7 @@
         <ul
           class="flex-1 overflow-y-auto overflow-x-hidden mt-1 space-y-0.5 px-1 min-h-0 min-w-0"
         >
-          {#each ["today", "yesterday", "week", "older"] as key}
+          {#each ["today", "yesterday", "week", "older"] as key (key)}
             {#if groups[key]?.length > 0}
               <li
                 class="px-2 pt-2 pb-0.5 text-[10px] font-medium uppercase tracking-wider"
@@ -569,7 +558,7 @@
                       ? "This week"
                       : "Older"}
               </li>
-              {#each groups[key] as conv}
+              {#each groups[key] as conv (conv.id)}
                 {@const isActive = activeId === conv.id}
                 <li>
                   <div
