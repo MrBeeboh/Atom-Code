@@ -125,10 +125,6 @@
     audioVolume = DEFAULTS.audio_volume;
   }
 
-  function onBackdropClick(e) {
-    if (e.target === e.currentTarget) close();
-  }
-
   function onWindowKey(e) {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -139,12 +135,13 @@
 
 <svelte:window onkeydown={onWindowKey} />
 
-<div
-  class="settings-backdrop"
-  role="presentation"
-  onclick={onBackdropClick}
-  onkeydown={(e) => e.key === "Escape" && close()}
->
+<div class="settings-backdrop">
+  <button
+    type="button"
+    class="settings-scrim"
+    aria-label="Close settings"
+    onclick={close}
+  ></button>
   <div
     class="settings-dialog"
     role="dialog"
@@ -153,7 +150,6 @@
     tabindex="-1"
     in:fly={{ x: 300, duration: 400, easing: backOut }}
     out:fly={{ x: 300, duration: 300, easing: quintOut }}
-    onclick={(e) => e.stopPropagation()}
   >
     <div class="settings-header">
       <div>
@@ -648,9 +644,18 @@
     align-items: center;
     justify-content: center;
     padding: 1rem;
+  }
+  .settings-scrim {
+    position: absolute;
+    inset: 0;
+    border: none;
+    padding: 0;
     background: rgba(0, 0, 0, 0.45);
+    cursor: pointer;
   }
   .settings-dialog {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: column;
     width: 100%;
