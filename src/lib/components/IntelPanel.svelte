@@ -15,7 +15,7 @@
     updateGlobalDefault,
     setPerModelOverride,
     hardware,
-    settingsOpen,
+    openSettings,
     confirm,
   } from "$lib/stores.js";
   import { BATCH_SIZE_MIN, BATCH_SIZE_MAX } from "$lib/modelDefaults.js";
@@ -244,10 +244,6 @@
   }
   function stepBatchUp() {
     evalBatchSize = Math.min(BATCH_SIZE_MAX, Math.round(evalBatchSize * 2));
-  }
-
-  function openSettings() {
-    settingsOpen.set(true);
   }
 
   const PRESETS_STORAGE_KEY = "intelPresets";

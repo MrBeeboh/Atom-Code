@@ -1,6 +1,7 @@
 <!--
-  ConvoRail: compact conversation rail (collapsible). Collapsed = 5 category icons only.
-  Expanded = section-based: History (grouped list), Search, or Pinned.
+  ConvoRail: compact conversation rail (collapsible). Collapsed = category icons.
+  Expanded = section-based: History, Search, Pinned, Explorer, or Git.
+  Settings hamburger is pinned to the bottom so API keys stay reachable.
 -->
 <script>
   import { onMount } from "svelte";
@@ -9,8 +10,8 @@
     conversations,
     layout,
     confirm,
-    settingsOpen,
   } from "$lib/stores.js";
+  import RailMenu from "$lib/components/RailMenu.svelte";
   import {
     listConversations,
     createConversation,
@@ -34,10 +35,10 @@
         ? "320px"
         : "220px",
   );
-  let convosList = $state([]);
+  const convosList = $derived($conversations ?? []);
   const groups = $derived(groupByDate(convosList));
-  let activeId = $state(null);
-  let layoutVal = $state("flow");
+  const activeId = $derived($activeConversationId);
+  const layoutVal = $derived($layout);
   let searchQuery = $state("");
   const filteredList = $derived(
     searchQuery.trim() === ""
@@ -53,17 +54,6 @@
     (convosList || []).filter((c) => c.pinned === true),
   );
   const pinnedGroups = $derived(groupByDate(pinnedList));
-
-  $effect(() => {
-    const unsubC = conversations.subscribe((v) => (convosList = v ?? []));
-    const unsubA = activeConversationId.subscribe((v) => (activeId = v));
-    const unsubL = layout.subscribe((v) => (layoutVal = v));
-    return () => {
-      unsubC();
-      unsubA();
-      unsubL();
-    };
-  });
 
   onMount(() => {
     function onKeydown(e) {
@@ -150,10 +140,6 @@
     expanded = true;
   }
 
-  function openSettings() {
-    settingsOpen.set(true);
-  }
-
   async function onTogglePin(ev, convId) {
     ev.stopPropagation();
     await toggleConversationPin(convId);
@@ -196,12 +182,12 @@
       >
     {/if}
   </button>
-  <!-- Content wrapper: clips to rail width -->
+  <!-- Content wrapper: clips to rail width. Settings hamburger is a sibling so it never scrolls away. -->
   <div class="flex flex-1 flex-col min-w-0 overflow-hidden">
     {#if !expanded}
       <!-- Collapsed: icon buttons with text labels below each icon -->
       <div
-        class="flex flex-col items-center gap-1.5 pt-4 shrink-0"
+        class="flex flex-1 flex-col items-center gap-1.5 pt-4 pb-1 min-h-0 overflow-y-auto overflow-x-hidden"
         style="color: var(--ui-text-secondary);"
       >
         <button
@@ -348,33 +334,6 @@
           >
           <span class="rail-icon-label">History</span>
         </button>
-        <div
-          class="w-6 my-1"
-          style="height: 1px; background: var(--ui-border);"
-          aria-hidden="true"
-        ></div>
-        <button
-          type="button"
-          class="rail-icon-labeled"
-          style="color: var(--ui-text-secondary);"
-          onclick={openSettings}
-          title="Settings"
-          aria-label="Settings"
-        >
-          <svg
-            class="w-4.5 h-4.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            ><path
-              d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
-            /><circle cx="12" cy="12" r="3" /></svg
-          >
-          <span class="rail-icon-label">Settings</span>
-        </button>
       </div>
     {:else}
       <!-- Expanded: section header + content -->
@@ -414,7 +373,7 @@
         <ul
           class="flex-1 overflow-y-auto overflow-x-hidden mt-1 space-y-0.5 px-1 min-h-0 min-w-0"
         >
-          {#each ["today", "yesterday", "week", "older"] as key}
+          {#each ["today", "yesterday", "week", "older"] as key (key)}
             {#if filteredGroups[key]?.length > 0}
               <li
                 class="px-2 pt-2 pb-0.5 text-[10px] font-medium uppercase tracking-wider"
@@ -428,7 +387,7 @@
                       ? "This week"
                       : "Older"}
               </li>
-              {#each filteredGroups[key] as conv}
+              {#each filteredGroups[key] as conv (conv.id)}
                 {@const isActive = activeId === conv.id}
                 <li>
                   <div
@@ -483,7 +442,7 @@
               No pinned conversations.
             </li>
           {:else}
-            {#each ["today", "yesterday", "week", "older"] as key}
+            {#each ["today", "yesterday", "week", "older"] as key (key)}
               {#if pinnedGroups[key]?.length > 0}
                 <li
                   class="px-2 pt-2 pb-0.5 text-[10px] font-medium uppercase tracking-wider"
@@ -497,7 +456,7 @@
                         ? "This week"
                         : "Older"}
                 </li>
-                {#each pinnedGroups[key] as conv}
+                {#each pinnedGroups[key] as conv (conv.id)}
                   {@const isActive = activeId === conv.id}
                   <li>
                     <div
@@ -555,7 +514,7 @@
         <ul
           class="flex-1 overflow-y-auto overflow-x-hidden mt-1 space-y-0.5 px-1 min-h-0 min-w-0"
         >
-          {#each ["today", "yesterday", "week", "older"] as key}
+          {#each ["today", "yesterday", "week", "older"] as key (key)}
             {#if groups[key]?.length > 0}
               <li
                 class="px-2 pt-2 pb-0.5 text-[10px] font-medium uppercase tracking-wider"
@@ -569,7 +528,7 @@
                       ? "This week"
                       : "Older"}
               </li>
-              {#each groups[key] as conv}
+              {#each groups[key] as conv (conv.id)}
                 {@const isActive = activeId === conv.id}
                 <li>
                   <div
@@ -636,6 +595,7 @@
       {/if}
     {/if}
   </div>
+  <RailMenu {expanded} />
 </div>
 
 <style>

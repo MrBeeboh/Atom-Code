@@ -11,6 +11,7 @@
     conversations,
     models,
     settingsOpen,
+    openSettings,
     chatCommand,
     webSearchForNextMessage,
     shortcutsModalOpen,
@@ -130,9 +131,16 @@
       {
         id: "settings",
         label: "Open Settings",
+        shortcut: "Ctrl+,",
+        category: "Actions",
+        run: () => openSettings(),
+      },
+      {
+        id: "api-keys",
+        label: "Open API key settings",
         shortcut: "",
         category: "Actions",
-        run: () => settingsOpen.set(true),
+        run: () => openSettings("apikeys"),
       },
       {
         id: "toggle-terminal",
@@ -153,7 +161,7 @@
         label: "Set Workspace Root",
         shortcut: "",
         category: "Actions",
-        run: () => settingsOpen.set(true),
+        run: () => openSettings("connection"),
       },
     ];
     actions.forEach((a) => {
@@ -412,6 +420,12 @@
       if ((e.ctrlKey || e.metaKey) && e.key === "n") {
         e.preventDefault();
         runNewChat();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+        e.preventDefault();
+        if (get(settingsOpen)) closePalette();
+        openSettings();
         return;
       }
       if (e.key === "?" && !open) {
