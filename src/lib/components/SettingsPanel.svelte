@@ -21,7 +21,14 @@
     githubToken,
     performanceMode,
     isTauri,
+    settingsSection,
+    closeSettings,
   } from "$lib/stores.js";
+  import {
+    SETTINGS_SECTIONS,
+    SETTINGS_SECTION_LABELS,
+    hasSecretValue,
+  } from "$lib/settingsUi.js";
   import { syncBraveKeyToProxy } from "$lib/duckduckgo.js";
   import { storeKey } from "$lib/secureKeys.js";
 
@@ -36,6 +43,15 @@
   let audioEnabled = $state(DEFAULTS.audio_enabled);
   let audioClicks = $state(DEFAULTS.audio_clicks);
   let audioVolume = $state(DEFAULTS.audio_volume);
+  let reveal = $state({
+    deepseek: false,
+    grok: false,
+    brave: false,
+    github: false,
+    deepinfra: false,
+    together: false,
+  });
+  let saving = $state(false);
 
   $effect(() => {
     const g = $globalDefault;
@@ -63,6 +79,11 @@
     },
   ];
 
+  function close() {
+    if (onclose) onclose();
+    else closeSettings();
+  }
+
   function setPresetDefaultModel(presetName, modelId) {
     presetDefaultModels.update((m) => {
       const next = { ...m };
@@ -80,6 +101,7 @@
       audio_volume: Math.max(0, Math.min(1, Number(audioVolume) || 0)),
     });
 
+    saving = true;
     try {
       await Promise.all([
         storeKey("deepSeekApiKey", $deepSeekApiKey),
@@ -89,9 +111,11 @@
         storeKey("braveApiKey", $braveApiKey),
         storeKey("githubToken", $githubToken),
       ]);
-      onclose?.();
+      close();
     } catch (err) {
       alert(`Failed to save secure keys: ${err.message}`);
+    } finally {
+      saving = false;
     }
   }
 
@@ -100,53 +124,77 @@
     audioClicks = DEFAULTS.audio_clicks;
     audioVolume = DEFAULTS.audio_volume;
   }
+
+  function onWindowKey(e) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      close();
+    }
+  }
 </script>
 
-<div
-  class="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
-  role="dialog"
-  aria-modal="true"
-  aria-label="Settings"
->
+<svelte:window onkeydown={onWindowKey} />
+
+<div class="settings-backdrop">
+  <button
+    type="button"
+    class="settings-scrim"
+    aria-label="Close settings"
+    onclick={close}
+  ></button>
   <div
-    class="rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-hidden dark:border-zinc-700 flex flex-col glass-modal"
+    class="settings-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="settings-title"
+    tabindex="-1"
     in:fly={{ x: 300, duration: 400, easing: backOut }}
     out:fly={{ x: 300, duration: 300, easing: quintOut }}
   >
-    <div
-      class="shrink-0 px-6 pt-5 pb-2 border-b border-zinc-200 dark:border-zinc-700 flex items-start justify-between gap-2"
-    >
+    <div class="settings-header">
       <div>
-        <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-          Settings
-        </h2>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+        <h2 id="settings-title" class="settings-title">Settings</h2>
+        <p class="settings-sub">
           Connection &amp; API keys. Model/load settings are in the Intel panel
           (right).
         </p>
       </div>
       <button
         type="button"
-        class="shrink-0 p-1.5 rounded text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700 dark:hover:text-zinc-200 text-xl leading-none"
-        onclick={() => onclose?.()}
+        class="settings-icon-btn"
+        onclick={close}
         title="Close"
         aria-label="Close">✕</button
       >
     </div>
-    <div class="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-      <details
-        class="border border-zinc-200 dark:border-zinc-600 rounded-lg overflow-hidden group"
-        open
-      >
-        <summary
-          class="px-4 py-3 cursor-pointer list-none bg-zinc-50 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-600 text-sm font-medium text-zinc-700 dark:text-zinc-300"
-          >Connection</summary
+
+    <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+      {#each SETTINGS_SECTIONS as id (id)}
+        <button
+          type="button"
+          role="tab"
+          id="settings-tab-{id}"
+          aria-selected={$settingsSection === id}
+          aria-controls="settings-panel-{id}"
+          class="settings-tab"
+          class:active={$settingsSection === id}
+          onclick={() => settingsSection.set(id)}
         >
-        <div class="px-4 py-3 space-y-3">
+          {SETTINGS_SECTION_LABELS[id]}
+        </button>
+      {/each}
+    </div>
+
+    <div class="settings-body">
+      {#if $settingsSection === "connection"}
+        <div
+          id="settings-panel-connection"
+          role="tabpanel"
+          aria-labelledby="settings-tab-connection"
+          class="settings-stack"
+        >
           <div>
-            <label
-              for="settings-lmstudio-url"
-              class="block text-sm font-medium text-zinc-600 dark:text-zinc-400"
+            <label for="settings-lmstudio-url" class="settings-label"
               >LM Studio URL</label
             >
             <input
@@ -154,16 +202,14 @@
               type="url"
               bind:value={$lmStudioBaseUrl}
               placeholder="http://localhost:1234"
-              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal"
+              class="settings-input"
             />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+            <p class="settings-hint">
               Empty = localhost:1234. Enable CORS in LM Studio → Developer.
             </p>
           </div>
           <div>
-            <label
-              for="settings-unload-helper-url"
-              class="block text-sm font-medium text-zinc-600 dark:text-zinc-400"
+            <label for="settings-unload-helper-url" class="settings-label"
               >Unload helper URL</label
             >
             <input
@@ -171,18 +217,15 @@
               type="url"
               bind:value={$lmStudioUnloadHelperUrl}
               placeholder="http://localhost:8766"
-              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal"
+              class="settings-input"
             />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              Optional. <code class="bg-zinc-200 dark:bg-zinc-700 px-1 rounded"
-                >python scripts/unload_helper_server.py</code
-              >. Leave empty to disable.
+            <p class="settings-hint">
+              Optional. <code>python scripts/unload_helper_server.py</code>.
+              Leave empty to disable.
             </p>
           </div>
           <div>
-            <label
-              for="settings-voice-url"
-              class="block text-sm font-medium text-zinc-600 dark:text-zinc-400"
+            <label for="settings-voice-url" class="settings-label"
               >Voice server URL</label
             >
             <input
@@ -190,16 +233,14 @@
               type="url"
               bind:value={$voiceServerUrl}
               placeholder="http://localhost:8765"
-              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal"
+              class="settings-input"
             />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+            <p class="settings-hint">
               Mic/voice. Default port 8765; see voice-server/README.
             </p>
           </div>
           <div>
-            <label
-              for="settings-terminal-url"
-              class="block text-sm font-medium text-zinc-600 dark:text-zinc-400"
+            <label for="settings-terminal-url" class="settings-label"
               >Terminal server URL</label
             >
             <input
@@ -207,20 +248,16 @@
               type="url"
               bind:value={$terminalServerUrl}
               placeholder="ws://localhost:8767"
-              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal"
+              class="settings-input"
             />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              WebSocket for integrated terminal. Run <code
-                class="bg-zinc-200 dark:bg-zinc-700 px-1 rounded"
-                >services/terminal-server</code
-              >. Toggle panel: Ctrl+`
+            <p class="settings-hint">
+              WebSocket for integrated terminal. Run
+              <code>services/terminal-server</code>. Toggle panel: Ctrl+`
             </p>
           </div>
           {#if !isTauri}
             <div>
-              <label
-                for="settings-file-server-url"
-                class="block text-sm font-medium text-zinc-600 dark:text-zinc-400"
+              <label for="settings-file-server-url" class="settings-label"
                 >File server URL</label
               >
               <input
@@ -228,20 +265,16 @@
                 type="url"
                 bind:value={$fileServerUrl}
                 placeholder="http://localhost:8768"
-                class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal"
+                class="settings-input"
               />
-              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                For file explorer and pinned context. Run <code
-                  class="bg-zinc-200 dark:bg-zinc-700 px-1 rounded"
-                  >services/file-server</code
-                >. Toggle: Ctrl+E
+              <p class="settings-hint">
+                For file explorer and pinned context. Run
+                <code>services/file-server</code>. Toggle: Ctrl+E
               </p>
             </div>
           {/if}
           <div>
-            <label
-              for="settings-workspace-root"
-              class="block text-sm font-medium text-zinc-600 dark:text-zinc-400"
+            <label for="settings-workspace-root" class="settings-label"
               >Workspace root</label
             >
             <input
@@ -249,223 +282,295 @@
               type="text"
               bind:value={$workspaceRoot}
               placeholder="/path/to/project"
-              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal"
+              class="settings-input"
             />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+            <p class="settings-hint">
               Default path for file explorer tree. Also set in the File Explorer
               panel.
             </p>
           </div>
         </div>
-      </details>
-
-      <details
-        class="border border-zinc-200 dark:border-zinc-600 rounded-lg overflow-hidden group"
-      >
-        <summary
-          class="px-4 py-3 cursor-pointer list-none bg-zinc-50 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-600 text-sm font-medium text-zinc-700 dark:text-zinc-300"
-          >API keys</summary
+      {:else if $settingsSection === "apikeys"}
+        <div
+          id="settings-panel-apikeys"
+          role="tabpanel"
+          aria-labelledby="settings-tab-apikeys"
+          class="settings-stack"
         >
-        <div class="px-4 py-3 space-y-4">
-          <p class="text-xs text-zinc-500 dark:text-zinc-400">
-            Keys stored in browser only. Set to show models in dropdown.
+          <p class="settings-hint">
+            Keys stay in this browser (or the desktop keychain). Set a key to
+            show that provider’s models in the dropdown.
           </p>
+
           <div>
-            <label
-              for="settings-deepseek-key"
-              class="block text-sm font-medium text-zinc-600 dark:text-zinc-400"
-              >DeepSeek API key</label
-            >
-            <input
-              id="settings-deepseek-key"
-              type="password"
-              autocomplete="off"
-              bind:value={$deepSeekApiKey}
-              placeholder="API key (paste without extra spaces)"
-              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal"
-            />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            <div class="settings-label-row">
+              <label for="settings-deepseek-key" class="settings-label"
+                >DeepSeek API key</label
+              >
+              <span
+                class="settings-badge"
+                class:set={hasSecretValue($deepSeekApiKey)}
+                >{hasSecretValue($deepSeekApiKey) ? "Set" : "Not set"}</span
+              >
+            </div>
+            <div class="settings-secret-row">
+              <input
+                id="settings-deepseek-key"
+                type={reveal.deepseek ? "text" : "password"}
+                autocomplete="off"
+                bind:value={$deepSeekApiKey}
+                placeholder="API key (paste without extra spaces)"
+                class="settings-input"
+              />
+              <button
+                type="button"
+                class="settings-reveal"
+                onclick={() => (reveal.deepseek = !reveal.deepseek)}
+                aria-label={reveal.deepseek ? "Hide key" : "Show key"}
+                >{reveal.deepseek ? "Hide" : "Show"}</button
+              >
+            </div>
+            <p class="settings-hint">
               <a
                 href="https://platform.deepseek.com"
                 target="_blank"
-                rel="noopener noreferrer"
-                class="underline">platform.deepseek.com</a
+                rel="noopener noreferrer">platform.deepseek.com</a
               >
             </p>
           </div>
+
           <div>
-            <label
-              for="settings-grok-key"
-              class="block text-sm font-medium text-zinc-600 dark:text-zinc-400"
-              >Grok (xAI) API key</label
-            >
-            <input
-              id="settings-grok-key"
-              type="password"
-              autocomplete="off"
-              bind:value={$grokApiKey}
-              placeholder="xai-…"
-              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal"
-            />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            <div class="settings-label-row">
+              <label for="settings-grok-key" class="settings-label"
+                >Grok (xAI) API key</label
+              >
+              <span
+                class="settings-badge"
+                class:set={hasSecretValue($grokApiKey)}
+                >{hasSecretValue($grokApiKey) ? "Set" : "Not set"}</span
+              >
+            </div>
+            <div class="settings-secret-row">
+              <input
+                id="settings-grok-key"
+                type={reveal.grok ? "text" : "password"}
+                autocomplete="off"
+                bind:value={$grokApiKey}
+                placeholder="xai-…"
+                class="settings-input"
+              />
+              <button
+                type="button"
+                class="settings-reveal"
+                onclick={() => (reveal.grok = !reveal.grok)}
+                aria-label={reveal.grok ? "Hide key" : "Show key"}
+                >{reveal.grok ? "Hide" : "Show"}</button
+              >
+            </div>
+            <p class="settings-hint">
               <a
                 href="https://console.x.ai"
                 target="_blank"
-                rel="noopener noreferrer"
-                class="underline">console.x.ai</a
+                rel="noopener noreferrer">console.x.ai</a
               >
             </p>
           </div>
+
           <div>
-            <label
-              for="settings-brave-key"
-              class="block text-sm font-medium text-zinc-600 dark:text-zinc-400"
-              >Brave Search API key (web search)</label
-            >
-            <input
-              id="settings-brave-key"
-              type="password"
-              autocomplete="off"
-              bind:value={$braveApiKey}
-              onblur={() => syncBraveKeyToProxy($braveApiKey)}
-              placeholder="Paste your Brave Search API key"
-              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal"
-            />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-              Web search (globe). <a
+            <div class="settings-label-row">
+              <label for="settings-brave-key" class="settings-label"
+                >Brave Search API key</label
+              >
+              <span
+                class="settings-badge"
+                class:set={hasSecretValue($braveApiKey)}
+                >{hasSecretValue($braveApiKey) ? "Set" : "Not set"}</span
+              >
+            </div>
+            <div class="settings-secret-row">
+              <input
+                id="settings-brave-key"
+                type={reveal.brave ? "text" : "password"}
+                autocomplete="off"
+                bind:value={$braveApiKey}
+                onblur={() => syncBraveKeyToProxy($braveApiKey)}
+                placeholder="Paste your Brave Search API key"
+                class="settings-input"
+              />
+              <button
+                type="button"
+                class="settings-reveal"
+                onclick={() => (reveal.brave = !reveal.brave)}
+                aria-label={reveal.brave ? "Hide key" : "Show key"}
+                >{reveal.brave ? "Hide" : "Show"}</button
+              >
+            </div>
+            <p class="settings-hint">
+              Web search (globe).
+              <a
                 href="https://search.brave.com/help/api"
                 target="_blank"
-                rel="noopener noreferrer"
-                class="underline">search.brave.com/help/api</a
+                rel="noopener noreferrer">search.brave.com/help/api</a
               >
             </p>
           </div>
+
           <div>
-            <label
-              for="settings-github-token"
-              class="block text-sm font-medium text-zinc-600 dark:text-zinc-400"
-              >GitHub token (optional, for private repos)</label
-            >
-            <input
-              id="settings-github-token"
-              type="password"
-              autocomplete="off"
-              bind:value={$githubToken}
-              placeholder="ghp_… (only for private repo fetch)"
-              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal"
-            />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-              Paste a GitHub URL in chat to fetch repo context. Token only
-              needed for private repos. Never sent to the model.
+            <div class="settings-label-row">
+              <label for="settings-github-token" class="settings-label"
+                >GitHub token</label
+              >
+              <span
+                class="settings-badge"
+                class:set={hasSecretValue($githubToken)}
+                >{hasSecretValue($githubToken) ? "Set" : "Not set"}</span
+              >
+            </div>
+            <div class="settings-secret-row">
+              <input
+                id="settings-github-token"
+                type={reveal.github ? "text" : "password"}
+                autocomplete="off"
+                bind:value={$githubToken}
+                placeholder="ghp_… (only for private repo fetch)"
+                class="settings-input"
+              />
+              <button
+                type="button"
+                class="settings-reveal"
+                onclick={() => (reveal.github = !reveal.github)}
+                aria-label={reveal.github ? "Hide token" : "Show token"}
+                >{reveal.github ? "Hide" : "Show"}</button
+              >
+            </div>
+            <p class="settings-hint">
+              Optional. Paste a GitHub URL in chat to fetch repo context. Token
+              only needed for private repos. Never sent to the model.
             </p>
           </div>
+
           <div>
-            <label
-              for="settings-deepinfra-key"
-              class="block text-sm font-medium text-zinc-600 dark:text-zinc-400"
-              >DeepInfra API key (image + video when DeepSeek)</label
-            >
-            <input
-              id="settings-deepinfra-key"
-              type="password"
-              autocomplete="off"
-              bind:value={$deepinfraApiKey}
-              placeholder="…"
-              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal"
-            />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-              Image/video when DeepSeek. <a
+            <div class="settings-label-row">
+              <label for="settings-deepinfra-key" class="settings-label"
+                >DeepInfra API key</label
+              >
+              <span
+                class="settings-badge"
+                class:set={hasSecretValue($deepinfraApiKey)}
+                >{hasSecretValue($deepinfraApiKey) ? "Set" : "Not set"}</span
+              >
+            </div>
+            <div class="settings-secret-row">
+              <input
+                id="settings-deepinfra-key"
+                type={reveal.deepinfra ? "text" : "password"}
+                autocomplete="off"
+                bind:value={$deepinfraApiKey}
+                placeholder="…"
+                class="settings-input"
+              />
+              <button
+                type="button"
+                class="settings-reveal"
+                onclick={() => (reveal.deepinfra = !reveal.deepinfra)}
+                aria-label={reveal.deepinfra ? "Hide key" : "Show key"}
+                >{reveal.deepinfra ? "Hide" : "Show"}</button
+              >
+            </div>
+            <p class="settings-hint">
+              Image/video when DeepSeek.
+              <a
                 href="https://deepinfra.com"
                 target="_blank"
-                rel="noopener noreferrer"
-                class="underline">deepinfra.com</a
+                rel="noopener noreferrer">deepinfra.com</a
               >
             </p>
           </div>
+
           <div>
-            <label
-              for="settings-together-key"
-              class="block text-sm font-medium text-zinc-600 dark:text-zinc-400"
-              >Together AI API key (legacy image when DeepSeek)</label
-            >
-            <input
-              id="settings-together-key"
-              type="password"
-              autocomplete="off"
-              bind:value={$togetherApiKey}
-              placeholder="…"
-              class="w-full rounded border-zinc-300 px-3 py-2 text-zinc-900 dark:text-zinc-100 text-sm font-mono placeholder:text-zinc-400 glass-modal"
-            />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-              Legacy image when DeepSeek. <a
+            <div class="settings-label-row">
+              <label for="settings-together-key" class="settings-label"
+                >Together AI API key</label
+              >
+              <span
+                class="settings-badge"
+                class:set={hasSecretValue($togetherApiKey)}
+                >{hasSecretValue($togetherApiKey) ? "Set" : "Not set"}</span
+              >
+            </div>
+            <div class="settings-secret-row">
+              <input
+                id="settings-together-key"
+                type={reveal.together ? "text" : "password"}
+                autocomplete="off"
+                bind:value={$togetherApiKey}
+                placeholder="…"
+                class="settings-input"
+              />
+              <button
+                type="button"
+                class="settings-reveal"
+                onclick={() => (reveal.together = !reveal.together)}
+                aria-label={reveal.together ? "Hide key" : "Show key"}
+                >{reveal.together ? "Hide" : "Show"}</button
+              >
+            </div>
+            <p class="settings-hint">
+              Legacy image when DeepSeek.
+              <a
                 href="https://api.together.xyz"
                 target="_blank"
-                rel="noopener noreferrer"
-                class="underline">api.together.xyz</a
+                rel="noopener noreferrer">api.together.xyz</a
               >
             </p>
           </div>
         </div>
-      </details>
-
-      <details
-        class="border border-zinc-200 dark:border-zinc-600 rounded-lg overflow-hidden group"
-      >
-        <summary
-          class="px-4 py-3 cursor-pointer list-none bg-zinc-50 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-600 text-sm font-medium text-zinc-700 dark:text-zinc-300"
-          >Performance</summary
+      {:else if $settingsSection === "performance"}
+        <div
+          id="settings-panel-performance"
+          role="tabpanel"
+          aria-labelledby="settings-tab-performance"
+          class="settings-stack"
         >
-        <div class="px-4 py-3 space-y-3">
-          <label class="flex items-center gap-2 cursor-pointer">
+          <label class="settings-check">
             <input
               type="checkbox"
               bind:checked={$performanceMode}
-              class="rounded border-zinc-300 dark:border-zinc-600 accent-themed"
+              class="accent-themed"
             />
-            <span class="text-sm text-zinc-700 dark:text-zinc-300"
-              >Performance Mode</span
-            >
+            <span>Performance Mode</span>
           </label>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400">
+          <p class="settings-hint">
             Disables expensive UI effects (blur, heavy animations) for better
             responsiveness on lower-end hardware or under heavy LLM load.
           </p>
         </div>
-      </details>
-
-      <details
-        class="border border-zinc-200 dark:border-zinc-600 rounded-lg overflow-hidden group"
-      >
-        <summary
-          class="px-4 py-3 cursor-pointer list-none bg-zinc-50 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-600 text-sm font-medium text-zinc-700 dark:text-zinc-300"
-          >Audio</summary
+      {:else if $settingsSection === "audio"}
+        <div
+          id="settings-panel-audio"
+          role="tabpanel"
+          aria-labelledby="settings-tab-audio"
+          class="settings-stack"
         >
-        <div class="px-4 py-3 space-y-3">
-          <label class="flex items-center gap-2 cursor-pointer">
+          <label class="settings-check">
             <input
               type="checkbox"
               bind:checked={audioEnabled}
-              class="rounded border-zinc-300 dark:border-zinc-600 accent-themed"
+              class="accent-themed"
             />
-            <span class="text-sm text-zinc-700 dark:text-zinc-300"
-              >Enable audio feedback</span
-            >
+            <span>Enable audio feedback</span>
           </label>
-          <label class="flex items-center gap-2 cursor-pointer">
+          <label class="settings-check">
             <input
               type="checkbox"
               bind:checked={audioClicks}
               disabled={!audioEnabled}
-              class="rounded border-zinc-300 dark:border-zinc-600 accent-themed"
+              class="accent-themed"
             />
-            <span class="text-sm text-zinc-700 dark:text-zinc-300"
-              >Click sounds</span
-            >
+            <span>Click sounds</span>
           </label>
           <div>
-            <label
-              for="settings-audio-volume"
-              class="block text-sm font-medium text-zinc-600 dark:text-zinc-400 mb-1"
+            <label for="settings-audio-volume" class="settings-label"
               >Volume</label
             >
             <input
@@ -480,69 +585,294 @@
             />
           </div>
         </div>
-      </details>
-
-      <details
-        class="border border-zinc-200 dark:border-zinc-600 rounded-lg overflow-hidden group"
-      >
-        <summary
-          class="px-4 py-3 cursor-pointer list-none bg-zinc-50 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-600 text-sm font-medium text-zinc-700 dark:text-zinc-300"
-          >Preset default models</summary
+      {:else}
+        <div
+          id="settings-panel-presets"
+          role="tabpanel"
+          aria-labelledby="settings-tab-presets"
+          class="settings-stack"
         >
-        <div class="px-4 py-3">
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+          <p class="settings-hint">
             Model to switch to when selecting a preset from the header.
           </p>
-          <div class="space-y-2">
-            {#each PRESETS as p}
-              <div class="flex flex-wrap items-center gap-2">
-                <span
-                  class="text-xs text-zinc-600 dark:text-zinc-400 min-w-[4rem]"
-                  >{p.name}:</span
-                >
-                <select
-                  class="text-xs rounded-lg border-zinc-300 text-zinc-900 dark:text-zinc-100 px-2 py-1 min-w-[140px] glass-modal"
-                  value={$presetDefaultModels[p.name] ?? ""}
-                  onchange={(e) =>
-                    setPresetDefaultModel(
-                      p.name,
-                      e.currentTarget.value || null,
-                    )}
-                  aria-label="Default model for {p.name}"
-                >
-                  <option value="">None</option>
-                  {#each $models as m}
-                    <option value={m.id}>{m.id}</option>
-                  {/each}
-                </select>
-              </div>
-            {/each}
-          </div>
+          {#each PRESETS as p (p.name)}
+            <div class="settings-preset-row">
+              <span class="settings-preset-name">{p.name}</span>
+              <select
+                class="settings-input settings-select"
+                value={$presetDefaultModels[p.name] ?? ""}
+                onchange={(e) =>
+                  setPresetDefaultModel(p.name, e.currentTarget.value || null)}
+                aria-label="Default model for {p.name}"
+              >
+                <option value="">None</option>
+                {#each $models as m (m.id)}
+                  <option value={m.id}>{m.id}</option>
+                {/each}
+              </select>
+            </div>
+          {/each}
         </div>
-      </details>
+      {/if}
     </div>
 
-    <div
-      class="shrink-0 px-6 py-4 border-t border-zinc-200 dark:border-zinc-700 flex justify-between gap-2"
-    >
-      <button
-        type="button"
-        class="px-3 py-1.5 text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
-        onclick={resetToDefaults}>Reset to defaults</button
+    <div class="settings-footer">
+      <button type="button" class="settings-btn ghost" onclick={resetToDefaults}
+        >Reset to defaults</button
       >
-      <div class="flex gap-2">
-        <button
-          type="button"
-          class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
-          onclick={() => onclose?.()}>Cancel</button
+      <div class="settings-footer-actions">
+        <button type="button" class="settings-btn ghost" onclick={close}
+          >Cancel</button
         >
         <button
           type="button"
-          class="px-4 py-2 rounded-lg text-white hover:opacity-90"
-          style="background-color: var(--ui-accent);"
-          onclick={save}>Save</button
+          class="settings-btn primary"
+          onclick={save}
+          disabled={saving}>{saving ? "Saving…" : "Save"}</button
         >
       </div>
     </div>
   </div>
 </div>
+
+<style>
+  .settings-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  .settings-scrim {
+    position: absolute;
+    inset: 0;
+    border: none;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.45);
+    cursor: pointer;
+  }
+  .settings-dialog {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 36rem;
+    max-height: 90vh;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border, var(--ui-border));
+    background: var(--glass-bg, var(--ui-bg-main));
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+    color: var(--ui-text-primary);
+  }
+  .settings-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 1.1rem 1.25rem 0.75rem;
+    border-bottom: 1px solid var(--ui-border);
+  }
+  .settings-title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+  .settings-sub {
+    margin: 0.25rem 0 0;
+    font-size: 0.75rem;
+    color: var(--ui-text-secondary);
+  }
+  .settings-icon-btn {
+    flex-shrink: 0;
+    padding: 0.35rem 0.5rem;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ui-text-secondary);
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .settings-icon-btn:hover {
+    background: color-mix(in srgb, var(--ui-border) 40%, transparent);
+    color: var(--ui-text-primary);
+  }
+  .settings-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0.6rem 1.25rem 0;
+  }
+  .settings-tab {
+    padding: 0.4rem 0.7rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ui-text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .settings-tab:hover {
+    background: color-mix(in srgb, var(--ui-accent) 10%, transparent);
+  }
+  .settings-tab.active {
+    color: var(--ui-text-primary);
+    border-color: var(--ui-border);
+    background: color-mix(in srgb, var(--ui-accent) 14%, transparent);
+  }
+  .settings-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1rem 1.25rem;
+  }
+  .settings-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+  .settings-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ui-text-secondary);
+    margin-bottom: 0.3rem;
+  }
+  .settings-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+  }
+  .settings-label-row .settings-label {
+    margin-bottom: 0;
+  }
+  .settings-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    color: var(--ui-text-secondary);
+    background: color-mix(in srgb, var(--ui-border) 50%, transparent);
+  }
+  .settings-badge.set {
+    color: var(--ui-accent);
+    background: color-mix(in srgb, var(--ui-accent) 16%, transparent);
+  }
+  .settings-input {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--ui-border);
+    background: var(--ui-input-bg, var(--ui-bg-main));
+    color: var(--ui-text-primary);
+    padding: 0.5rem 0.7rem;
+    font-size: 0.85rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .settings-input:focus {
+    outline: 2px solid var(--ui-accent);
+    outline-offset: 1px;
+  }
+  .settings-select {
+    font-family: inherit;
+    min-width: 10rem;
+  }
+  .settings-secret-row {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .settings-reveal {
+    flex-shrink: 0;
+    padding: 0 0.7rem;
+    border-radius: 8px;
+    border: 1px solid var(--ui-border);
+    background: transparent;
+    color: var(--ui-text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .settings-reveal:hover {
+    color: var(--ui-text-primary);
+  }
+  .settings-hint {
+    margin: 0.3rem 0 0;
+    font-size: 0.75rem;
+    color: var(--ui-text-secondary);
+  }
+  .settings-hint a {
+    text-decoration: underline;
+    color: inherit;
+  }
+  .settings-hint code {
+    padding: 0 0.25rem;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--ui-border) 45%, transparent);
+  }
+  .settings-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+  }
+  .settings-preset-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .settings-preset-name {
+    min-width: 4.5rem;
+    font-size: 0.8rem;
+    color: var(--ui-text-secondary);
+  }
+  .settings-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.85rem 1.25rem;
+    border-top: 1px solid var(--ui-border);
+  }
+  .settings-footer-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .settings-btn {
+    padding: 0.45rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+  .settings-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+  .settings-btn.ghost {
+    border: 1px solid var(--ui-border);
+    background: transparent;
+    color: var(--ui-text-secondary);
+  }
+  .settings-btn.ghost:hover {
+    color: var(--ui-text-primary);
+    background: color-mix(in srgb, var(--ui-border) 30%, transparent);
+  }
+  .settings-btn.primary {
+    border: none;
+    background: var(--ui-accent);
+    color: #fff;
+  }
+  .settings-btn.primary:hover:not(:disabled) {
+    opacity: 0.92;
+  }
+</style>

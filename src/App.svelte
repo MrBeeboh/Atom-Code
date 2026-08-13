@@ -8,6 +8,7 @@
     theme,
     sidebarOpen,
     settingsOpen,
+    closeSettings,
     layout,
     activeConversationId,
     conversations,
@@ -602,7 +603,7 @@
   {/if}
 
   {#if $settingsOpen}
-    <SettingsPanel onclose={() => settingsOpen.set(false)} />
+    <SettingsPanel onclose={closeSettings} />
   {/if}
 </div>
 

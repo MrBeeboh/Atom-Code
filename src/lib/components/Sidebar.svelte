@@ -3,7 +3,7 @@
 -->
 <script>
   import { onMount } from 'svelte';
-  import { activeConversationId, conversations, sidebarOpen, settingsOpen, confirm } from '$lib/stores.js';
+  import { activeConversationId, conversations, sidebarOpen, openSettings, confirm } from '$lib/stores.js';
   import { listConversations, createConversation, deleteConversation, getMessageCount } from '$lib/db.js';
   import { bulkEraseChats } from '$lib/bulkEraseChats.js';
   import { formatTime, groupByDate } from '$lib/utils.js';
@@ -71,7 +71,7 @@
     type="button"
     class="w-full min-w-0 mt-1.5 py-1.5 px-3 rounded-lg text-left text-xs transition-opacity hover:opacity-90 shrink-0 border flex items-center gap-2"
     style="color: var(--ui-text-secondary); border-color: var(--ui-border);"
-    onclick={() => { settingsOpen.set(true); sidebarOpen.set(false); }}
+    onclick={() => { openSettings(); sidebarOpen.set(false); }}
     title="LM Studio URL, Voice server, Audio, Presets">
     <span class="text-base shrink-0">⚙</span> Settings
   </button>

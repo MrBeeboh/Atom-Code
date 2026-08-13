@@ -3,6 +3,7 @@
   import { shortcutsModalOpen } from "$lib/stores.js";
 
   const SHORTCUTS = [
+    { label: "Settings", keys: "Ctrl+," },
     { label: "Command palette", keys: "Ctrl+K" },
     { label: "Command palette (alt)", keys: "/" },
     { label: "New chat", keys: "Ctrl+N" },

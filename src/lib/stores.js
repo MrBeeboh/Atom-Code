@@ -7,6 +7,8 @@
 import { writable, derived, get } from 'svelte/store';
 import { detectHardware } from '$lib/hardware.js';
 import { getRecommendedSettingsForModel } from '$lib/modelDefaults.js';
+import { resolveSettingsSection } from './settingsUi.js';
+export { SETTINGS_SECTIONS, SETTINGS_SECTION_LABELS } from './settingsUi.js';
 
 /** True if running inside a Tauri container. */
 export const isTauri = typeof window !== 'undefined' && !!window['__TAURI_INTERNALS__'];
@@ -55,6 +57,20 @@ export const sidebarOpen = writable(false);
 
 /** UI: settings panel open */
 export const settingsOpen = writable(false);
+
+/** Active settings tab: connection | apikeys | performance | audio | presets */
+export const settingsSection = writable('connection');
+
+/** Open settings, optionally jumping to a tab (e.g. 'apikeys'). */
+export function openSettings(section) {
+  if (section != null) settingsSection.set(resolveSettingsSection(section));
+  settingsOpen.set(true);
+}
+
+/** Close the settings panel. */
+export function closeSettings() {
+  settingsOpen.set(false);
+}
 
 /** LM Studio connection status: true = reachable, false = not reachable, null = unknown */
 export const lmStudioConnected = writable(null);
